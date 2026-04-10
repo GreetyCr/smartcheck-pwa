@@ -1,0 +1,26 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+/**
+ * Detecta si la app está online u offline.
+ */
+export function useOnlineStatus(): boolean {
+  // Mismo valor en SSR y primer render del cliente (evita hydration mismatch).
+  // El valor real se aplica tras montar en el cliente.
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  return online;
+}

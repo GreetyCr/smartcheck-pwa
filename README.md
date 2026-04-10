@@ -1,6 +1,6 @@
 # Smartcheck PWA
 
-PWA de inspección vehicular para **Smartcheck**, empresa costarricense de inspección pre-compra de vehículos.
+PWA de inspección vehicular para **Smartcheck** (Costa Rica). La app está centrada en que **Esteban** (dueño) pueda realizar reportes de inspección pre-compra. Smartcheck ya tiene su sitio web; esta es solo la PWA.
 
 ## Stack
 
@@ -20,40 +20,33 @@ PWA de inspección vehicular para **Smartcheck**, empresa costarricense de inspe
 ## Cómo correr el proyecto
 
 ```bash
-# Instalar dependencias
 pnpm install
-
-# Desarrollo
 pnpm dev
-
-# Build
-pnpm build
-
-# Producción
-pnpm start
-
-# Lint
-pnpm lint
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000).
+Abrir [http://localhost:3000](http://localhost:3000). Build: `pnpm build`. Producción: `pnpm start`. Lint: `pnpm lint`.
 
-## Estructura (por dominio)
+## Estructura básica
 
-- `src/app/(marketing)/` — landing y páginas públicas
-- `src/app/(auth)/` — inicio de sesión (Clerk)
-- `src/app/(app)/` — área principal (dashboard, inspecciones, etc.)
+- `app/(auth)/` — sign-in (Clerk), layout de auth
+- `app/(dashboard)/` — dashboard principal, inspecciones (lista, nueva, [id], pdf), admin
+- `app/api/uploadthing/` — API UploadThing (stub)
+- `app/~offline/` — fallback offline
+- `app/sw.ts`, `app/manifest.ts` — PWA (Serwist)
+- `components/ui/` — Shadcn
+- `components/inspection/` — ClientForm, VehicleForm, SectionCard, InspectionItem, PhotoCapture, VoiceInput, ProgressBar
+- `components/layout/` — Header, MobileNav, OfflineIndicator
+- `components/providers/` — ConvexClientProvider, ClerkProvider
+- `convex/` — schema, users, inspections, sections, images (stubs)
+- `lib/` — utils, uploadthing, offline (db, sync), pdf (generator)
+- `hooks/` — useOnlineStatus, useInspection, useSyncQueue
+- `types/` — tipos globales
 
 ## Colores corporativos (Smartcheck)
 
-- **Primary:** #1E3A5F  
-- **Accent:** #FF8C00  
-- **Success:** #28A745  
-- **Warning:** #FFB347  
-- **Danger:** #DC3545  
-- **Background:** #F8F9FA  
+- **Primary:** #1E3A5F | **Accent:** #FF8C00 | **Success:** #28A745 | **Warning:** #FFB347 | **Danger:** #DC3545 | **Background:** #F8F9FA  
 
-Definidos en `src/app/globals.css` y usables vía Tailwind (`bg-primary`, `text-accent`, `bg-success`, etc.).
+En `app/globals.css`; uso vía Tailwind: `bg-primary`, `text-accent`, `bg-success`, etc.
 
 ## Licencia
 
