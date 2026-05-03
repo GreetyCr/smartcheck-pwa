@@ -70,10 +70,13 @@ function obsOk(
   return true;
 }
 
-export function validateSectionForm(
+export type SectionValidationError = { key: string; message: string };
+
+export function validateSectionFormDetailed(
   config: SectionConfig,
   state: SectionFormState,
-): { ok: boolean; message?: string } {
+): { ok: boolean; errors: SectionValidationError[] } {
+  const errors: SectionValidationError[] = [];
   for (const item of config.items) {
     const v = state[item.key];
     switch (item.type) {
@@ -81,25 +84,14 @@ export function validateSectionForm(
         break;
       case "text":
       case "textarea":
-        if (item.type === "textarea" && config.id === "finalizacion") {
-          if (item.key === "comentario_final") {
-            const s = typeof v === "string" ? v.trim() : "";
-            if (!s) {
-              return {
-                ok: false,
-                message: "Completa el comentario final antes de continuar.",
-              };
-            }
-          }
-        }
         break;
       case "select": {
         const row = v as { value?: unknown; observation?: string } | undefined;
         if (row?.value === undefined || row?.value === null) {
-          return {
-            ok: false,
+          errors.push({
+            key: item.key,
             message: `Selecciona una opción en «${item.label}».`,
-          };
+          });
         }
         break;
       }
@@ -109,18 +101,17 @@ export function validateSectionForm(
           | { value?: string; observation?: string }
           | undefined;
         if (!row?.value) {
-          return {
-            ok: false,
+          errors.push({
+            key: item.key,
             message: `Indica una opción en «${item.label}».`,
-          };
+          });
+          break;
         }
-        if (
-          !obsOk(observationRuleFor(item), row, row.observation)
-        ) {
-          return {
-            ok: false,
+        if (!obsOk(observationRuleFor(item), row, row.observation)) {
+          errors.push({
+            key: item.key,
             message: `Completa las observaciones en «${item.label}».`,
-          };
+          });
         }
         break;
       }
@@ -130,18 +121,17 @@ export function validateSectionForm(
           | { value?: string; observation?: string }
           | undefined;
         if (!row?.value) {
-          return {
-            ok: false,
+          errors.push({
+            key: item.key,
             message: `Indica una opción en «${item.label}».`,
-          };
+          });
+          break;
         }
-        if (
-          !obsOk(observationRuleFor(item), row, row.observation)
-        ) {
-          return {
-            ok: false,
+        if (!obsOk(observationRuleFor(item), row, row.observation)) {
+          errors.push({
+            key: item.key,
             message: `Completa las observaciones en «${item.label}».`,
-          };
+          });
         }
         break;
       }
@@ -149,7 +139,16 @@ export function validateSectionForm(
         break;
     }
   }
-  return { ok: true };
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateSectionForm(
+  config: SectionConfig,
+  state: SectionFormState,
+): { ok: boolean; message?: string } {
+  const r = validateSectionFormDetailed(config, state);
+  if (r.ok) return { ok: true };
+  return { ok: false, message: r.errors[0]?.message };
 }
 
 /** Convierte documento Convex a estado de formulario (sin metadatos). */

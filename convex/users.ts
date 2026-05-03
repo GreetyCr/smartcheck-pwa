@@ -36,11 +36,14 @@ export const upsertFromClerk = internalMutation({
     }
 
     const anyUser = await ctx.db.query("users").take(1);
-    const role = anyUser.length === 0 ? "admin" : "tecnico";
+    const isFirst = anyUser.length === 0;
+    const role = isFirst ? "admin" : "tecnico";
+    const approvalStatus = isFirst ? ("approved" as const) : ("pending" as const);
 
     return await ctx.db.insert("users", {
       ...args,
       role,
+      approvalStatus,
       createdAt: now,
       updatedAt: now,
     });
@@ -89,7 +92,38 @@ export const promoteToAdmin = mutation({
   handler: async (ctx, { userId }) => {
     await requireAdmin(ctx);
     const now = Date.now();
-    await ctx.db.patch(userId, { role: "admin", updatedAt: now });
+    await ctx.db.patch(userId, {
+      role: "admin",
+      approvalStatus: "approved",
+      updatedAt: now,
+    });
+  },
+});
+
+/** Aprueba el acceso de un técnico pendiente (tras alta por sign-up). */
+export const approveTechnician = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    await requireAdmin(ctx);
+    const target = await ctx.db.get(userId);
+    if (!target) throw new Error("Usuario no encontrado");
+    const now = Date.now();
+    await ctx.db.patch(userId, {
+      approvalStatus: "approved",
+      updatedAt: now,
+    });
+  },
+});
+
+/** Cantidad de cuentas esperando aprobación (solo admin). */
+export const pendingApprovalCount = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db.query("users").collect();
+    return rows.filter(
+      (u) => u.role !== "admin" && u.approvalStatus === "pending",
+    ).length;
   },
 });
 

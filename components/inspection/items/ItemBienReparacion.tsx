@@ -4,7 +4,6 @@ import { Ban, CheckCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ItemObservation } from "@/components/inspection/items/ItemObservation";
 import { ItemPhotos, type PhotoEntry } from "@/components/inspection/items/ItemPhotos";
-import type { Id } from "@/convex/_generated/dataModel";
 import type { SectionItem } from "@/lib/constants/sectionItems";
 import {
   derivePhotoUi,
@@ -32,7 +31,7 @@ type ItemBienReparacionProps = {
   photoEntries: PhotoEntry[] | undefined;
   disabled?: boolean;
   onPickPhotos: (files: File[]) => void | Promise<void>;
-  onRemovePhoto: (storageId: Id<"_storage">) => void;
+  onRemovePhoto: (ref: string) => void;
 };
 
 export function ItemBienReparacion({
@@ -48,7 +47,7 @@ export function ItemBienReparacion({
 }: ItemBienReparacionProps) {
   const okText =
     okButtonLabelFor(item) === "bien" ? "Bien" : "Está bien";
-  const showObs = Boolean(item.showObservation);
+  const showObs = item.showObservation !== false;
   const { allowPhotos, photoKind, photoLabel } = derivePhotoUi(item);
 
   const setVal = (v: "bien" | "reparacion" | "na") => {
@@ -116,7 +115,7 @@ export function ItemBienReparacion({
           >
             <AlertTriangle className="mb-0.5 size-4" />
             <span className="text-[11px] font-bold uppercase leading-tight">
-              Reparar
+              Atención
             </span>
           </button>
           {variant === "bien_reparacion_na" ? (

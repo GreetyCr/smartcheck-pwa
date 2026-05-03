@@ -47,7 +47,9 @@ export function SectionItem({
       className={cn(
         "flex items-center gap-3 rounded-2xl border-2 bg-card p-3 shadow-sm transition-colors active:bg-muted/40",
         isActive && "border-primary bg-primary/[0.08]",
-        !isActive && "border-transparent",
+        status === "pendiente" &&
+          "border-amber-500/65 bg-amber-50/45 dark:border-amber-600/55 dark:bg-amber-950/35",
+        status === "completado" && "border-transparent",
       )}
     >
       <div className={iconWrap}>

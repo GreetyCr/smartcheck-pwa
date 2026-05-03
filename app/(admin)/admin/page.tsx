@@ -139,6 +139,9 @@ export default function AdminDashboardPage() {
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-900">
             Sincronizado: {metrics.byStatus.synced}
           </span>
+          <span className="rounded-full bg-teal-100 px-3 py-1 text-teal-900">
+            Informe entregado: {metrics.byStatus.report_delivered}
+          </span>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Total en sistema:{" "}

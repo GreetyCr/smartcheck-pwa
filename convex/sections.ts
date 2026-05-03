@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, type QueryCtx, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { canAccessInspection, requireAuth } from "./lib/auth";
+import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
+import { canAccessInspection, requireUser } from "./lib/auth";
 
 /** Orden del flujo (catálogo Módulo 2.2) — índice `by_inspection` en cada tabla. */
 export const SECTION_TABLE_ORDER = [
@@ -27,27 +28,13 @@ export const SECTION_TABLE_ORDER = [
 
 export type SectionTable = (typeof SECTION_TABLE_ORDER)[number];
 
-/** Campos requeridos para considerar la sección completa (excl. photos, inspectionId, itemPhotos). */
-const SECTION_ITEM_TOTALS: Record<SectionTable, number> = {
-  section_motor: 11,
-  section_transmision: 9,
-  section_electrico: 5,
-  section_frenos: 6,
-  section_suspension: 4,
-  section_direccion: 3,
-  section_escape: 3,
-  section_neumaticos: 3,
-  section_combustible: 2,
-  section_electronica: 5,
-  section_iluminacion: 6,
-  section_accesorios: 21,
-  section_ac_calefaccion: 4,
-  section_seguridad: 6,
-  section_carroceria: 10,
-  section_conduccion: 7,
-  section_traccion: 4,
-  section_finalizacion: 3,
-};
+/** Ítems del catálogo por tabla — una sola fuente de verdad con `SECTIONS_CONFIG`. */
+const SECTION_ITEM_TOTALS: Record<SectionTable, number> = Object.fromEntries(
+  SECTION_TABLE_ORDER.map((table) => {
+    const cfg = SECTIONS_CONFIG.find((s) => s.table === table);
+    return [table, cfg?.items.length ?? 0];
+  }),
+) as Record<SectionTable, number>;
 
 function isItemFieldKey(key: string): boolean {
   return (
@@ -217,7 +204,7 @@ export const listSectionSummaries = query({
 export const ensureSectionRows = mutation({
   args: { inspectionId: v.id("inspections") },
   handler: async (ctx, { inspectionId }) => {
-    await requireAuth(ctx);
+    await requireUser(ctx);
     const allowed = await canAccessInspection(ctx, inspectionId);
     if (!allowed) throw new Error("No autorizado");
 
@@ -233,9 +220,17 @@ export const ensureSectionRows = mutation({
 export const touchDraft = mutation({
   args: { inspectionId: v.id("inspections") },
   handler: async (ctx, { inspectionId }) => {
-    await requireAuth(ctx);
+    await requireUser(ctx);
     const allowed = await canAccessInspection(ctx, inspectionId);
     if (!allowed) throw new Error("No autorizado");
+    const doc = await ctx.db.get(inspectionId);
+    if (!doc) throw new Error("No encontrado");
+    if (
+      doc.reportDeliveredAt != null ||
+      doc.status === "report_delivered"
+    ) {
+      return;
+    }
     await ctx.db.patch(inspectionId, { status: "draft" });
   },
 });
@@ -243,7 +238,7 @@ export const touchDraft = mutation({
 export const discardInspection = mutation({
   args: { inspectionId: v.id("inspections") },
   handler: async (ctx, { inspectionId }) => {
-    await requireAuth(ctx);
+    await requireUser(ctx);
     const allowed = await canAccessInspection(ctx, inspectionId);
     if (!allowed) throw new Error("No autorizado");
     await deleteAllSectionsForInspection(ctx, inspectionId);
@@ -274,7 +269,7 @@ export const upsertSection = mutation({
     data: v.any(),
   },
   handler: async (ctx, { inspectionId, sectionTable, data }) => {
-    await requireAuth(ctx);
+    await requireUser(ctx);
     if (!(await canAccessInspection(ctx, inspectionId))) {
       throw new Error("No autorizado");
     }
@@ -309,20 +304,25 @@ export const getSectionItemPhotoEntries = query({
     if (!doc) return {};
     const raw = doc as unknown as Record<string, unknown>;
     const itemPhotos = raw.itemPhotos as
-      | Record<string, Id<"_storage">[]>
+      | Record<string, (Id<"_storage"> | string)[]>
       | undefined;
     if (!itemPhotos) return {};
     const out: Record<
       string,
-      { storageId: Id<"_storage">; url: string | null }[]
+      { ref: string; url: string | null }[]
     > = {};
-    for (const [key, ids] of Object.entries(itemPhotos)) {
+    for (const [key, refs] of Object.entries(itemPhotos)) {
       out[key] = [];
-      for (const sid of ids) {
-        out[key].push({
-          storageId: sid,
-          url: await ctx.storage.getUrl(sid),
-        });
+      for (const ref of refs) {
+        if (typeof ref === "string" && /^https?:\/\//i.test(ref)) {
+          out[key].push({ ref, url: ref });
+        } else {
+          const sid = ref as Id<"_storage">;
+          out[key].push({
+            ref: sid,
+            url: await ctx.storage.getUrl(sid),
+          });
+        }
       }
     }
     return out;

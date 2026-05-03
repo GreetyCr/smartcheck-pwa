@@ -13,6 +13,11 @@ const engine: Record<string, string> = {
 };
 
 const country: Record<string, string> = {
+  usa: "USA",
+  nacional: "Nacional",
+  panama: "Panamá",
+  korea: "Korea",
+  otros: "Otros",
   estados_unidos: "Estados Unidos",
   corea: "Corea",
   japon: "Japón",
@@ -34,4 +39,11 @@ export function labelEngine(v: string | undefined): string {
 export function labelCountry(v: string | undefined): string {
   if (!v) return "—";
   return country[v] ?? v;
+}
+
+export function labelSellerType(v: string | undefined): string {
+  if (!v) return "—";
+  if (v === "concesionaria") return "Concesionaria";
+  if (v === "particular") return "Particular";
+  return v;
 }

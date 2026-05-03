@@ -1,18 +1,13 @@
-/**
- * UploadThing API route.
- * Conectar con createRouteHandler cuando se integre UploadThing.
- */
-// import { createRouteHandler } from "uploadthing/next";
-// import { ourFileRouter } from "./core";
+import { createRouteHandler } from "uploadthing/next";
 
-export async function GET() {
-  return new Response("UploadThing route (pendiente de integrar)", {
-    status: 501,
-  });
-}
+import { ourFileRouter } from "./core";
 
-export async function POST() {
-  return new Response("UploadThing route (pendiente de integrar)", {
-    status: 501,
-  });
-}
+export const { GET, POST } = createRouteHandler({
+  router: ourFileRouter,
+  config: {
+    token: process.env.UPLOADTHING_TOKEN,
+    ...(process.env.NODE_ENV === "development"
+      ? { logLevel: "Debug" as const }
+      : {}),
+  },
+});

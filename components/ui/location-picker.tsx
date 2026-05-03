@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { MapPin, Loader2 } from "lucide-react";
+import { formControlValue } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import { useGeolocation } from "@/hooks/useGeolocation";
 
@@ -109,7 +110,7 @@ export function LocationPicker({
           value={value}
           onChange={(e) => {
             onCoordsChange?.(undefined);
-            onChange(e.target.value);
+            onChange(formControlValue(e));
           }}
           className="w-full resize-y rounded-2xl border border-border bg-card px-4 py-3 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
         />

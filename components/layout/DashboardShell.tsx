@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { ApprovalGate } from "@/components/layout/ApprovalGate";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -15,7 +16,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const chromeHidden = wizardMode || inspectionFlowMode;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#F8F9FA]">
+    <ApprovalGate>
+      <div className="flex min-h-dvh flex-col bg-[#F8F9FA]">
       <StatusBar />
       {!chromeHidden && <Header />}
       <main
@@ -30,5 +32,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </main>
       {!chromeHidden && <BottomNav />}
     </div>
+    </ApprovalGate>
   );
 }

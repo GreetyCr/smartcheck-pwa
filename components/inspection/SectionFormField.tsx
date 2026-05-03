@@ -1,6 +1,7 @@
 "use client";
 
-import type { Id } from "@/convex/_generated/dataModel";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import type {
   SectionItem,
   ReadonlyUserContext,
@@ -17,11 +18,13 @@ type SectionFormFieldProps = {
   item: SectionItem;
   value: unknown;
   photoEntries: PhotoEntry[] | undefined;
+  /** Resaltar ítem con validación pendiente al intentar continuar. */
+  fieldInvalid?: boolean;
   readonlyContext: ReadonlyUserContext;
   disabled?: boolean;
   onChange: (key: string, next: unknown) => void;
   onPickPhotos: (itemKey: string, files: File[]) => void | Promise<void>;
-  onRemovePhoto: (itemKey: string, storageId: Id<"_storage">) => void;
+  onRemovePhoto: (itemKey: string, ref: string) => void;
 };
 
 function resolveReadonlyDisplay(
@@ -56,15 +59,29 @@ export function SectionFormField({
   item,
   value,
   photoEntries,
+  fieldInvalid,
   readonlyContext,
   disabled,
   onChange,
   onPickPhotos,
   onRemovePhoto,
 }: SectionFormFieldProps) {
+  const wrap = (node: ReactNode) => (
+    <div
+      id={`section-field-${item.key}`}
+      className={cn(
+        "scroll-mt-28 transition-shadow",
+        fieldInvalid &&
+          "rounded-xl ring-2 ring-amber-500 ring-offset-2 ring-offset-background",
+      )}
+    >
+      {node}
+    </div>
+  );
+
   switch (item.type) {
     case "bien_reparacion":
-      return (
+      return wrap(
         <ItemBienReparacion
           index={index}
           item={item}
@@ -74,11 +91,11 @@ export function SectionFormField({
           photoEntries={photoEntries}
           disabled={disabled}
           onPickPhotos={(files) => void onPickPhotos(item.key, files)}
-          onRemovePhoto={(sid) => onRemovePhoto(item.key, sid)}
-        />
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "bien_reparacion_na":
-      return (
+      return wrap(
         <ItemBienReparacion
           index={index}
           item={item}
@@ -88,11 +105,11 @@ export function SectionFormField({
           photoEntries={photoEntries}
           disabled={disabled}
           onPickPhotos={(files) => void onPickPhotos(item.key, files)}
-          onRemovePhoto={(sid) => onRemovePhoto(item.key, sid)}
-        />
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "si_no":
-      return (
+      return wrap(
         <ItemSiNo
           index={index}
           item={item}
@@ -102,11 +119,11 @@ export function SectionFormField({
           photoEntries={photoEntries}
           disabled={disabled}
           onPickPhotos={(files) => void onPickPhotos(item.key, files)}
-          onRemovePhoto={(sid) => onRemovePhoto(item.key, sid)}
-        />
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "si_no_na":
-      return (
+      return wrap(
         <ItemSiNo
           index={index}
           item={item}
@@ -116,43 +133,52 @@ export function SectionFormField({
           photoEntries={photoEntries}
           disabled={disabled}
           onPickPhotos={(files) => void onPickPhotos(item.key, files)}
-          onRemovePhoto={(sid) => onRemovePhoto(item.key, sid)}
-        />
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "select":
-      return (
+      return wrap(
         <ItemSelect
           index={index}
           item={item}
           value={value as never}
           onChange={(next) => onChange(item.key, next)}
           disabled={disabled}
-        />
+          photoEntries={photoEntries}
+          onPickPhotos={(files) => void onPickPhotos(item.key, files)}
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "text":
-      return (
+      return wrap(
         <ItemText
           index={index}
           item={item}
           value={typeof value === "string" ? value : ""}
           onChange={(v) => onChange(item.key, v)}
           disabled={disabled}
-        />
+          photoEntries={photoEntries}
+          onPickPhotos={(files) => void onPickPhotos(item.key, files)}
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "textarea":
-      return (
+      return wrap(
         <ItemTextarea
           index={index}
           item={item}
           value={typeof value === "string" ? value : ""}
           onChange={(v) => onChange(item.key, v)}
           disabled={disabled}
-        />
+          photoEntries={photoEntries}
+          onPickPhotos={(files) => void onPickPhotos(item.key, files)}
+          onRemovePhoto={(ref) => onRemovePhoto(item.key, ref)}
+        />,
       );
     case "readonly": {
       const text = resolveReadonlyDisplay(item, value, readonlyContext);
-      return (
-        <ItemReadonly index={index} item={item} displayValue={text} />
+      return wrap(
+        <ItemReadonly index={index} item={item} displayValue={text} />,
       );
     }
     default:

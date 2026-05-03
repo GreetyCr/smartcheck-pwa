@@ -9,24 +9,41 @@ export type PhotoUiKind =
 export type ObservationRule = "optional" | "when_reparacion" | "when_si";
 
 export function observationRuleFor(item: SectionItem): ObservationRule {
-  if (!item.showObservation) return "optional";
-  if (
-    item.type === "bien_reparacion" ||
-    item.type === "bien_reparacion_na"
-  ) {
-    return "when_reparacion";
-  }
-  if (item.type === "si_no" || item.type === "si_no_na") {
-    return "when_si";
-  }
+  void item;
   return "optional";
 }
+
+const PHOTO_CAPABLE: ReadonlySet<SectionItem["type"]> = new Set([
+  "bien_reparacion",
+  "bien_reparacion_na",
+  "si_no",
+  "si_no_na",
+  "select",
+  "text",
+  "textarea",
+]);
 
 export function derivePhotoUi(item: SectionItem): {
   allowPhotos: boolean;
   photoKind: PhotoUiKind;
   photoLabel: string;
 } {
+  if (item.type === "readonly") {
+    return { allowPhotos: false, photoKind: "none", photoLabel: "" };
+  }
+  if (item.showPhotos === false) {
+    return { allowPhotos: false, photoKind: "none", photoLabel: "" };
+  }
+  const defaultOptional =
+    item.showPhotos !== true &&
+    PHOTO_CAPABLE.has(item.type);
+  if (defaultOptional) {
+    return {
+      allowPhotos: true,
+      photoKind: "multiple_dashed",
+      photoLabel: "Fotos (opcional)",
+    };
+  }
   if (!item.showPhotos) {
     return { allowPhotos: false, photoKind: "none", photoLabel: "" };
   }

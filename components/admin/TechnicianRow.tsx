@@ -31,15 +31,18 @@ export function TechnicianRow({
   const [busy, setBusy] = useState(false);
   const promote = useMutation(api.users.promoteToAdmin);
   const demote = useMutation(api.users.demoteToTechnician);
+  const approve = useMutation(api.users.approveTechnician);
 
   const isAdmin = user.role === "admin";
+  const isPendingApproval =
+    user.role !== "admin" && user.approvalStatus === "pending";
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
       await fn();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error");
+      console.error(e);
     } finally {
       setBusy(false);
     }
@@ -71,16 +74,23 @@ export function TechnicianRow({
         </div>
       </td>
       <td className="px-3 py-3">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-xs font-semibold",
-            isAdmin
-              ? "bg-[#1E3A5F]/10 text-[#1E3A5F]"
-              : "bg-muted text-muted-foreground",
-          )}
-        >
-          {isAdmin ? "Administrador" : "Técnico"}
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-xs font-semibold",
+              isAdmin
+                ? "bg-[#1E3A5F]/10 text-[#1E3A5F]"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {isAdmin ? "Administrador" : "Técnico"}
+          </span>
+          {isPendingApproval ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
+              Pendiente de aprobación
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="px-3 py-3 tabular-nums text-muted-foreground">
         {inspectionCount}
@@ -90,6 +100,21 @@ export function TechnicianRow({
       </td>
       <td className="px-3 py-3 text-right">
         <div className="flex flex-wrap justify-end gap-2">
+          {isPendingApproval ? (
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-lg bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-600/90"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await approve({ userId: user._id });
+                })
+              }
+            >
+              Aprobar acceso
+            </Button>
+          ) : null}
           {isAdmin ? (
             <Button
               type="button"

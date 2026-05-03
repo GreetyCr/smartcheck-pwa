@@ -3,7 +3,6 @@
 import { cn } from "@/lib/utils";
 import { ItemObservation } from "@/components/inspection/items/ItemObservation";
 import { ItemPhotos, type PhotoEntry } from "@/components/inspection/items/ItemPhotos";
-import type { Id } from "@/convex/_generated/dataModel";
 import type { SectionItem } from "@/lib/constants/sectionItems";
 import { derivePhotoUi, type PhotoUiKind } from "@/lib/section-form-ui";
 
@@ -26,7 +25,7 @@ type ItemSiNoProps = {
   photoEntries: PhotoEntry[] | undefined;
   disabled?: boolean;
   onPickPhotos: (files: File[]) => void | Promise<void>;
-  onRemovePhoto: (storageId: Id<"_storage">) => void;
+  onRemovePhoto: (ref: string) => void;
 };
 
 export function ItemSiNo({
@@ -50,7 +49,7 @@ export function ItemSiNo({
 
   const multiline = Boolean(item.observationMultiline);
   const { allowPhotos, photoKind, photoLabel } = derivePhotoUi(item);
-  const showObs = Boolean(item.showObservation);
+  const showObs = item.showObservation !== false;
 
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">

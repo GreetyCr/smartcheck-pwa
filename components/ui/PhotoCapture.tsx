@@ -1,8 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Camera, Car, ImagePlus } from "lucide-react";
+import { isImageLikeFile } from "@/lib/images/isImageLikeFile";
 import { cn } from "@/lib/utils";
+
+function clickFileInput(ref: RefObject<HTMLInputElement | null>) {
+  const el = ref.current as unknown as { click: () => void } | null;
+  el?.click();
+}
 
 type PhotoCaptureProps = {
   file: File | null;
@@ -37,9 +50,13 @@ export function PhotoCapture({
 
   const onPick = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0] ?? null;
-      e.target.value = "";
-      if (f && f.type.startsWith("image/")) onFileChange(f);
+      const input = e.currentTarget as unknown as {
+        files: FileList | null;
+        value: string;
+      };
+      const f = input.files?.length ? input.files[0]! : null;
+      input.value = "";
+      if (f && isImageLikeFile(f)) onFileChange(f);
       setMenuOpen(false);
     },
     [onFileChange],
@@ -98,7 +115,7 @@ export function PhotoCapture({
               role="menuitem"
               className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-muted"
               onClick={() => {
-                cameraRef.current?.click();
+                clickFileInput(cameraRef);
                 setMenuOpen(false);
               }}
             >
@@ -110,7 +127,7 @@ export function PhotoCapture({
               role="menuitem"
               className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-muted"
               onClick={() => {
-                galleryRef.current?.click();
+                clickFileInput(galleryRef);
                 setMenuOpen(false);
               }}
             >

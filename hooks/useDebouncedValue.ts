@@ -6,8 +6,8 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(t);
+    const t = globalThis.setTimeout(() => setDebounced(value), delayMs);
+    return () => globalThis.clearTimeout(t);
   }, [value, delayMs]);
 
   return debounced;

@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { canAccessInspection, requireAuth } from "./lib/auth";
+import {
+  canAccessInspection,
+  requireAdmin,
+  requireUser,
+} from "./lib/auth";
 import { SECTION_TABLE_ORDER } from "./sections";
 
 const inspectionStatus = v.union(
@@ -9,12 +13,26 @@ const inspectionStatus = v.union(
   v.literal("completed"),
   v.literal("pending_sync"),
   v.literal("synced"),
+  v.literal("report_delivered"),
+);
+
+const countryOfOriginUnion = v.union(
+  v.literal("usa"),
+  v.literal("nacional"),
+  v.literal("panama"),
+  v.literal("korea"),
+  v.literal("otros"),
 );
 
 const patchFields = v.object({
   clientName: v.optional(v.string()),
   clientPhone: v.optional(v.string()),
+  clientEmail: v.optional(v.string()),
   location: v.optional(v.string()),
+  sellerType: v.optional(
+    v.union(v.literal("concesionaria"), v.literal("particular")),
+  ),
+  sellerNote: v.optional(v.string()),
   inspectionFee: v.optional(v.number()),
   outOfGamFee: v.optional(v.number()),
   captureSource: v.optional(
@@ -46,31 +64,48 @@ const patchFields = v.object({
     ),
   ),
   engineSpec: v.optional(v.string()),
-  countryOfOrigin: v.optional(
-    v.union(
-      v.literal("estados_unidos"),
-      v.literal("corea"),
-      v.literal("japon"),
-      v.literal("alemania"),
-      v.literal("mexico"),
-      v.literal("otro"),
-    ),
-  ),
+  countryOfOrigin: v.optional(countryOfOriginUnion),
   identifierType: v.optional(v.union(v.literal("vin"), v.literal("placa"))),
   identifier: v.optional(v.string()),
+  plateNumber: v.optional(v.string()),
   vin: v.optional(v.string()),
   mileage: v.optional(v.number()),
   mileageUnit: v.optional(v.union(v.literal("km"), v.literal("millas"))),
   vehiclePhoto: v.optional(v.id("_storage")),
+  vehiclePhotoFront: v.optional(v.id("_storage")),
+  vehiclePhotoSideLeft: v.optional(v.id("_storage")),
+  vehiclePhotoSideRight: v.optional(v.id("_storage")),
+  vehiclePhotoRear: v.optional(v.id("_storage")),
   circulationCard: v.optional(v.id("_storage")),
+  photoDekra: v.optional(v.id("_storage")),
+  photoPlate: v.optional(v.id("_storage")),
+  platePhotoNote: v.optional(v.string()),
+  photoMarchamo: v.optional(v.id("_storage")),
+  photoVinSticker: v.optional(v.id("_storage")),
   status: v.optional(inspectionStatus),
   findingsCount: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
+  reportDeliveredAt: v.optional(v.number()),
+  biCommission: v.optional(v.union(v.literal("si"), v.literal("no"))),
+  biVehicleCondition: v.optional(
+    v.union(v.literal(1), v.literal(2), v.literal(3)),
+  ),
 });
 
 function normalizeStatus(
-  s: "draft" | "completed" | "pending_sync" | "synced" | undefined,
-): "draft" | "completed" | "pending_sync" | "synced" {
+  s:
+    | "draft"
+    | "completed"
+    | "pending_sync"
+    | "synced"
+    | "report_delivered"
+    | undefined,
+):
+  | "draft"
+  | "completed"
+  | "pending_sync"
+  | "synced"
+  | "report_delivered" {
   return s ?? "draft";
 }
 
@@ -91,6 +126,10 @@ async function inspectionsForCurrentUser(ctx: {
     return { rows, isAdmin: true };
   }
 
+  if (user?.approvalStatus === "pending") {
+    return { rows: [], isAdmin: false };
+  }
+
   const rows = await ctx.db
     .query("inspections")
     .withIndex("by_clerk_user", (q) => q.eq("clerkUserId", identity.subject))
@@ -104,9 +143,9 @@ async function inspectionsForCurrentUser(ctx: {
 export const createDraft = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await requireAuth(ctx);
+    const user = await requireUser(ctx);
     return await ctx.db.insert("inspections", {
-      clerkUserId: identity.subject,
+      clerkUserId: user.clerkId,
       status: "draft",
       findingsCount: 0,
     });
@@ -117,7 +156,7 @@ export const createDraft = mutation({
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requireUser(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -165,9 +204,13 @@ export const listByClerkUser = query({
 
     let filtered = rows;
     if (args.status !== undefined) {
-      filtered = rows.filter(
-        (r) => normalizeStatus(r.status) === args.status,
-      );
+      filtered = rows.filter((r) => {
+        const s = normalizeStatus(r.status);
+        if (args.status === "synced") {
+          return s === "synced" || s === "report_delivered";
+        }
+        return s === args.status;
+      });
     }
 
     return filtered.slice(0, limit);
@@ -261,6 +304,20 @@ export const getVehicleHistory = query({
   },
 });
 
+/** Admin: marca el informe PDF como entregado al cliente. */
+export const markReportDelivered = mutation({
+  args: { inspectionId: v.id("inspections") },
+  handler: async (ctx, { inspectionId }) => {
+    await requireAdmin(ctx);
+    const doc = await ctx.db.get(inspectionId);
+    if (!doc) throw new Error("Inspección no encontrada");
+    await ctx.db.patch(inspectionId, {
+      status: "report_delivered",
+      reportDeliveredAt: Date.now(),
+    });
+  },
+});
+
 /** Marca inspección como sincronizada (p. ej. tras subir a la nube). */
 export const markSynced = mutation({
   args: { id: v.id("inspections") },
@@ -309,15 +366,18 @@ export const duplicateInspection = mutation({
     if (!allowed) throw new Error("No autorizado");
     const src = await ctx.db.get(sourceId);
     if (!src) throw new Error("No encontrado");
-    const identity = await requireAuth(ctx);
+    const user = await requireUser(ctx);
 
     return await ctx.db.insert("inspections", {
-      clerkUserId: identity.subject,
+      clerkUserId: user.clerkId,
       status: "draft",
       findingsCount: 0,
       clientName: src.clientName,
       clientPhone: src.clientPhone,
+      clientEmail: src.clientEmail,
       location: src.location,
+      sellerType: src.sellerType,
+      sellerNote: src.sellerNote,
       inspectionFee: src.inspectionFee,
       outOfGamFee: src.outOfGamFee,
       captureSource: src.captureSource,
@@ -330,6 +390,7 @@ export const duplicateInspection = mutation({
       countryOfOrigin: src.countryOfOrigin,
       identifierType: src.identifierType,
       identifier: src.identifier,
+      plateNumber: src.plateNumber,
       vin: src.vin,
       mileage: src.mileage,
       mileageUnit: src.mileageUnit,

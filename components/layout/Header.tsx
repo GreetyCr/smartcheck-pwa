@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
@@ -7,7 +8,6 @@ import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
 type HeaderProps = {
-  /** Notificaciones no leídas (placeholder hasta integrar notificaciones reales) */
   unreadNotifications?: number;
 };
 
@@ -33,9 +33,13 @@ function buildGreeting(
   return `${firstName} ${lastWord[0]!.toUpperCase()}.`;
 }
 
-export function Header({ unreadNotifications = 1 }: HeaderProps) {
+export function Header({ unreadNotifications }: HeaderProps) {
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
-  const convexUser = useQuery(api.users.getMe);
+  const convexUser = useQuery(api.users.getMe, {});
+  const pendingApprovals = useQuery(
+    api.users.pendingApprovalCount,
+    convexUser?.role === "admin" ? {} : "skip",
+  );
 
   const greeting = buildGreeting(
     convexUser?.name,
@@ -47,7 +51,12 @@ export function Header({ unreadNotifications = 1 }: HeaderProps) {
   const imageUrl =
     convexUser?.imageUrl || clerkUser?.imageUrl || null;
 
-  const showBadge = unreadNotifications > 0;
+  const adminPending =
+    convexUser?.role === "admin" && (pendingApprovals ?? 0) > 0;
+  const showPlaceholderDot =
+    !adminPending &&
+    unreadNotifications !== undefined &&
+    unreadNotifications > 0;
 
   if (!clerkLoaded) {
     return (
@@ -91,16 +100,29 @@ export function Header({ unreadNotifications = 1 }: HeaderProps) {
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        className="relative shrink-0 rounded-full p-2 text-primary transition-colors hover:bg-muted"
-        aria-label="Notificaciones"
-      >
-        <Bell className="size-6" strokeWidth={2} />
-        {showBadge && (
-          <span className="absolute right-1 top-1 size-2 rounded-full bg-[#DC3545] ring-2 ring-card" />
-        )}
-      </button>
+      {adminPending ? (
+        <Link
+          href="/admin/tecnicos"
+          className="relative shrink-0 rounded-full p-2 text-primary transition-colors hover:bg-muted"
+          aria-label={`${pendingApprovals ?? 0} solicitudes de nuevos usuarios`}
+        >
+          <Bell className="size-6" strokeWidth={2} />
+          <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-[#DC3545] text-[10px] font-bold text-white ring-2 ring-card">
+            {(pendingApprovals ?? 0) > 9 ? "9+" : pendingApprovals}
+          </span>
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="relative shrink-0 rounded-full p-2 text-primary transition-colors hover:bg-muted"
+          aria-label="Notificaciones"
+        >
+          <Bell className="size-6" strokeWidth={2} />
+          {showPlaceholderDot ? (
+            <span className="absolute right-1 top-1 size-2 rounded-full bg-[#DC3545] ring-2 ring-card" />
+          ) : null}
+        </button>
+      )}
     </header>
   );
 }

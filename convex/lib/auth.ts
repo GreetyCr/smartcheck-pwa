@@ -34,6 +34,11 @@ export async function requireUser(ctx: Ctx): Promise<Doc<"users">> {
       "Usuario no sincronizado. Espera unos segundos o vuelve a iniciar sesión.",
     );
   }
+  if (user.role !== "admin" && user.approvalStatus === "pending") {
+    throw new Error(
+      "Tu cuenta está pendiente de aprobación por un administrador.",
+    );
+  }
   return user;
 }
 
@@ -59,6 +64,7 @@ export async function canAccessInspection(
   if (!identity) return false;
   const user = await getCurrentUser(ctx);
   if (user?.role === "admin") return true;
+  if (user?.approvalStatus === "pending") return false;
   return inspection.clerkUserId === identity.subject;
 }
 

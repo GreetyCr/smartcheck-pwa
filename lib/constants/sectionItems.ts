@@ -37,6 +37,10 @@ export interface SectionItem {
   placeholder?: string;
   /** Solo `readonly`: ver `ReadonlySource`. */
   readonlySource?: ReadonlySource;
+  /**
+   * PDF / hallazgos: en Sí/No, «No» indica ausencia del defecto (ej. sin herrumbre = bueno).
+   */
+  positiveWhenNo?: boolean;
 }
 
 export interface SectionConfig {
@@ -77,6 +81,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "contaminacion_interna",
         label: "Contaminación interna",
         type: "si_no",
+        positiveWhenNo: true,
         showObservation: true,
         showPhotos: true,
         observationPlaceholder: "Especifique contaminación...",
@@ -93,6 +98,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fuga_aceite",
         label: "Fuga de aceite",
         type: "si_no",
+        positiveWhenNo: true,
         showPhotos: true,
         photoLabel: "Subir múltiples fotos",
       },
@@ -113,6 +119,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fugas_coolant",
         label: "Fugas de coolant",
         type: "si_no",
+        positiveWhenNo: true,
         showObservation: true,
         showPhotos: true,
         observationPlaceholder: "Ubicación de la fuga...",
@@ -137,8 +144,15 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "presencia_humo",
         label: "Presencia de humo",
         type: "si_no",
+        positiveWhenNo: true,
         showObservation: true,
         observationPlaceholder: "Color del humo y frecuencia...",
+      },
+      {
+        key: "presencia_herrumbre_motor",
+        label: "¿Presencia de herrumbre?",
+        type: "si_no_na",
+        positiveWhenNo: true,
       },
     ],
   },
@@ -157,6 +171,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fugas_aceite",
         label: "Fugas de aceite",
         type: "si_no",
+        positiveWhenNo: true,
         showPhotos: true,
       },
       {
@@ -174,6 +189,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fugas_liquido_embrague",
         label: "Fugas de líquido de embrague",
         type: "si_no_na",
+        positiveWhenNo: true,
       },
       {
         key: "funcionamiento_embrague",
@@ -261,8 +277,8 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
       },
       {
         key: "ajuste_freno_emergencia",
-        label: "Ajuste de freno de emergencia",
-        type: "bien_reparacion",
+        label: "Freno de estacionamiento",
+        type: "bien_reparacion_na",
       },
     ],
   },
@@ -276,6 +292,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fuga_liquido_compensadores",
         label: "Fuga de líquido de compensadores",
         type: "si_no",
+        positiveWhenNo: true,
         showPhotos: true,
       },
       {
@@ -307,6 +324,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "fugas_liquido",
         label: "Fugas de líquido",
         type: "si_no_na",
+        positiveWhenNo: true,
         showPhotos: true,
       },
       {
@@ -330,8 +348,8 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
     items: [
       {
         key: "estado_tubo_escape",
-        label: "Estado de tubo de escape",
-        type: "bien_reparacion",
+        label: "Estado",
+        type: "bien_reparacion_na",
         showPhotos: true,
       },
       { key: "catalizador", label: "Catalizador", type: "si_no" },
@@ -506,7 +524,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
       },
       {
         key: "accionamiento_sistema",
-        label: "Accionamiento del sistema",
+        label: "Activación del sistema",
         type: "si_no",
       },
       {
@@ -573,6 +591,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "presencia_masilla",
         label: "Presencia de masilla",
         type: "si_no",
+        positiveWhenNo: true,
         showPhotos: true,
         showObservation: true,
       },
@@ -587,6 +606,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "herrumbre",
         label: "Herrumbre",
         type: "si_no",
+        positiveWhenNo: true,
         showPhotos: true,
         showObservation: true,
       },
@@ -702,9 +722,10 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
       },
       {
         key: "comentario_final",
-        label: "Comentario final",
+        label: "Información importante (opcional)",
         type: "textarea",
-        placeholder: "Observaciones generales de la inspección...",
+        placeholder:
+          "Datos relevantes para el cliente o la operación (opcional)...",
       },
     ],
   },

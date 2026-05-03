@@ -29,7 +29,23 @@ export function useGeolocation(options?: UseGeolocationOptions) {
   });
 
   const requestPosition = useCallback(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
+    const nav = navigator as unknown as {
+      geolocation?: {
+        getCurrentPosition: (
+          onOk: (p: {
+            coords: { latitude: number; longitude: number };
+          }) => void,
+          onErr: (e: {
+            code: number;
+            PERMISSION_DENIED: number;
+            POSITION_UNAVAILABLE: number;
+            TIMEOUT: number;
+          }) => void,
+          opts?: Record<string, unknown>,
+        ) => void;
+      };
+    };
+    if (typeof navigator === "undefined" || !nav.geolocation) {
       setState({
         status: "error",
         coords: null,
@@ -44,7 +60,7 @@ export function useGeolocation(options?: UseGeolocationOptions) {
       errorMessage: null,
     }));
 
-    navigator.geolocation.getCurrentPosition(
+    nav.geolocation.getCurrentPosition(
       (position) => {
         const coords = {
           lat: position.coords.latitude,

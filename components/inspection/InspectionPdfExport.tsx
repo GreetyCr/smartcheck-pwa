@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { ExternalLink, FileText, Loader2 } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileText, Loader2, Truck } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { browserAlert } from "@/lib/browser-confirm";
 import { generateInspectionPdfBlob } from "@/lib/pdf/generatePdf";
 import type { PdfExportPayload } from "@/lib/pdf/types";
 import { uploadPdfBlobToConvex } from "@/lib/pdf/uploadPdf";
+import { cn } from "@/lib/utils";
+
+type WebDownloadLink = { href: string; download: string; click: () => void };
 
 function buildFileName(inspection: Record<string, unknown>): string {
   const raw = String(inspection.identifier ?? "sin-placa")
@@ -26,6 +30,10 @@ type Props = { inspectionId: Id<"inspections"> };
 
 export function InspectionPdfExport({ inspectionId }: Props) {
   const canExport = useQuery(api.users.exportPdfAllowed, {});
+  const inspection = useQuery(
+    api.inspections.get,
+    canExport === true ? { id: inspectionId } : "skip",
+  );
   const payload = useQuery(
     api.pdfs.getExportPayload,
     canExport === true ? { inspectionId } : "skip",
@@ -35,11 +43,16 @@ export function InspectionPdfExport({ inspectionId }: Props) {
   });
   const genUrl = useMutation(api.pdfs.generatePdfUploadUrl);
   const recordPdf = useMutation(api.pdfs.recordPdf);
+  const markReportDelivered = useMutation(api.inspections.markReportDelivered);
   const [busy, setBusy] = useState(false);
+  const [deliverBusy, setDeliverBusy] = useState(false);
 
   if (canExport !== true) {
     return null;
   }
+
+  const deliveredAt = inspection?.reportDeliveredAt;
+  const hasPdfInCloud = Boolean(latest);
 
   const handleGenerate = async () => {
     if (!payload) return;
@@ -49,7 +62,10 @@ export function InspectionPdfExport({ inspectionId }: Props) {
       const blob = await generateInspectionPdfBlob(data);
       const name = buildFileName(data.inspection);
       const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const d = (globalThis as unknown as {
+        document: { createElement: (t: string) => WebDownloadLink };
+      }).document;
+      const a = d.createElement("a");
       a.href = href;
       a.download = name;
       a.click();
@@ -65,14 +81,29 @@ export function InspectionPdfExport({ inspectionId }: Props) {
           fileSize: blob.size,
         });
       } else if (typeof navigator !== "undefined") {
-        alert(
+        browserAlert(
           "PDF descargado en el dispositivo. Sin conexión: no se guardó en la nube; vuelve a generar cuando tengas red para archivarlo.",
         );
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo generar el PDF");
+      browserAlert(
+        e instanceof Error ? e.message : "No se pudo generar el PDF",
+      );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleMarkDelivered = async () => {
+    setDeliverBusy(true);
+    try {
+      await markReportDelivered({ inspectionId });
+    } catch (e) {
+      browserAlert(
+        e instanceof Error ? e.message : "No se pudo registrar la entrega.",
+      );
+    } finally {
+      setDeliverBusy(false);
     }
   };
 
@@ -122,6 +153,52 @@ export function InspectionPdfExport({ inspectionId }: Props) {
           Abrir último PDF en la nube
         </a>
       ) : null}
+
+      {deliveredAt ? (
+        <div
+          className={cn(
+            "mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-950",
+          )}
+        >
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
+          <div>
+            <p className="font-semibold">Informe entregado</p>
+            <p className="text-xs text-emerald-900/90">
+              Registrado el{" "}
+              {new Date(deliveredAt).toLocaleString("es-CR", {
+                dateStyle: "long",
+                timeStyle: "short",
+              })}
+            </p>
+          </div>
+        </div>
+      ) : hasPdfInCloud ? (
+        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+          <p className="text-xs text-muted-foreground">
+            Cuando el informe impreso o digital haya sido entregado al cliente,
+            regístralo aquí para seguimiento.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 gap-2 rounded-xl border-[#FF8C00] text-[#1E3A5F] hover:bg-[#FF8C00]/10"
+            disabled={deliverBusy}
+            onClick={() => void handleMarkDelivered()}
+          >
+            {deliverBusy ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Truck className="size-4" aria-hidden />
+            )}
+            Marcar como entregado
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Tras generar y guardar el PDF en la nube, podrás marcar el informe como
+          entregado.
+        </p>
+      )}
     </div>
   );
 }

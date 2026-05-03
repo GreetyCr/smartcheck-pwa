@@ -1,0 +1,125 @@
+"use client";
+
+import { useMutation } from "convex/react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { api } from "@/convex/_generated/api";
+import { countPendingInspections } from "@/lib/offline/db";
+import { syncPendingToConvex } from "@/lib/offline/sync";
+
+type SyncContextValue = {
+  isOnline: boolean;
+  pendingCount: number;
+  isSyncing: boolean;
+  lastSyncAt: Date | null;
+  syncNow: () => Promise<void>;
+  /** Refresca contador desde IndexedDB. */
+  refreshPendingCount: () => Promise<void>;
+};
+
+const SyncContext = createContext<SyncContextValue | null>(null);
+
+const POLL_MS = 5000;
+
+export function SyncProvider({ children }: { children: React.ReactNode }) {
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+
+  const createDraft = useMutation(api.inspections.createDraft);
+  const patch = useMutation(api.inspections.patch);
+  const ensureSectionRows = useMutation(api.sections.ensureSectionRows);
+  const upsertSection = useMutation(api.sections.upsertSection);
+  const markSynced = useMutation(api.inspections.markSynced);
+
+  const refreshPendingCount = useCallback(async () => {
+    const n = await countPendingInspections();
+    setPendingCount(n);
+  }, []);
+
+  useEffect(() => {
+    void refreshPendingCount();
+    const t = setInterval(() => {
+      void refreshPendingCount();
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [refreshPendingCount]);
+
+  useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" && navigator.onLine);
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    globalThis.addEventListener("online", on);
+    globalThis.addEventListener("offline", off);
+    return () => {
+      globalThis.removeEventListener("online", on);
+      globalThis.removeEventListener("offline", off);
+    };
+  }, []);
+
+  const syncNow = useCallback(async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncPendingToConvex({
+        createDraft: () => createDraft(),
+        patch: async (args) => {
+          await patch({ id: args.id, patch: args.patch });
+        },
+        ensureSectionRows: async (a) => {
+          await ensureSectionRows(a);
+        },
+        upsertSection: async (a) => {
+          await upsertSection(a);
+        },
+        markSynced: async (a) => {
+          await markSynced(a);
+        },
+      });
+      if (result.ok > 0 || !result.timedOut) {
+        setLastSyncAt(new Date());
+      }
+      await refreshPendingCount();
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [
+    createDraft,
+    patch,
+    ensureSectionRows,
+    upsertSection,
+    markSynced,
+    isSyncing,
+    refreshPendingCount,
+  ]);
+
+  useEffect(() => {
+    if (isOnline && pendingCount > 0 && !isSyncing) {
+      void syncNow();
+    }
+  }, [isOnline, pendingCount, isSyncing, syncNow]);
+
+  return (
+    <SyncContext.Provider
+      value={{
+        isOnline,
+        pendingCount,
+        isSyncing,
+        lastSyncAt,
+        syncNow,
+        refreshPendingCount,
+      }}
+    >
+      {children}
+    </SyncContext.Provider>
+  );
+}
+
+export function useSync(): SyncContextValue {
+  const ctx = useContext(SyncContext);
+  if (!ctx) {
+    throw new Error("useSync must be used within SyncProvider");
+  }
+  return ctx;
+}

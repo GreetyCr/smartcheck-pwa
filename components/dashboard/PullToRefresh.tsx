@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { getScrollY } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 
 type PullToRefreshProps = {
@@ -40,7 +41,7 @@ export function PullToRefresh({
       className={cn("relative", className)}
       onTouchStart={(e) => {
         const y = e.touches[0]?.clientY ?? 0;
-        if (window.scrollY <= 0) {
+        if (getScrollY() <= 0) {
           pulling.current = true;
           startY.current = y;
         }
@@ -49,7 +50,7 @@ export function PullToRefresh({
         if (!pulling.current || busy) return;
         const y = e.touches[0]?.clientY ?? 0;
         const dy = y - startY.current;
-        if (dy > 0 && window.scrollY <= 0) {
+        if (dy > 0 && getScrollY() <= 0) {
           setOffset(Math.min(dy * 0.45, threshold + 20));
         }
       }}

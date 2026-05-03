@@ -1,13 +1,35 @@
-import type { CountryOriginKey, DraftEngineUi } from "@/types/inspection-draft";
+import type {
+  CountryOriginKey,
+  DraftEngineUi,
+} from "@/types/inspection-draft";
+
+/** ISO 3779: sin I, O, Q para evitar confusiones. */
+const VIN_BODY = "[A-HJ-NPR-Z0-9]{17}";
+
+/** Solo letras y números, mayúsculas (para validar longitud de placa). */
+export function plateAlphanumericCore(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
 
 export function normalizePlate(value: string): string {
   return value.trim().toUpperCase();
 }
 
-export function isValidPlate(value: string): boolean {
-  const p = normalizePlate(value);
-  if (p.length < 2) return false;
-  return /^[A-Z0-9-]+$/.test(p);
+/** Placa costarricense típica: 6 u 7 caracteres alfanuméricos (sin contar guiones). */
+export function isValidPlateCr(value: string): boolean {
+  const core = plateAlphanumericCore(value);
+  return /^[A-Z0-9]{6,7}$/.test(core);
+}
+
+export function normalizeVin(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+/** VIN vacío válido; si hay texto deben ser 17 caracteres válidos según ISO 3779. */
+export function isValidVinOptional17(vin: string): boolean {
+  const v = normalizeVin(vin);
+  if (v.length === 0) return true;
+  return new RegExp(`^${VIN_BODY}$`).test(v);
 }
 
 /** Año con exactamente 4 dígitos, entre 1990 y año actual + 1. */
@@ -21,18 +43,7 @@ export function parseYear(value: string): number | null {
   return y;
 }
 
-export function normalizeVin(value: string): string {
-  return value.trim().toUpperCase();
-}
-
-/** VIN opcional: vacío válido; si hay texto deben ser 17 caracteres alfanuméricos. */
-export function isValidVinOptional(vin: string): boolean {
-  const v = normalizeVin(vin);
-  if (v.length === 0) return true;
-  return /^[A-Z0-9]{17}$/.test(v);
-}
-
-export function parseMileageKm(value: string): number | null {
+export function parseMileage(value: string): number | null {
   const n = Number.parseInt(value.trim(), 10);
   if (Number.isNaN(n) || n <= 0) return null;
   return n;
@@ -62,10 +73,48 @@ export const BRAND_OPTIONS: string[] = [
 ];
 
 export const COUNTRY_OPTIONS: { value: CountryOriginKey; label: string }[] = [
-  { value: "estados_unidos", label: "Estados Unidos" },
-  { value: "corea", label: "Corea" },
-  { value: "japon", label: "Japón" },
-  { value: "alemania", label: "Alemania" },
-  { value: "mexico", label: "México" },
-  { value: "otro", label: "Otro" },
+  { value: "usa", label: "USA" },
+  { value: "nacional", label: "Nacional" },
+  { value: "panama", label: "Panamá" },
+  { value: "korea", label: "Korea" },
+  { value: "otros", label: "Otros" },
 ];
+
+/** Prioridad: VIN válido (17 caracteres); si no, placa 6–7. */
+export function resolvePrimaryVehicleId(
+  plateInput: string,
+  vinInput: string,
+): {
+  identifierType: "vin" | "placa";
+  identifier: string;
+  vin?: string;
+  plateNumber?: string;
+} {
+  const plateCore = plateAlphanumericCore(plateInput);
+  const vinNorm = normalizeVin(vinInput);
+  const hasVin = new RegExp(`^${VIN_BODY}$`).test(vinNorm);
+  const hasPlate = /^[A-Z0-9]{6,7}$/.test(plateCore);
+  if (hasVin) {
+    return {
+      identifierType: "vin",
+      identifier: vinNorm,
+      vin: vinNorm,
+      plateNumber: hasPlate ? plateCore : undefined,
+    };
+  }
+  if (hasPlate) {
+    return {
+      identifierType: "placa",
+      identifier: plateCore,
+    };
+  }
+  throw new Error(
+    "Se requiere VIN (17 caracteres) o placa (6–7 caracteres alfanuméricos).",
+  );
+}
+
+export function isValidOptionalEmail(raw: string): boolean {
+  const t = raw.trim();
+  if (t.length === 0) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+}

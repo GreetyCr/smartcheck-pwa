@@ -14,6 +14,7 @@ import { InspectionFooter } from "@/components/inspection/InspectionFooter";
 import { InspectionPdfExport } from "@/components/inspection/InspectionPdfExport";
 import { InspectionPdfStatus } from "@/components/inspection/InspectionPdfStatus";
 import type { SectionRowStatus } from "@/components/inspection/SectionItem";
+import { browserAlert, browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
 
@@ -48,24 +49,32 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     try {
       await touchDraft({ inspectionId });
       setToast("Borrador guardado");
-      window.setTimeout(() => setToast(null), 2500);
+      globalThis.setTimeout(() => setToast(null), 2500);
     } catch {
       setToast("No se pudo guardar");
-      window.setTimeout(() => setToast(null), 2500);
+      globalThis.setTimeout(() => setToast(null), 2500);
     } finally {
       setSaving(false);
     }
   }, [inspectionId, touchDraft]);
 
   const handleShare = useCallback(async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
+    const url =
+      typeof globalThis !== "undefined" && "location" in globalThis
+        ? (globalThis as unknown as { location: { href: string } }).location
+            .href
+        : "";
+    const nav = navigator as unknown as {
+      share?: (d: { title: string; url: string }) => Promise<void>;
+      clipboard: { writeText: (s: string) => Promise<void> };
+    };
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "Inspección Smartcheck", url });
+      if (nav.share) {
+        await nav.share({ title: "Inspección Smartcheck", url });
       } else {
-        await navigator.clipboard.writeText(url);
+        await nav.clipboard.writeText(url);
         setToast("Enlace copiado");
-        window.setTimeout(() => setToast(null), 2000);
+        globalThis.setTimeout(() => setToast(null), 2000);
       }
     } catch {
       /* usuario canceló share */
@@ -73,14 +82,14 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
   }, []);
 
   const handleDiscard = useCallback(async () => {
-    if (!confirm("¿Descartar esta inspección? Esta acción no se puede deshacer.")) {
+    if (!browserConfirm("¿Descartar esta inspección? Esta acción no se puede deshacer.")) {
       return;
     }
     try {
       await discardInspection({ inspectionId });
       router.replace("/");
     } catch {
-      alert("No se pudo eliminar la inspección.");
+      browserAlert("No se pudo eliminar la inspección.");
     }
   }, [discardInspection, inspectionId, router]);
 

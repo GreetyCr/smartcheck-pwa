@@ -1,8 +1,16 @@
 "use client";
 
 import { ItemObservation } from "@/components/inspection/items/ItemObservation";
+import {
+  ItemPhotos,
+  type PhotoEntry,
+} from "@/components/inspection/items/ItemPhotos";
 import { cn } from "@/lib/utils";
 import type { SectionItem } from "@/lib/constants/sectionItems";
+import {
+  derivePhotoUi,
+  type PhotoUiKind,
+} from "@/lib/section-form-ui";
 
 export type SelectFieldValue = {
   value: string;
@@ -15,6 +23,9 @@ type ItemSelectProps = {
   value: SelectFieldValue | undefined;
   onChange: (next: SelectFieldValue) => void;
   disabled?: boolean;
+  photoEntries?: PhotoEntry[];
+  onPickPhotos?: (files: File[]) => void | Promise<void>;
+  onRemovePhoto?: (ref: string) => void;
 };
 
 const LABELS: Record<string, string> = {
@@ -29,8 +40,12 @@ export function ItemSelect({
   value,
   onChange,
   disabled,
+  photoEntries,
+  onPickPhotos,
+  onRemovePhoto,
 }: ItemSelectProps) {
   const opts = item.options ?? [];
+  const { allowPhotos, photoKind, photoLabel } = derivePhotoUi(item);
 
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -74,6 +89,23 @@ export function ItemSelect({
             placeholder="Observaciones sobre el desgaste..."
             disabled={disabled || !value?.value}
             showMic
+          />
+        </div>
+      ) : null}
+
+      {allowPhotos &&
+      (photoKind as PhotoUiKind) !== "none" &&
+      onPickPhotos &&
+      onRemovePhoto ? (
+        <div className="mt-3">
+          <ItemPhotos
+            entries={photoEntries}
+            variant={photoKind}
+            label={photoLabel}
+            multiple={photoKind !== "single_solid"}
+            disabled={disabled}
+            onPickFiles={onPickPhotos}
+            onRemove={onRemovePhoto}
           />
         </div>
       ) : null}

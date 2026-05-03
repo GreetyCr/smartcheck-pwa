@@ -4,7 +4,8 @@ export type InspectionBadgeKind =
   | "borrador"
   | "completado"
   | "pendiente_sync"
-  | "sincronizado";
+  | "sincronizado"
+  | "informe_entregado";
 
 /** Mapea documento Convex → estado de UI (badges del diseño Módulo 4.1). */
 export function getInspectionUiStatus(
@@ -17,6 +18,19 @@ export function getInspectionUiStatus(
 } {
   const status = inspection.status ?? "draft";
   const queuePending = options?.pendingInSyncQueue ?? false;
+
+  /** Fuente de verdad: la fecha no se borra si `touchDraft` degradó el status. */
+  if (
+    inspection.reportDeliveredAt != null ||
+    status === "report_delivered"
+  ) {
+    return {
+      kind: "informe_entregado",
+      label: "INFORME ENTREGADO",
+      className:
+        "bg-emerald-600/15 text-emerald-900 border border-emerald-600/35 dark:text-emerald-100",
+    };
+  }
 
   if (status === "synced") {
     return {

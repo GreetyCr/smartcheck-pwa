@@ -7,6 +7,7 @@ const inspectionStatus = v.union(
   v.literal("completed"),
   v.literal("pending_sync"),
   v.literal("synced"),
+  v.literal("report_delivered"),
 );
 
 function startOfDay(ts: number): number {
@@ -91,8 +92,17 @@ export const getDashboardMetrics = query({
       completed: 0,
       pending_sync: 0,
       synced: 0,
+      report_delivered: 0,
     };
     for (const insp of inspections) {
+      /** Alineado con UI: entrega registrada aunque `status` se haya degradado (p. ej. guardar borrador). */
+      if (
+        insp.reportDeliveredAt != null ||
+        insp.status === "report_delivered"
+      ) {
+        byStatus.report_delivered++;
+        continue;
+      }
       const s = insp.status ?? "draft";
       if (s === "draft") byStatus.draft++;
       else if (s === "completed") byStatus.completed++;
@@ -130,7 +140,13 @@ export const listAllInspections = query({
     let rows = await ctx.db.query("inspections").order("desc").collect();
 
     if (args.status !== undefined) {
-      rows = rows.filter((r) => (r.status ?? "draft") === args.status);
+      rows = rows.filter((r) => {
+        const s = r.status ?? "draft";
+        if (args.status === "synced") {
+          return s === "synced" || s === "report_delivered";
+        }
+        return s === args.status;
+      });
     }
     if (args.technicianClerkId) {
       rows = rows.filter((r) => r.clerkUserId === args.technicianClerkId);

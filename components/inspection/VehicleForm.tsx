@@ -10,23 +10,36 @@ import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { PhotoCapture } from "@/components/ui/PhotoCapture";
 import { useInspectionWizard } from "@/components/inspection/InspectionWizard";
+import { formControlValue } from "@/lib/browser-confirm";
 import { uploadFileToConvexStorage } from "@/lib/convex-storage";
 import {
   BRAND_OPTIONS,
   COUNTRY_OPTIONS,
   draftEngineToConvex,
-  isValidPlate,
-  isValidVinOptional,
-  normalizePlate,
-  normalizeVin,
-  parseMileageKm,
+  isValidVinOptional17,
+  parseMileage,
   parseYear,
+  plateAlphanumericCore,
+  resolvePrimaryVehicleId,
 } from "@/lib/vehicle-form";
-import type { CaptureSource, CountryOriginKey } from "@/types/inspection-draft";
+import type {
+  CaptureSource,
+  CountryOriginKey,
+  MileageUnitKey,
+  SellerTypeKey,
+} from "@/types/inspection-draft";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
+
+async function uploadOne(
+  generateUploadUrl: () => Promise<string>,
+  file: File,
+): Promise<Id<"_storage">> {
+  const postUrl = await generateUploadUrl();
+  return uploadFileToConvexStorage(postUrl, file);
+}
 
 export function VehicleForm({ className }: { className?: string }) {
   const router = useRouter();
@@ -41,49 +54,69 @@ export function VehicleForm({ className }: { className?: string }) {
   useEffect(() => {
     if (
       !draft.captureSource ||
-      draft.clientName.trim().length < 3
+      draft.clientName.trim().length < 3 ||
+      draft.sellerType === ""
     ) {
       router.replace("/inspecciones/nueva/cliente");
     }
-  }, [draft.captureSource, draft.clientName, router]);
+  }, [draft.captureSource, draft.clientName, draft.sellerType, router]);
 
   const yearNum = parseYear(draft.yearInput);
-  const mileageNum = parseMileageKm(draft.mileageInput);
-  const vinOk = isValidVinOptional(draft.vinInput);
+  const mileageNum = parseMileage(draft.mileageInput);
+  const vinNorm = draft.vinInput.trim().toUpperCase();
+  const plateCore = plateAlphanumericCore(draft.plate);
+  const hasVin17 = /^[A-HJ-NPR-Z0-9]{17}$/.test(vinNorm);
+  const hasPlateOk = /^[A-Z0-9]{6,7}$/.test(plateCore);
+  const vinFormatOk = isValidVinOptional17(draft.vinInput);
+  const idOk = hasVin17 || hasPlateOk;
+
+  const photosOk =
+    draft.vehiclePhotoFrontFile !== null &&
+    draft.vehiclePhotoSideLeftFile !== null &&
+    draft.vehiclePhotoSideRightFile !== null &&
+    draft.vehiclePhotoRearFile !== null;
 
   const isValid = useMemo(() => {
-    const photoOk = draft.vehiclePhotoFile !== null;
-    const plateOk = isValidPlate(draft.plate);
     const yearOk = yearNum !== null;
     const modelOk = draft.model.trim().length >= 2;
     const brandOk = draft.brand.trim().length > 0;
     const countryOk = draft.countryOfOrigin !== "";
     const mileageOk = mileageNum !== null;
     return (
-      photoOk &&
-      plateOk &&
+      photosOk &&
+      idOk &&
       yearOk &&
       modelOk &&
       brandOk &&
       countryOk &&
       mileageOk &&
-      vinOk
+      vinFormatOk
     );
   }, [
     draft.brand,
     draft.model,
-    draft.plate,
-    draft.vehiclePhotoFile,
     draft.countryOfOrigin,
     draft.vinInput,
     mileageNum,
-    vinOk,
     yearNum,
+    photosOk,
+    idOk,
+    vinFormatOk,
   ]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid || !yearNum || !mileageNum || !draft.vehiclePhotoFile) return;
+    if (
+      !isValid ||
+      !yearNum ||
+      !mileageNum ||
+      !draft.vehiclePhotoFrontFile ||
+      !draft.vehiclePhotoSideLeftFile ||
+      !draft.vehiclePhotoSideRightFile ||
+      !draft.vehiclePhotoRearFile
+    ) {
+      return;
+    }
 
     setSubmitError(null);
     setSubmitting(true);
@@ -91,35 +124,69 @@ export function VehicleForm({ className }: { className?: string }) {
     try {
       const inspectionId = (await createDraft()) as Id<"inspections">;
       const source = draft.captureSource as CaptureSource;
+      const sellerType = draft.sellerType as SellerTypeKey;
 
-      const postUrl = await generateUploadUrl();
-      const storageId = await uploadFileToConvexStorage(
-        postUrl,
-        draft.vehiclePhotoFile,
+      const gen = () => generateUploadUrl();
+
+      const vehiclePhotoFront = await uploadOne(gen, draft.vehiclePhotoFrontFile);
+      const vehiclePhotoSideLeft = await uploadOne(
+        gen,
+        draft.vehiclePhotoSideLeftFile,
       );
+      const vehiclePhotoSideRight = await uploadOne(
+        gen,
+        draft.vehiclePhotoSideRightFile,
+      );
+      const vehiclePhotoRear = await uploadOne(gen, draft.vehiclePhotoRearFile);
 
-      const plate = normalizePlate(draft.plate);
-      const vin = normalizeVin(draft.vinInput);
+      const photoDekra = draft.photoDekraFile
+        ? await uploadOne(gen, draft.photoDekraFile)
+        : undefined;
+      const photoPlate = draft.photoPlateFile
+        ? await uploadOne(gen, draft.photoPlateFile)
+        : undefined;
+      const photoMarchamo = draft.photoMarchamoFile
+        ? await uploadOne(gen, draft.photoMarchamoFile)
+        : undefined;
+      const photoVinSticker = draft.photoVinStickerFile
+        ? await uploadOne(gen, draft.photoVinStickerFile)
+        : undefined;
+
+      const ids = resolvePrimaryVehicleId(draft.plate, draft.vinInput);
+
+      const mileageUnit = draft.mileageUnit as MileageUnitKey;
 
       await patchInspection({
         id: inspectionId,
         patch: {
           clientName: draft.clientName.trim(),
           clientPhone: draft.clientPhone.trim(),
-          location: draft.location.trim(),
+          clientEmail: draft.clientEmail.trim() || undefined,
+          sellerType,
+          sellerNote: draft.sellerNote.trim() || undefined,
           captureSource: source,
           outOfGamFee: draft.isInGAM ? 0 : draft.outOfGamFee,
           vehicleBrand: draft.brand.trim(),
           vehicleModel: draft.model.trim(),
           vehicleYear: yearNum,
-          identifier: plate,
-          identifierType: "placa",
-          vin: vin.length > 0 ? vin : undefined,
+          identifierType: ids.identifierType,
+          identifier: ids.identifier,
+          vin: ids.vin,
+          plateNumber: ids.plateNumber,
           mileage: mileageNum,
-          mileageUnit: "km",
+          mileageUnit,
           countryOfOrigin: draft.countryOfOrigin as CountryOriginKey,
           engineType: draftEngineToConvex(draft.engineType),
-          vehiclePhoto: storageId,
+          vehiclePhoto: vehiclePhotoFront,
+          vehiclePhotoFront,
+          vehiclePhotoSideLeft,
+          vehiclePhotoSideRight,
+          vehiclePhotoRear,
+          photoDekra,
+          photoPlate,
+          platePhotoNote: draft.platePhotoNote.trim() || undefined,
+          photoMarchamo,
+          photoVinSticker,
           status: "draft",
         },
       });
@@ -139,11 +206,40 @@ export function VehicleForm({ className }: { className?: string }) {
       onSubmit={(e) => void handleSubmit(e)}
       className={cn("mx-auto max-w-lg space-y-5 px-4 py-4", className)}
     >
-      <PhotoCapture
-        file={draft.vehiclePhotoFile}
-        onFileChange={(f) => setDraft({ vehiclePhotoFile: f })}
-        disabled={submitting}
-      />
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-foreground">
+          Fotos del vehículo <span className="text-destructive">*</span>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Cuatro ángulos obligatorios: frontal, dos laterales y trasera.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PhotoCapture
+            file={draft.vehiclePhotoFrontFile}
+            onFileChange={(f) => setDraft({ vehiclePhotoFrontFile: f })}
+            disabled={submitting}
+            label="Frontal"
+          />
+          <PhotoCapture
+            file={draft.vehiclePhotoSideLeftFile}
+            onFileChange={(f) => setDraft({ vehiclePhotoSideLeftFile: f })}
+            disabled={submitting}
+            label="Lateral izquierdo"
+          />
+          <PhotoCapture
+            file={draft.vehiclePhotoSideRightFile}
+            onFileChange={(f) => setDraft({ vehiclePhotoSideRightFile: f })}
+            disabled={submitting}
+            label="Lateral derecho"
+          />
+          <PhotoCapture
+            file={draft.vehiclePhotoRearFile}
+            onFileChange={(f) => setDraft({ vehiclePhotoRearFile: f })}
+            disabled={submitting}
+            label="Trasera"
+          />
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -155,11 +251,14 @@ export function VehicleForm({ className }: { className?: string }) {
             name="plate"
             type="text"
             autoCapitalize="characters"
-            placeholder="MX-782-KP"
+            placeholder="6–7 caracteres"
             value={draft.plate}
-            onChange={(e) => setDraft({ plate: e.target.value })}
+            onChange={(e) => setDraft({ plate: formControlValue(e) })}
             className={fieldClass}
           />
+          <p className="text-xs text-muted-foreground">
+            Opcional si ya tienes VIN (17 caracteres). Sin guiones o con guiones.
+          </p>
         </div>
         <div className="space-y-1.5">
           <label htmlFor="year" className="text-sm font-medium text-foreground">
@@ -172,7 +271,7 @@ export function VehicleForm({ className }: { className?: string }) {
             inputMode="numeric"
             placeholder="2022"
             value={draft.yearInput}
-            onChange={(e) => setDraft({ yearInput: e.target.value })}
+            onChange={(e) => setDraft({ yearInput: formControlValue(e) })}
             className={fieldClass}
           />
         </div>
@@ -180,21 +279,33 @@ export function VehicleForm({ className }: { className?: string }) {
 
       <div className="space-y-1.5">
         <label htmlFor="vin" className="text-sm font-medium text-foreground">
-          VIN (Número de Chasis)
+          VIN (17 caracteres)
         </label>
         <input
           id="vin"
           name="vin"
           type="text"
           autoCapitalize="characters"
-          placeholder="3N1AB7AP0LL523491"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={17}
+          placeholder="Ej. 3VWD17FJ5HM123456"
           value={draft.vinInput}
-          onChange={(e) => setDraft({ vinInput: e.target.value })}
+          onChange={(e) => setDraft({ vinInput: formControlValue(e) })}
           className={fieldClass}
         />
-        {draft.vinInput.trim().length > 0 && !vinOk ? (
+        <p className="text-xs text-muted-foreground">
+          Código único del fabricante (sin I, O ni Q). En Costa Rica los ensamblados
+          locales suelen usar prefijos WMI como 3V–37…
+        </p>
+        {draft.vinInput.trim().length > 0 && !vinFormatOk ? (
           <p className="text-xs text-destructive">
-            Si indicas VIN, deben ser 17 caracteres.
+            Si indicas VIN, deben ser 17 caracteres válidos (estándar internacional).
+          </p>
+        ) : null}
+        {!idOk && vinFormatOk ? (
+          <p className="text-xs text-destructive">
+            Indica un VIN válido (17 caracteres) o una placa de 6–7 caracteres.
           </p>
         ) : null}
       </div>
@@ -209,7 +320,7 @@ export function VehicleForm({ className }: { className?: string }) {
               id="brand"
               name="brand"
               value={draft.brand}
-              onChange={(e) => setDraft({ brand: e.target.value })}
+              onChange={(e) => setDraft({ brand: formControlValue(e) })}
               className={cn(
                 fieldClass,
                 "appearance-none bg-card pr-10",
@@ -239,7 +350,7 @@ export function VehicleForm({ className }: { className?: string }) {
             type="text"
             placeholder="Sentra SR"
             value={draft.model}
-            onChange={(e) => setDraft({ model: e.target.value })}
+            onChange={(e) => setDraft({ model: formControlValue(e) })}
             className={fieldClass}
           />
         </div>
@@ -247,7 +358,7 @@ export function VehicleForm({ className }: { className?: string }) {
 
       <div className="space-y-1.5">
         <label htmlFor="mileage" className="text-sm font-medium text-foreground">
-          Kilometraje
+          Kilometraje / Millaje
         </label>
         <div className="relative">
           <input
@@ -258,13 +369,29 @@ export function VehicleForm({ className }: { className?: string }) {
             min={1}
             placeholder="45200"
             value={draft.mileageInput}
-            onChange={(e) => setDraft({ mileageInput: e.target.value })}
-            className={cn(fieldClass, "pr-12")}
+            onChange={(e) => setDraft({ mileageInput: formControlValue(e) })}
+            className={cn(fieldClass, "pr-14")}
           />
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-            km
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+            {draft.mileageUnit === "millas" ? "mi" : "km"}
           </span>
         </div>
+        <span id="mileage-unit-label" className="sr-only">
+          Unidad de odómetro
+        </span>
+        <ToggleButtonGroup
+          labelId="mileage-unit-label"
+          variant="outline"
+          className="mt-2"
+          value={draft.mileageUnit}
+          onChange={(mileageUnit) =>
+            setDraft({ mileageUnit: mileageUnit as MileageUnitKey })
+          }
+          options={[
+            { value: "km" as const, label: "Kilómetros (km)" },
+            { value: "millas" as const, label: "Millas (mi)" },
+          ]}
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -278,7 +405,7 @@ export function VehicleForm({ className }: { className?: string }) {
             value={draft.countryOfOrigin}
             onChange={(e) =>
               setDraft({
-                countryOfOrigin: e.target.value as CountryOriginKey | "",
+                countryOfOrigin: formControlValue(e) as CountryOriginKey | "",
               })
             }
             className={cn(
@@ -322,6 +449,52 @@ export function VehicleForm({ className }: { className?: string }) {
               icon: <Plug className="text-inherit" />,
             },
           ]}
+        />
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">
+        <p className="text-sm font-medium text-foreground">
+          Documentación adicional <span className="font-normal text-muted-foreground">(opcional)</span>
+        </p>
+        <PhotoCapture
+          file={draft.photoDekraFile}
+          onFileChange={(f) => setDraft({ photoDekraFile: f })}
+          disabled={submitting}
+          label="Foto Dekra"
+        />
+        <PhotoCapture
+          file={draft.photoPlateFile}
+          onFileChange={(f) => setDraft({ photoPlateFile: f })}
+          disabled={submitting}
+          label="Foto de placa"
+        />
+        <div className="space-y-1.5">
+          <label htmlFor="plate-photo-note" className="text-sm font-medium text-foreground">
+            Texto junto a placa <span className="font-normal text-muted-foreground">(opcional)</span>
+          </label>
+          <input
+            id="plate-photo-note"
+            name="platePhotoNote"
+            type="text"
+            placeholder="Ej. observaciones sobre la placa"
+            value={draft.platePhotoNote}
+            onChange={(e) =>
+              setDraft({ platePhotoNote: formControlValue(e) })
+            }
+            className={fieldClass}
+          />
+        </div>
+        <PhotoCapture
+          file={draft.photoMarchamoFile}
+          onFileChange={(f) => setDraft({ photoMarchamoFile: f })}
+          disabled={submitting}
+          label="Foto de marchamo"
+        />
+        <PhotoCapture
+          file={draft.photoVinStickerFile}
+          onFileChange={(f) => setDraft({ photoVinStickerFile: f })}
+          disabled={submitting}
+          label="Foto de VIN (etiqueta)"
         />
       </div>
 

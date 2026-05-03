@@ -8,12 +8,15 @@ export type CaptureSource =
 
 /** Valores de `countryOfOrigin` en Convex. */
 export type CountryOriginKey =
-  | "estados_unidos"
-  | "corea"
-  | "japon"
-  | "alemania"
-  | "mexico"
-  | "otro";
+  | "usa"
+  | "nacional"
+  | "panama"
+  | "korea"
+  | "otros";
+
+export type SellerTypeKey = "concesionaria" | "particular";
+
+export type MileageUnitKey = "km" | "millas";
 
 /** UI paso 2 — se mapea a `engineType` de Convex. */
 export type DraftEngineUi = "combustion" | "electrico";
@@ -22,8 +25,8 @@ export type DraftEngineUi = "combustion" | "electrico";
 export interface InspectionDraft {
   clientName: string;
   clientPhone: string;
-  location: string;
-  locationCoords?: { lat: number; lng: number };
+  /** Opcional en Convex. */
+  clientEmail: string;
   /** Número de revisiones (solo borrador local; aún no en Convex). */
   inspectionCount: 1 | 2 | 3;
   isInGAM: boolean;
@@ -31,10 +34,21 @@ export interface InspectionDraft {
   captureSource: CaptureSource | "";
   /** Si está en GAM → 0 al avanzar; si no, se definirá en una iteración posterior. */
   outOfGamFee?: number;
+  /** Paso 1 — contexto comercial / BI. */
+  sellerType: SellerTypeKey | "";
+  sellerNote: string;
 
   // Paso 2 — Vehículo
-  /** Archivo local hasta subir a Convex. */
-  vehiclePhotoFile: File | null;
+  vehiclePhotoFrontFile: File | null;
+  vehiclePhotoSideLeftFile: File | null;
+  vehiclePhotoSideRightFile: File | null;
+  vehiclePhotoRearFile: File | null;
+  photoDekraFile: File | null;
+  photoPlateFile: File | null;
+  photoMarchamoFile: File | null;
+  photoVinStickerFile: File | null;
+  /** Texto opcional junto a la foto de placa. */
+  platePhotoNote: string;
   plate: string;
   /** Vacío en UI hasta completar */
   yearInput: string;
@@ -42,6 +56,7 @@ export interface InspectionDraft {
   brand: string;
   model: string;
   mileageInput: string;
+  mileageUnit: MileageUnitKey;
   countryOfOrigin: CountryOriginKey | "";
   engineType: DraftEngineUi;
 }
@@ -50,17 +65,28 @@ export function createEmptyInspectionDraft(): InspectionDraft {
   return {
     clientName: "",
     clientPhone: "",
-    location: "",
+    clientEmail: "",
     inspectionCount: 1,
     isInGAM: false,
     captureSource: "",
-    vehiclePhotoFile: null,
+    sellerType: "",
+    sellerNote: "",
+    vehiclePhotoFrontFile: null,
+    vehiclePhotoSideLeftFile: null,
+    vehiclePhotoSideRightFile: null,
+    vehiclePhotoRearFile: null,
+    photoDekraFile: null,
+    photoPlateFile: null,
+    photoMarchamoFile: null,
+    photoVinStickerFile: null,
+    platePhotoNote: "",
     plate: "",
     yearInput: "",
     vinInput: "",
     brand: "",
     model: "",
     mileageInput: "",
+    mileageUnit: "km",
     countryOfOrigin: "",
     engineType: "combustion",
   };

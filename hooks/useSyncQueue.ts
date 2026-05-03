@@ -6,9 +6,20 @@ import { api } from "@/convex/_generated/api";
 
 const LAST_SYNC_KEY = "smartcheck_last_sync_at";
 
+function getLs(): { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void } | null {
+  const g = globalThis as unknown as {
+    localStorage?: {
+      getItem: (k: string) => string | null;
+      setItem: (k: string, v: string) => void;
+    };
+  };
+  return g.localStorage ?? null;
+}
+
 function readLastSyncAt(): number | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(LAST_SYNC_KEY);
+  const ls = getLs();
+  if (!ls) return null;
+  const raw = ls.getItem(LAST_SYNC_KEY);
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
@@ -56,7 +67,7 @@ export function useSyncQueue() {
     if (pendingIds === undefined) return;
     if (pendingIds.length === 0) {
       const now = Date.now();
-      window.localStorage.setItem(LAST_SYNC_KEY, String(now));
+      getLs()?.setItem(LAST_SYNC_KEY, String(now));
       setLastSyncAt(now);
       return;
     }
@@ -66,7 +77,7 @@ export function useSyncQueue() {
         await markSynced({ id });
       }
       const now = Date.now();
-      window.localStorage.setItem(LAST_SYNC_KEY, String(now));
+      getLs()?.setItem(LAST_SYNC_KEY, String(now));
       setLastSyncAt(now);
     } finally {
       setIsSyncing(false);

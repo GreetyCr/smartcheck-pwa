@@ -42,9 +42,12 @@ const itemSnNa = v.object({
 
 const sectionPhotos = v.optional(v.array(v.id("_storage")));
 
+/** Referencia a foto de ítem: Convex Storage o URL (p. ej. UploadThing) */
+const itemPhotoRef = v.union(v.id("_storage"), v.string());
+
 /** Fotos por clave de ítem en cualquier sección */
 const sectionItemPhotos = v.optional(
-  v.record(v.string(), v.array(v.id("_storage"))),
+  v.record(v.string(), v.array(itemPhotoRef)),
 );
 
 /* -------------------------------------------------------------------------- */
@@ -73,7 +76,13 @@ const engineType = v.union(
   v.literal("hibrido"),
 );
 
+/** País de origen (actual). Los literales legados se aceptan por datos históricos; migrar con `migrations.migrateLegacyCountryOfOrigin`. */
 const countryOfOrigin = v.union(
+  v.literal("usa"),
+  v.literal("nacional"),
+  v.literal("panama"),
+  v.literal("korea"),
+  v.literal("otros"),
   v.literal("estados_unidos"),
   v.literal("corea"),
   v.literal("japon"),
@@ -82,11 +91,18 @@ const countryOfOrigin = v.union(
   v.literal("otro"),
 );
 
+const sellerType = v.union(
+  v.literal("concesionaria"),
+  v.literal("particular"),
+);
+
 const identifierType = v.union(v.literal("vin"), v.literal("placa"));
 
 const mileageUnit = v.union(v.literal("km"), v.literal("millas"));
 
 const userRole = v.union(v.literal("tecnico"), v.literal("admin"));
+
+const approvalStatus = v.union(v.literal("pending"), v.literal("approved"));
 
 export default defineSchema({
   /** Usuarios sincronizados desde Clerk (webhook) */
@@ -96,6 +112,8 @@ export default defineSchema({
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     role: userRole,
+    /** Ausente u `approved`: acceso normal. `pending`: alta por sign-up, esperando admin. */
+    approvalStatus: v.optional(approvalStatus),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -109,7 +127,12 @@ export default defineSchema({
 
     clientName: v.optional(v.string()),
     clientPhone: v.optional(v.string()),
+    clientEmail: v.optional(v.string()),
+    /** Legacy: dirección / texto de ubicación (wizard anterior). */
     location: v.optional(v.string()),
+    sellerType: v.optional(sellerType),
+    /** Nota libre para BI (opcional). */
+    sellerNote: v.optional(v.string()),
     inspectionFee: v.optional(v.number()),
     outOfGamFee: v.optional(v.number()),
     captureSource: v.optional(captureSource),
@@ -123,13 +146,26 @@ export default defineSchema({
     countryOfOrigin: v.optional(countryOfOrigin),
     identifierType: v.optional(identifierType),
     identifier: v.optional(v.string()),
-    /** VIN / chasis (opcional; la placa sigue en `identifier` cuando aplica). */
+    /** Placa normalizada cuando el identificador principal es VIN pero también hay placa. */
+    plateNumber: v.optional(v.string()),
+    /** VIN estándar ISO (17 caracteres alfanuméricos sin I, O, Q). */
     vin: v.optional(v.string()),
     mileage: v.optional(v.number()),
     mileageUnit: v.optional(mileageUnit),
 
+    /** Legacy: una sola foto exterior; nuevas inspecciones usan los cuatro ángulos. */
     vehiclePhoto: v.optional(v.id("_storage")),
+    vehiclePhotoFront: v.optional(v.id("_storage")),
+    vehiclePhotoSideLeft: v.optional(v.id("_storage")),
+    vehiclePhotoSideRight: v.optional(v.id("_storage")),
+    vehiclePhotoRear: v.optional(v.id("_storage")),
     circulationCard: v.optional(v.id("_storage")),
+    photoDekra: v.optional(v.id("_storage")),
+    photoPlate: v.optional(v.id("_storage")),
+    /** Texto opcional asociado a la foto de placa. */
+    platePhotoNote: v.optional(v.string()),
+    photoMarchamo: v.optional(v.id("_storage")),
+    photoVinSticker: v.optional(v.id("_storage")),
 
     /**
      * draft: en curso
@@ -143,12 +179,22 @@ export default defineSchema({
         v.literal("completed"),
         v.literal("pending_sync"),
         v.literal("synced"),
+        /** Informe PDF registrado como entregado al cliente (BI / seguimiento). */
+        v.literal("report_delivered"),
       ),
     ),
     /** Conteo opcional de hallazgos (reparaciones / alertas) para el listado. */
     findingsCount: v.optional(v.number()),
     /** Marca de tiempo de última sincronización exitosa con backend. */
     lastSyncedAt: v.optional(v.number()),
+    /** Informe PDF entregado al cliente (solo tras generación del PDF). */
+    reportDeliveredAt: v.optional(v.number()),
+    /** Solo base de datos / BI — no va en el cuerpo del PDF. */
+    biCommission: v.optional(v.union(v.literal("si"), v.literal("no"))),
+    /** 1 = bueno … 3 = mal estado (solo BI). */
+    biVehicleCondition: v.optional(
+      v.union(v.literal(1), v.literal(2), v.literal(3)),
+    ),
   }).index("by_clerk_user", ["clerkUserId"]),
 
   /** PDFs generados del reporte de inspección (solo admin puede crear). */
@@ -180,6 +226,7 @@ export default defineSchema({
     indicios_malas_manipulaciones: v.optional(itemSn),
     ruidos_anormales: v.optional(itemSn),
     presencia_humo: v.optional(itemSn),
+    presencia_herrumbre_motor: v.optional(itemSnNa),
     /** Notas generales (ítem “Adicional”) */
     notas_adicional: v.optional(v.string()),
   }).index("by_inspection", ["inspectionId"]),

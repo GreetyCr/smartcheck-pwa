@@ -9,14 +9,19 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { SectionFormShell } from "@/components/inspection/SectionFormShell";
 import { SectionFooter } from "@/components/inspection/SectionFooter";
 import { SectionFormField } from "@/components/inspection/SectionFormField";
-import { uploadFileToConvexStorage } from "@/lib/convex-storage";
+import { InspectionBiClosingFields } from "@/components/inspection/InspectionBiClosingFields";
+import { UploadProgress } from "@/components/inspection/UploadProgress";
+import type { PhotoEntry } from "@/components/inspection/items/ItemPhotos";
+import { usePhotoUpload } from "@/hooks/usePhotoUpload";
 import type { SectionConfig, ReadonlyUserContext } from "@/lib/constants/sectionItems";
+import { browserAlert } from "@/lib/browser-confirm";
 import { getInspectionSections } from "@/lib/constants/sections";
+import { derivePhotoUi } from "@/lib/section-form-ui";
 import {
   countSectionProgress,
   docToFormState,
   formStateToPatch,
-  validateSectionForm,
+  validateSectionFormDetailed,
   type SectionFormState,
 } from "@/lib/section-form-utils";
 
@@ -39,20 +44,54 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   });
 
   const upsertSection = useMutation(api.sections.upsertSection);
-  const genUrl = useMutation(api.inspections.generateUploadUrl);
 
   const [state, setState] = useState<SectionFormState>({});
   const seeded = useRef(false);
   const userEdited = useRef(false);
   const [dirty, setDirty] = useState(false);
+  const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
+
+  const getSavedPhotoCount = useCallback(
+    (itemKey: string) => {
+      const photos =
+        (state.itemPhotos as Record<string, unknown[]> | undefined) ?? {};
+      return photos[itemKey]?.length ?? 0;
+    },
+    [state.itemPhotos],
+  );
+
+  const onPhotoUrl = useCallback((itemKey: string, url: string) => {
+    userEdited.current = true;
+    setDirty(true);
+    setState((prev) => {
+      const photos =
+        (prev.itemPhotos as Record<string, string[]> | undefined) ?? {};
+      const list = photos[itemKey] ?? [];
+      return {
+        ...prev,
+        itemPhotos: {
+          ...photos,
+          [itemKey]: [...list, url],
+        },
+      };
+    });
+  }, []);
+
+  const photoUpload = usePhotoUpload({
+    inspectionId,
+    sectionTable: sectionConfig.table,
+    getSavedPhotoCount,
+    onPhotoUrl,
+  });
 
   useEffect(() => {
     seeded.current = false;
     userEdited.current = false;
     setDirty(false);
+    setInvalidKeys(new Set());
     setState({});
   }, [sectionConfig.id]);
 
@@ -122,7 +161,7 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
         data: patch,
       });
       setSaveStatus("saved");
-      window.setTimeout(() => setSaveStatus("idle"), 2000);
+      globalThis.setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
       setSaveStatus("idle");
     }
@@ -130,68 +169,99 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
 
   useEffect(() => {
     if (!dirty) return;
-    const t = window.setTimeout(() => {
+    const t = globalThis.setTimeout(() => {
       void persist();
     }, 800);
-    return () => window.clearTimeout(t);
+    return () => globalThis.clearTimeout(t);
   }, [state, dirty, persist]);
 
   const updateField = useCallback((key: string, value: unknown) => {
     userEdited.current = true;
     setDirty(true);
+    setInvalidKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
     setState((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const addPhotosForItem = useCallback(
     async (itemKey: string, files: File[]) => {
-      const ids: Id<"_storage">[] = [];
-      for (const file of files) {
-        const post = await genUrl();
-        const sid = await uploadFileToConvexStorage(post, file);
-        ids.push(sid);
+      await photoUpload.addPhotosForItem(itemKey, files);
+    },
+    [photoUpload],
+  );
+
+  const removePhotoForItem = useCallback(
+    async (itemKey: string, ref: string) => {
+      const pend = photoUpload.pendingForItem(itemKey);
+      if (pend.some((p) => p.id === ref)) {
+        await photoUpload.removePendingPhoto(itemKey, ref);
+        return;
       }
       userEdited.current = true;
       setDirty(true);
       setState((prev) => {
-        const photos = (prev.itemPhotos as Record<string, Id<"_storage">[]> | undefined) ?? {};
-        const prevList = photos[itemKey] ?? [];
-        return {
-          ...prev,
-          itemPhotos: {
-            ...photos,
-            [itemKey]: [...prevList, ...ids],
-          },
-        };
-      });
-    },
-    [genUrl],
-  );
-
-  const removePhotoForItem = useCallback(
-    (itemKey: string, storageId: Id<"_storage">) => {
-      userEdited.current = true;
-      setDirty(true);
-      setState((prev) => {
-        const photos = (prev.itemPhotos as Record<string, Id<"_storage">[]> | undefined) ?? {};
+        const photos =
+          (prev.itemPhotos as Record<string, (Id<"_storage"> | string)[]> | undefined) ??
+          {};
         const list = photos[itemKey] ?? [];
         return {
           ...prev,
           itemPhotos: {
             ...photos,
-            [itemKey]: list.filter((id) => id !== storageId),
+            [itemKey]: list.filter((x) => String(x) !== ref),
           },
         };
       });
     },
-    [],
+    [photoUpload],
   );
 
+  const mergedPhotoEntries = useMemo(() => {
+    const out: Record<string, PhotoEntry[]> = {};
+    for (const item of sectionConfig.items) {
+      if (!derivePhotoUi(item).allowPhotos) continue;
+      const server = photoEntries?.[item.key] ?? [];
+      const pend = photoUpload.pendingForItem(item.key).map(
+        (p): PhotoEntry => ({
+          ref: p.id,
+          url: p.previewUrl,
+          status: p.status,
+          errorMessage: p.errorMessage,
+        }),
+      );
+      const saved: PhotoEntry[] = server.map((e) => ({
+        ref: e.ref,
+        url: e.url,
+        status: "done",
+      }));
+      out[item.key] = [...pend, ...saved];
+    }
+    return out;
+  }, [photoEntries, photoUpload, sectionConfig.items]);
+
   const onContinue = useCallback(async () => {
-    const v = validateSectionForm(sectionConfig, state);
+    const v = validateSectionFormDetailed(sectionConfig, state);
     if (!v.ok) {
-      window.alert(v.message ?? "Revisa el formulario.");
+      const keys = new Set(v.errors.map((e) => e.key));
+      setInvalidKeys(keys);
+      browserAlert(
+        v.errors.length > 1
+          ? `${v.errors[0]?.message ?? "Revisa el formulario."} (${v.errors.length} campos pendientes)`
+          : (v.errors[0]?.message ?? "Revisa el formulario."),
+      );
+      const first = v.errors[0]?.key;
+      if (first && typeof globalThis.document !== "undefined") {
+        globalThis.document
+          .getElementById(`section-field-${first}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
+    setInvalidKeys(new Set());
     await persist();
     const idx = routeSections.findIndex((s) => s.id === sectionConfig.id);
     const next = idx >= 0 ? routeSections[idx + 1] : undefined;
@@ -234,14 +304,22 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
             index={i + 1}
             item={item}
             value={state[item.key]}
-            photoEntries={photoEntries?.[item.key]}
+            photoEntries={mergedPhotoEntries[item.key]}
+            fieldInvalid={invalidKeys.has(item.key)}
             readonlyContext={readonlyContext}
             onChange={updateField}
             onPickPhotos={addPhotosForItem}
             onRemovePhoto={removePhotoForItem}
           />
         ))}
+        {sectionConfig.id === "finalizacion" ? (
+          <InspectionBiClosingFields inspectionId={inspectionId} />
+        ) : null}
       </SectionFormShell>
+      <UploadProgress
+        pending={photoUpload.stats.pending}
+        uploading={photoUpload.stats.uploading}
+      />
       <SectionFooter onClick={() => void onContinue()} />
     </>
   );

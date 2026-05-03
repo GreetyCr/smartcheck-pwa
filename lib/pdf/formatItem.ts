@@ -8,7 +8,7 @@ export type FormattedLine = {
 
 const BR_NA: Record<string, string> = {
   bien: "Está bien",
-  reparacion: "Necesita reparación",
+  reparacion: "Atención",
   na: "N/A",
 };
 

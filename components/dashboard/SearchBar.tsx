@@ -1,6 +1,7 @@
 "use client";
 
 import { ScanLine, Search, X } from "lucide-react";
+import { formControlValue } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 
 export type SearchBarProps = {
@@ -34,7 +35,7 @@ export function SearchBar({
         placeholder={placeholder}
         className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(formControlValue(e))}
       />
       {value ? (
         <button

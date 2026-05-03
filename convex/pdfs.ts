@@ -44,14 +44,18 @@ export const getExportPayload = query({
 
       const itemPhotoUrls: Record<string, string[]> = {};
       const rawIp = plain?.itemPhotos as
-        | Record<string, Id<"_storage">[]>
+        | Record<string, (Id<"_storage"> | string)[]>
         | undefined;
       if (rawIp) {
-        for (const [key, ids] of Object.entries(rawIp)) {
+        for (const [key, refs] of Object.entries(rawIp)) {
           const urls: string[] = [];
-          for (const sid of ids) {
-            const u = await ctx.storage.getUrl(sid);
-            if (u) urls.push(u);
+          for (const ref of refs) {
+            if (typeof ref === "string" && /^https?:\/\//i.test(ref)) {
+              urls.push(ref);
+            } else {
+              const u = await ctx.storage.getUrl(ref as Id<"_storage">);
+              if (u) urls.push(u);
+            }
           }
           itemPhotoUrls[key] = urls;
         }
@@ -74,14 +78,36 @@ export const getExportPayload = query({
       });
     }
 
-    let vehiclePhotoUrl: string | null = null;
-    let circulationCardUrl: string | null = null;
-    if (inspection.vehiclePhoto) {
-      vehiclePhotoUrl = await ctx.storage.getUrl(inspection.vehiclePhoto);
-    }
-    if (inspection.circulationCard) {
-      circulationCardUrl = await ctx.storage.getUrl(inspection.circulationCard);
-    }
+    const storageUrl = async (
+      ref: Id<"_storage"> | undefined,
+    ): Promise<string | null> => {
+      if (!ref) return null;
+      return (await ctx.storage.getUrl(ref)) ?? null;
+    };
+
+    const frontRef =
+      inspection.vehiclePhotoFront ?? inspection.vehiclePhoto ?? undefined;
+    const vehiclePhotoUrl = await storageUrl(frontRef);
+
+    const vehicleAnglePhotoUrls = {
+      front: await storageUrl(
+        inspection.vehiclePhotoFront ?? inspection.vehiclePhoto ?? undefined,
+      ),
+      sideLeft: await storageUrl(inspection.vehiclePhotoSideLeft ?? undefined),
+      sideRight: await storageUrl(inspection.vehiclePhotoSideRight ?? undefined),
+      rear: await storageUrl(inspection.vehiclePhotoRear ?? undefined),
+    };
+
+    const extraVehiclePhotoUrls = {
+      dekra: await storageUrl(inspection.photoDekra ?? undefined),
+      plate: await storageUrl(inspection.photoPlate ?? undefined),
+      marchamo: await storageUrl(inspection.photoMarchamo ?? undefined),
+      vinSticker: await storageUrl(inspection.photoVinSticker ?? undefined),
+    };
+
+    const circulationCardUrl = await storageUrl(
+      inspection.circulationCard ?? undefined,
+    );
 
     return {
       inspection: JSON.parse(JSON.stringify(inspection)) as Record<
@@ -91,6 +117,8 @@ export const getExportPayload = query({
       sections,
       vehiclePhotoUrl,
       circulationCardUrl,
+      vehicleAnglePhotoUrls,
+      extraVehiclePhotoUrls,
     };
   },
 });

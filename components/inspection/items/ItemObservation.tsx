@@ -1,6 +1,7 @@
 "use client";
 
 import { Mic } from "lucide-react";
+import { formControlValue } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 
 type ItemObservationProps = {
@@ -31,7 +32,7 @@ export function ItemObservation({
       {multiline ? (
         <textarea
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(formControlValue(e))}
           placeholder={placeholder}
           disabled={disabled}
           rows={3}
@@ -41,7 +42,7 @@ export function ItemObservation({
         <input
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(formControlValue(e))}
           placeholder={placeholder}
           disabled={disabled}
           className={cn(common, "pr-10")}

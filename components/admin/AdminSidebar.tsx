@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { SignOutButton } from "@clerk/nextjs";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -37,6 +39,7 @@ type AdminSidebarProps = {
 
 export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const pendingApprovals = useQuery(api.users.pendingApprovalCount, {});
 
   const linkClass = (href: string, exact?: boolean) => {
     const active = exact
@@ -72,7 +75,15 @@ export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
             onClick={() => onClose()}
           >
             <Icon className="size-4 shrink-0 opacity-90" aria-hidden />
-            {label}
+            <span className="flex flex-1 items-center justify-between gap-2">
+              {label}
+              {href === "/admin/tecnicos" &&
+              (pendingApprovals ?? 0) > 0 ? (
+                <span className="rounded-full bg-[#FF8C00] px-2 py-0.5 text-[10px] font-bold text-white">
+                  {pendingApprovals}
+                </span>
+              ) : null}
+            </span>
           </Link>
         ))}
       </nav>

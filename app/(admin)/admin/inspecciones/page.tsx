@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { InspectionTableRow } from "@/components/admin/InspectionTableRow";
@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completado" },
   { value: "pending_sync", label: "Pendiente sync" },
   { value: "synced", label: "Sincronizado" },
+  { value: "report_delivered", label: "Informe entregado" },
 ] as const;
 
 export default function AdminInspeccionesPage() {
@@ -30,7 +31,12 @@ export default function AdminInspeccionesPage() {
       status:
         status === ""
           ? undefined
-          : (status as "draft" | "completed" | "pending_sync" | "synced"),
+          : (status as
+              | "draft"
+              | "completed"
+              | "pending_sync"
+              | "synced"
+              | "report_delivered"),
       technicianClerkId: technicianClerkId || undefined,
       dateFrom: from,
       dateTo: to,
@@ -63,7 +69,10 @@ export default function AdminInspeccionesPage() {
           <select
             className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+              const v = (e.currentTarget as unknown as { value: string }).value;
+              setStatus(v);
+            }}
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value || "all"} value={o.value}>
@@ -77,7 +86,11 @@ export default function AdminInspeccionesPage() {
           <select
             className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
             value={technicianClerkId}
-            onChange={(e) => setTechnicianClerkId(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+              setTechnicianClerkId(
+                (e.currentTarget as unknown as { value: string }).value,
+              )
+            }
           >
             <option value="">Todos</option>
             {(users ?? []).map((u) => (
@@ -93,7 +106,11 @@ export default function AdminInspeccionesPage() {
             type="date"
             className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setDateFrom(
+                (e.currentTarget as unknown as { value: string }).value,
+              )
+            }
           />
         </label>
         <label className="grid gap-1 text-xs font-medium text-muted-foreground">
@@ -102,7 +119,11 @@ export default function AdminInspeccionesPage() {
             type="date"
             className="rounded-xl border border-border bg-card px-3 py-2 text-sm"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setDateTo(
+                (e.currentTarget as unknown as { value: string }).value,
+              )
+            }
           />
         </label>
         <Button

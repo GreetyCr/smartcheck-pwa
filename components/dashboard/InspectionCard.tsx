@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 import { Car, Copy, MoreVertical, Trash2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import {
   formatInspectionDate,
@@ -40,6 +41,7 @@ function formatVehicleLine(inspection: Doc<"inspections">): string {
 }
 
 function isDraft(inspection: Doc<"inspections">): boolean {
+  if (inspection.reportDeliveredAt != null) return false;
   return (inspection.status ?? "draft") === "draft";
 }
 
@@ -84,7 +86,8 @@ export function InspectionCard({
   };
 
   const handleDelete = async () => {
-    if (!confirm("¿Eliminar este borrador? No se puede deshacer.")) return;
+    if (!browserConfirm("¿Eliminar este borrador? No se puede deshacer."))
+      return;
     closeMenu();
     await removeDraft({ id: inspection._id });
   };

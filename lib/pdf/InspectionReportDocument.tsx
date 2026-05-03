@@ -10,11 +10,13 @@ import {
 import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
 import { countFindingsInDoc } from "@/lib/pdf/countFindings";
 import { formatItemForPdf } from "@/lib/pdf/formatItem";
+import { pdfItemValueIsPositive } from "@/lib/pdf/itemPdfStyle";
 import { pdfStyles as styles } from "@/lib/pdf/reportStyles";
 import type { PdfExportPayload } from "@/lib/pdf/types";
 import {
   labelCountry,
   labelEngine,
+  labelSellerType,
   labelTransmission,
 } from "@/lib/pdf/vehicleLabels";
 
@@ -24,10 +26,16 @@ function plateLine(inspection: Record<string, unknown>): string {
   const idType = inspection.identifierType as string | undefined;
   const id = (inspection.identifier as string | undefined)?.trim();
   const vin = (inspection.vin as string | undefined)?.trim();
-  if (idType === "placa" && id) return `Placa: ${id.toUpperCase()}`;
-  if (id) return `Identificador: ${id}`;
-  if (vin) return `VIN: ${vin}`;
-  return "Identificador: —";
+  const plateNum = (inspection.plateNumber as string | undefined)?.trim();
+  const parts: string[] = [];
+  if (idType === "vin" && id) parts.push(`VIN: ${id}`);
+  else if (idType === "placa" && id) parts.push(`Placa: ${id.toUpperCase()}`);
+  else if (vin) parts.push(`VIN: ${vin}`);
+  else if (id) parts.push(`Identificador: ${id}`);
+  if (plateNum && idType === "vin") {
+    parts.push(`Placa: ${plateNum.toUpperCase()}`);
+  }
+  return parts.length ? parts.join(" · ") : "Identificador: —";
 }
 
 function formatDate(ts: number): string {
@@ -40,7 +48,14 @@ function formatDate(ts: number): string {
 type Props = { data: PdfExportPayload };
 
 export function InspectionReportDocument({ data }: Props) {
-  const { inspection, sections, vehiclePhotoUrl, circulationCardUrl } = data;
+  const {
+    inspection,
+    sections,
+    vehiclePhotoUrl,
+    circulationCardUrl,
+    vehicleAnglePhotoUrls,
+    extraVehiclePhotoUrls,
+  } = data;
   const ins = inspection;
   const orderNo = String(ins._id ?? "—").slice(-8).toUpperCase();
   const created = ins._creationTime as number | undefined;
@@ -72,9 +87,37 @@ export function InspectionReportDocument({ data }: Props) {
       });
     }
   }
-  if (vehiclePhotoUrl) {
+  const angleGallery: { caption: string; url: string | null }[] = [
+    { caption: "Vehículo — frontal", url: vehicleAnglePhotoUrls.front },
+    { caption: "Vehículo — lateral izquierdo", url: vehicleAnglePhotoUrls.sideLeft },
+    { caption: "Vehículo — lateral derecho", url: vehicleAnglePhotoUrls.sideRight },
+    { caption: "Vehículo — trasera", url: vehicleAnglePhotoUrls.rear },
+  ];
+  for (const row of angleGallery) {
+    if (row.url) {
+      g += 1;
+      gallery.push({ n: g, caption: row.caption, url: row.url });
+    }
+  }
+  if (vehiclePhotoUrl && !vehicleAnglePhotoUrls.front) {
     g += 1;
     gallery.push({ n: g, caption: "Vehículo", url: vehiclePhotoUrl });
+  }
+  const plateNote = (ins.platePhotoNote as string | undefined)?.trim();
+  const extrasGallery: { caption: string; url: string | null }[] = [
+    { caption: "Dekra", url: extraVehiclePhotoUrls.dekra },
+    {
+      caption: plateNote ? `Placa (foto) — ${plateNote}` : "Placa (foto)",
+      url: extraVehiclePhotoUrls.plate,
+    },
+    { caption: "Marchamo", url: extraVehiclePhotoUrls.marchamo },
+    { caption: "VIN (etiqueta)", url: extraVehiclePhotoUrls.vinSticker },
+  ];
+  for (const row of extrasGallery) {
+    if (row.url) {
+      g += 1;
+      gallery.push({ n: g, caption: row.caption, url: row.url });
+    }
   }
   if (circulationCardUrl) {
     g += 1;
@@ -130,6 +173,20 @@ export function InspectionReportDocument({ data }: Props) {
           </Text>
         </View>
         <View style={styles.coverRow}>
+          <Text style={styles.coverLabel}>Origen de compra</Text>
+          <Text style={styles.coverValue}>
+            {labelSellerType(ins.sellerType as string | undefined)}
+          </Text>
+        </View>
+        {(ins.sellerNote as string | undefined)?.trim() ? (
+          <View style={styles.coverRow}>
+            <Text style={styles.coverLabel}>Nota (origen)</Text>
+            <Text style={styles.coverValue}>
+              {String(ins.sellerNote).trim()}
+            </Text>
+          </View>
+        ) : null}
+        <View style={styles.coverRow}>
           <Text style={styles.coverLabel}>País de origen</Text>
           <Text style={styles.coverValue}>
             {labelCountry(ins.countryOfOrigin as string | undefined)}
@@ -156,20 +213,36 @@ export function InspectionReportDocument({ data }: Props) {
             {created ? formatDate(created) : "—"}
           </Text>
         </View>
-        {(vehiclePhotoUrl || circulationCardUrl) ? (
-          <View style={{ flexDirection: "row", marginTop: 16 }}>
-            {vehiclePhotoUrl ? (
-              <View style={styles.photoThumbWrap}>
-                <Image src={vehiclePhotoUrl} style={styles.photoThumb} />
-              </View>
-            ) : null}
-            {circulationCardUrl ? (
-              <View style={styles.photoThumbWrap}>
-                <Image src={circulationCardUrl} style={styles.photoThumb} />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+        {(() => {
+          const coverUrls = [
+            vehicleAnglePhotoUrls.front,
+            vehicleAnglePhotoUrls.sideLeft,
+            vehicleAnglePhotoUrls.sideRight,
+            vehicleAnglePhotoUrls.rear,
+            extraVehiclePhotoUrls.dekra,
+            extraVehiclePhotoUrls.plate,
+            extraVehiclePhotoUrls.marchamo,
+            extraVehiclePhotoUrls.vinSticker,
+            circulationCardUrl,
+          ].filter(Boolean) as string[];
+          if (
+            coverUrls.length === 0 &&
+            vehiclePhotoUrl &&
+            !vehicleAnglePhotoUrls.front
+          ) {
+            coverUrls.push(vehiclePhotoUrl);
+          }
+          if (coverUrls.length === 0) return null;
+          return (
+            <View style={[styles.photoRow, { marginTop: 16 }]}>
+              {coverUrls.map((url, i) => (
+                <View key={`cov-${i}`} style={styles.photoThumbWrap}>
+                  <Image src={url} style={styles.photoThumb} />
+                </View>
+              ))}
+            </View>
+          );
+        })()}
       </Page>
 
       {sections
@@ -177,7 +250,7 @@ export function InspectionReportDocument({ data }: Props) {
         .map((sec) => {
           const cfg = SECTIONS_CONFIG.find((c) => c.table === sec.table);
           if (!cfg) return null;
-          const findings = countFindingsInDoc(sec.doc);
+          const findings = countFindingsInDoc(sec.doc, sec.table);
           const name = cfg.name;
           return (
             <Page key={sec.table} size="LETTER" style={styles.page}>
@@ -189,12 +262,20 @@ export function InspectionReportDocument({ data }: Props) {
               {cfg.items.map((item) => {
                 const raw = sec.doc?.[item.key];
                 const line = formatItemForPdf(item, raw);
+                const signed = pdfItemValueIsPositive(item, line);
                 const valueStyle =
-                  line.value.includes("reparación") || line.value === "No"
-                    ? styles.repair
-                    : line.value === "—"
-                      ? styles.muted
-                      : styles.good;
+                  signed === true
+                    ? styles.good
+                    : signed === false
+                      ? styles.repair
+                      : line.value === "No" ||
+                          line.value === "Atención" ||
+                          line.value.includes("atención") ||
+                          line.value.includes("reparación")
+                        ? styles.repair
+                        : line.value === "—"
+                          ? styles.muted
+                          : styles.good;
                 return (
                   <View key={item.key}>
                     <View style={styles.itemRow}>
@@ -249,7 +330,7 @@ export function InspectionReportDocument({ data }: Props) {
         {comentarioFinal ? (
           <View style={{ marginTop: 12 }}>
             <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 4 }}>
-              Comentario final
+              Información importante
             </Text>
             <Text style={{ fontSize: 9, lineHeight: 1.35 }}>{comentarioFinal}</Text>
           </View>
