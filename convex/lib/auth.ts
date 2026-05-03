@@ -4,6 +4,14 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 type Ctx = QueryCtx | MutationCtx;
 
 /**
+ * Admin siempre; técnico solo con `approvalStatus === "approved"` explícito.
+ */
+export function userHasFullAccess(user: Doc<"users">): boolean {
+  if (user.role === "admin") return true;
+  return user.approvalStatus === "approved";
+}
+
+/**
  * Usuario de la tabla `users` según el JWT de Clerk (`identity.subject`).
  */
 export async function getCurrentUser(ctx: Ctx): Promise<Doc<"users"> | null> {
@@ -34,7 +42,7 @@ export async function requireUser(ctx: Ctx): Promise<Doc<"users">> {
       "Usuario no sincronizado. Espera unos segundos o vuelve a iniciar sesión.",
     );
   }
-  if (user.role !== "admin" && user.approvalStatus === "pending") {
+  if (!userHasFullAccess(user)) {
     throw new Error(
       "Tu cuenta está pendiente de aprobación por un administrador.",
     );
@@ -64,7 +72,7 @@ export async function canAccessInspection(
   if (!identity) return false;
   const user = await getCurrentUser(ctx);
   if (user?.role === "admin") return true;
-  if (user?.approvalStatus === "pending") return false;
+  if (!user || !userHasFullAccess(user)) return false;
   return inspection.clerkUserId === identity.subject;
 }
 

@@ -4,9 +4,43 @@ import Link from "next/link";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { LayoutDashboard, LogOut, Mail, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { APP_VERSION } from "@/lib/app-meta";
 import { Button } from "@/components/ui/button";
+
+/** Solo con `?sessiondebug=1`: JWT ↔ fila Convex y URL del build (prod vs dev). */
+function SessionDebugPanel() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    setEnabled(new URLSearchParams(window.location.search).has("sessiondebug"));
+  }, []);
+  const { user } = useUser();
+  const dbg = useQuery(api.users.sessionSelf, enabled ? {} : "skip");
+  if (!enabled) return null;
+  const convexUrl =
+    typeof process.env.NEXT_PUBLIC_CONVEX_URL === "string"
+      ? process.env.NEXT_PUBLIC_CONVEX_URL
+      : "(no definido en build)";
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-left font-mono text-[10px] leading-relaxed">
+      <p className="mb-2 font-sans text-xs font-semibold text-foreground">
+        Diagnóstico (?sessiondebug=1)
+      </p>
+      <pre className="whitespace-pre-wrap break-all">
+        {JSON.stringify(
+          {
+            NEXT_PUBLIC_CONVEX_URL: convexUrl,
+            clerkReactUserId: user?.id ?? null,
+            sessionSelf: dbg,
+          },
+          null,
+          2,
+        )}
+      </pre>
+    </div>
+  );
+}
 
 export default function PerfilPage() {
   const { user, isLoaded } = useUser();
@@ -24,11 +58,26 @@ export default function PerfilPage() {
     user?.fullName ?? user?.firstName ?? user?.username ?? "Usuario";
   const email = user?.primaryEmailAddress?.emailAddress ?? "—";
   const imageUrl = user?.imageUrl;
-  const roleLabel = me?.role === "admin" ? "Administrador" : "Técnico";
+  const roleLabel =
+    me === undefined
+      ? "…"
+      : me === null
+        ? "—"
+        : me.role === "admin"
+          ? "Administrador"
+          : "Técnico";
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-4 pb-6 pt-4">
       <h1 className="text-xl font-bold text-primary">Perfil</h1>
+
+      {me === null ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          Tu sesión de Clerk no tiene fila en Convex (o el{" "}
+          <code className="rounded bg-muted px-1">clerkId</code> no coincide).
+          Revisa deployment de Convex y que el webhook de Clerk esté activo.
+        </p>
+      ) : null}
 
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
         <div className="relative size-24 overflow-hidden rounded-full border-2 border-primary/20 bg-muted">
@@ -95,6 +144,8 @@ export default function PerfilPage() {
           Cerrar sesión
         </Button>
       </SignOutButton>
+
+      <SessionDebugPanel />
 
       <p className="text-center text-[11px] text-muted-foreground">
         Cuenta gestionada con Clerk. Ajustes avanzados en el panel web.

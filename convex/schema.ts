@@ -112,7 +112,7 @@ export default defineSchema({
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     role: userRole,
-    /** Ausente u `approved`: acceso normal. `pending`: alta por sign-up, esperando admin. */
+    /** `pending`: esperando admin. `approved`: técnico puede usar la app. Ausente se normaliza con migración (legacy). */
     approvalStatus: v.optional(approvalStatus),
     createdAt: v.number(),
     updatedAt: v.number(),

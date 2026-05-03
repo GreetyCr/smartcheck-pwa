@@ -26,7 +26,8 @@ export function ApprovalGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (me.role !== "admin" && me.approvalStatus === "pending") {
+  /** Técnico: solo acceso con aprobación explícita (no basta con ausencia de `approvalStatus`). */
+  if (me.role !== "admin" && me.approvalStatus !== "approved") {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F8F9FA] px-6 text-center">
         <div className="max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">

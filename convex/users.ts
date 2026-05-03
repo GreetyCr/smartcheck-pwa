@@ -69,6 +69,40 @@ export const getMe = query({
   },
 });
 
+/**
+ * Diagnóstico prod/local: JWT ↔ fila `users`. Ver perfil con `?sessiondebug=1`.
+ */
+export const sessionSelf = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return {
+        ok: false as const,
+        reason: "no_jwt_identity",
+      };
+    }
+    const row = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    return {
+      ok: true as const,
+      jwtSubject: identity.subject,
+      tokenIdentifier: identity.tokenIdentifier,
+      row: row
+        ? {
+            _id: row._id,
+            clerkId: row.clerkId,
+            role: row.role,
+            approvalStatus: row.approvalStatus,
+            email: row.email,
+          }
+        : null,
+    };
+  },
+});
+
 /** Lista de usuarios (solo admin). */
 export const list = query({
   args: {},

@@ -5,6 +5,7 @@ import {
   canAccessInspection,
   requireAdmin,
   requireUser,
+  userHasFullAccess,
 } from "./lib/auth";
 import { SECTION_TABLE_ORDER } from "./sections";
 
@@ -126,7 +127,7 @@ async function inspectionsForCurrentUser(ctx: {
     return { rows, isAdmin: true };
   }
 
-  if (user?.approvalStatus === "pending") {
+  if (user && !userHasFullAccess(user)) {
     return { rows: [], isAdmin: false };
   }
 

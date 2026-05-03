@@ -48,3 +48,28 @@ export const migrateLegacyCountryOfOrigin = mutation({
     return { scanned: rows.length, updated, skipped };
   },
 });
+
+/**
+ * Antes los técnicos sin campo se trataban como aprobados; ahora hace falta `approved` explícito.
+ * Ejecutar **una vez** en prod tras el deploy que endurece `userHasFullAccess`.
+ */
+export const migrateLegacyTechnicianApproval = mutation({
+  args: {},
+  returns: v.object({ updated: v.number() }),
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db.query("users").collect();
+    let updated = 0;
+    const now = Date.now();
+    for (const u of rows) {
+      if (u.role === "tecnico" && u.approvalStatus === undefined) {
+        await ctx.db.patch(u._id, {
+          approvalStatus: "approved",
+          updatedAt: now,
+        });
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});

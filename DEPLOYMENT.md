@@ -10,6 +10,10 @@ Guía paso a paso para publicar **smartcheck-pwa** en **Vercel** con backend **C
 - **Node.js** 20+ y **pnpm** instalados localmente (`corepack enable` / `npm i -g pnpm`).
 - Repositorio en GitHub/GitLab/Bitbucket conectado a Vercel (o CLI de Vercel).
 
+### Clerk Production y dominio
+
+Al crear la **instancia Production** en Clerk (“Create production instance”), el campo **Application domain** suele **no aceptar** `https://tu-proyecto.vercel.app`: hace falta un **dominio propio** (registro DNS que controles), p. ej. `https://app.tudominio.com`. Planifica comprar/configurar ese dominio **antes** de cerrar el flujo de Clerk Production. El subdominio `*.vercel.app` sigue siendo útil para previews y pruebas, pero **no sustituye** ese requisito para la instancia Production de Clerk según su asistente actual.
+
 ---
 
 ## 1. Convex (backend producción)
@@ -30,13 +34,16 @@ Guía paso a paso para publicar **smartcheck-pwa** en **Vercel** con backend **C
 
 ## 2. Clerk (autenticación)
 
-1. Crea una aplicación en Clerk (o usa una existente) para **producción**.
-2. En **Domains**, añade el dominio que te dará Vercel (p. ej. `tu-app.vercel.app` y más adelante tu dominio custom).
-3. En **API Keys**, obtén:
+1. Ten listo el **dominio de producción** que usará la app (ver nota arriba): Clerk Production suele pedir `https://…` de un dominio **propio**, no solo `*.vercel.app`.
+2. En Clerk: **Create production instance** (p. ej. clone desde Development) y completa **Application domain** con ese dominio (cuando el DNS apunte a Vercel, el login quedará alineado).
+3. En **API Keys** → pestaña **Production**, obtén:
    - **`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`**
    - **`CLERK_SECRET_KEY`**
-4. Opcional (útil en desarrollo / página `/dev/jwt`): **`NEXT_PUBLIC_CLERK_ISSUER_URL`** = misma URL que `CLERK_JWT_ISSUER_DOMAIN` en Convex.
-5. Si usas **JWT template “convex”** en Clerk para Convex, mantén **exactamente la misma app** de Clerk que las keys de Vercel y el mismo issuer en Convex (`docs/CLERK_CONVEX_AUTH.md`).
+4. En **Domains / redirects** de Clerk, añade también las URLs que uses en la práctica (dominio custom **y**, si quieres, `https://tu-proyecto.vercel.app` para previews), según las opciones que ofrezca el dashboard.
+5. Opcional (útil en desarrollo / página `/dev/jwt`): **`NEXT_PUBLIC_CLERK_ISSUER_URL`** = misma URL que `CLERK_JWT_ISSUER_DOMAIN` en Convex.
+6. Si usas **JWT template “convex”** en Clerk para Convex, mantén **exactamente la misma app** de Clerk que las keys de Vercel y el mismo issuer en Convex (`docs/CLERK_CONVEX_AUTH.md`).
+
+**Orden típico:** dominio registrado → instancia Clerk Production con ese dominio → DNS del dominio hacia Vercel → variables de Clerk en Vercel → deploy.
 
 ---
 
@@ -44,9 +51,9 @@ Guía paso a paso para publicar **smartcheck-pwa** en **Vercel** con backend **C
 
 1. Crea una app en UploadThing en modo producción.
 2. Obtén **`UPLOADTHING_TOKEN`** (API key).
-3. En el dashboard de UploadThing, configura la URL base de la API de tu app desplegada:  
-   `https://<tu-dominio-vercel>/api/uploadthing`  
-   (o la que indique la documentación actual de UploadThing para Next.js App Router).
+3. En el dashboard de UploadThing, configura la URL base de la API de tu app desplegada, p. ej.  
+   `https://<tu-dominio-producción>/api/uploadthing`  
+   (dominio custom en prod; en preview puedes usar la URL `*.vercel.app` si UploadThing lo permite en tu plan).
 
 ---
 
@@ -70,7 +77,7 @@ Guía paso a paso para publicar **smartcheck-pwa** en **Vercel** con backend **C
 
    No subas secretos al repo; solo en Vercel / Convex.
 
-5. **Deploy.** Tras el primer deploy correcto, actualiza en **Clerk** las URLs permitidas y los redirects si Vercel te asignó dominio definitivo.
+5. **Deploy.** Enlaza en Vercel tu **dominio custom** (desde el dashboard de Vercel → Domains) para que coincida con el que diste en Clerk Production.
 
 ---
 
