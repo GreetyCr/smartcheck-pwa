@@ -2,6 +2,10 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useMemo, useState } from "react";
+import {
+  audIncludesConvex,
+  getConvexStyleToken,
+} from "@/lib/clerk-convex-token";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -15,29 +19,6 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
-}
-
-function audIncludesConvex(aud: unknown): boolean {
-  if (aud === "convex") return true;
-  if (Array.isArray(aud)) return aud.includes("convex");
-  return false;
-}
-
-/**
- * Misma lógica que `ConvexProviderWithClerk`: si la sesión ya tiene `aud: "convex"`
- * (integración Clerk↔Convex), usa `getToken()` sin template; si no, pide el template `convex`.
- */
-async function getConvexStyleToken(
-  getToken: ReturnType<typeof useAuth>["getToken"],
-  sessionClaims: Record<string, unknown> | null | undefined,
-): Promise<string | null> {
-  const aud = sessionClaims?.aud;
-  const sessionHasConvexAud =
-    aud === "convex" || (Array.isArray(aud) && aud.includes("convex"));
-  if (sessionHasConvexAud) {
-    return await getToken();
-  }
-  return await getToken({ template: "convex" });
 }
 
 /**
@@ -94,7 +75,7 @@ export default function DevJwtPage() {
           <strong>integración Convex activada en Clerk</strong>, el claim{" "}
           <code className="rounded bg-muted px-1">aud: &quot;convex&quot;</code> va en el{" "}
           <strong>token de sesión</strong>.{" "}
-          <code className="rounded bg-muted px-1">ConvexProviderWithClerk</code> entonces usa{" "}
+          <code className="rounded bg-muted px-1">ConvexClientProvider</code> entonces usa{" "}
           <code className="rounded bg-muted px-1">getToken()</code>{" "}
           <em>sin</em> template — el JWT template manual llamado{" "}
           <code className="rounded bg-muted px-1">convex</code> puede quedar{" "}
