@@ -9,6 +9,16 @@ export function audIncludesConvex(aud: unknown): boolean {
   return false;
 }
 
+/** Dep estable para efectos: cambia cuando cambia `aud` en session claims. */
+export function convexSessionAudDependencyKey(
+  claims: Record<string, unknown> | null | undefined,
+): string {
+  const aud = claims?.aud;
+  if (aud === "convex") return "convex";
+  if (Array.isArray(aud)) return `arr:${[...aud].sort().join(",")}`;
+  return aud === undefined || aud === null ? "" : String(aud);
+}
+
 /** Firma habitual de `useAuth().getToken` en Clerk. */
 export type ClerkGetTokenFn = (
   opts?: { skipCache?: boolean } | { template: string; skipCache?: boolean },

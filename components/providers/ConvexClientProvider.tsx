@@ -6,7 +6,10 @@ import {
   ConvexProviderWithAuth,
 } from "convex/react";
 import { useCallback, useMemo, useRef } from "react";
-import { getConvexStyleToken } from "@/lib/clerk-convex-token";
+import {
+  convexSessionAudDependencyKey,
+  getConvexStyleToken,
+} from "@/lib/clerk-convex-token";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 if (!convexUrl) {
@@ -14,16 +17,6 @@ if (!convexUrl) {
 }
 
 const convex = new ConvexReactClient(convexUrl);
-
-/** Estable para deps: solo cambia cuando cambia el audience relevante para Convex. */
-function convexAudDependencyKey(
-  claims: Record<string, unknown> | null | undefined,
-): string {
-  const aud = claims?.aud;
-  if (aud === "convex") return "convex";
-  if (Array.isArray(aud)) return `arr:${[...aud].sort().join(",")}`;
-  return aud === undefined || aud === null ? "" : String(aud);
-}
 
 /**
  * Reemplazo de `ConvexProviderWithClerk`: el oficial memoiza `fetchAccessToken` sin
@@ -39,7 +32,7 @@ function useConvexAuthFromClerk() {
   getTokenRef.current = getToken;
   sessionClaimsRef.current = sessionClaims;
 
-  const audDep = convexAudDependencyKey(sessionClaims);
+  const audDep = convexSessionAudDependencyKey(sessionClaims);
 
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {

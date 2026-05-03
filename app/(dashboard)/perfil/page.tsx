@@ -4,43 +4,10 @@ import Link from "next/link";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { LayoutDashboard, LogOut, Mail, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { APP_VERSION } from "@/lib/app-meta";
+import { SessionDebugPanel } from "@/components/perfil/SessionDebugPanel";
 import { Button } from "@/components/ui/button";
-
-/** Solo con `?sessiondebug=1`: JWT ↔ fila Convex y URL del build (prod vs dev). */
-function SessionDebugPanel() {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    setEnabled(new URLSearchParams(window.location.search).has("sessiondebug"));
-  }, []);
-  const { user } = useUser();
-  const dbg = useQuery(api.users.sessionSelf, enabled ? {} : "skip");
-  if (!enabled) return null;
-  const convexUrl =
-    typeof process.env.NEXT_PUBLIC_CONVEX_URL === "string"
-      ? process.env.NEXT_PUBLIC_CONVEX_URL
-      : "(no definido en build)";
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-muted/40 p-3 text-left font-mono text-[10px] leading-relaxed">
-      <p className="mb-2 font-sans text-xs font-semibold text-foreground">
-        Diagnóstico (?sessiondebug=1)
-      </p>
-      <pre className="whitespace-pre-wrap break-all">
-        {JSON.stringify(
-          {
-            NEXT_PUBLIC_CONVEX_URL: convexUrl,
-            clerkReactUserId: user?.id ?? null,
-            sessionSelf: dbg,
-          },
-          null,
-          2,
-        )}
-      </pre>
-    </div>
-  );
-}
 
 export default function PerfilPage() {
   const { user, isLoaded } = useUser();
@@ -73,9 +40,14 @@ export default function PerfilPage() {
 
       {me === null ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          Tu sesión de Clerk no tiene fila en Convex (o el{" "}
-          <code className="rounded bg-muted px-1">clerkId</code> no coincide).
-          Revisa deployment de Convex y que el webhook de Clerk esté activo.
+          Tu sesión de Clerk no tiene fila en Convex, el{" "}
+          <code className="rounded bg-muted px-1">clerkId</code> no coincide, o Convex
+          rechaza el JWT (p. ej. consola: «No auth provider found matching the given
+          token»). Abre{" "}
+          <code className="rounded bg-muted px-1">?sessiondebug=1</code> y alinea{" "}
+          <code className="rounded bg-muted px-1">CLERK_JWT_ISSUER_DOMAIN</code> en
+          Convex con el <code className="rounded bg-muted px-1">iss</code> del token.
+          Revisa también el webhook de Clerk y el deployment correcto.
         </p>
       ) : null}
 
