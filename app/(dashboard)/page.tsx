@@ -21,12 +21,12 @@ export default function DashboardPage() {
   const { isLoaded, isSignedIn } = useUser();
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 400);
-  useEffect(() => {
-    setHideVehicleHistory(false);
-  }, [debounced]);
   const [filter, setFilter] = useState<InspectionStatusFilter>("all");
   const [refresh, setRefresh] = useState(0);
   const [hideVehicleHistory, setHideVehicleHistory] = useState(false);
+  useEffect(() => {
+    setHideVehicleHistory(false);
+  }, [debounced]);
 
   const { pendingCount, lastSyncLabel, isSyncing, flush } = useSyncQueue();
 

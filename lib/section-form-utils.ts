@@ -154,7 +154,7 @@ export function validateSectionForm(
 /** Convierte documento Convex a estado de formulario (sin metadatos). */
 export function docToFormState(
   doc: Record<string, unknown> | null | undefined,
-  config: SectionConfig,
+  _config: SectionConfig,
 ): SectionFormState {
   if (!doc) return {};
   const out: SectionFormState = {};

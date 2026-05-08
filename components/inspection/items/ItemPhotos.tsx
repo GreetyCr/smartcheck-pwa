@@ -36,16 +36,17 @@ type ItemPhotosProps = {
   className?: string;
 };
 
-function variantIcon(v: PhotoUiKind) {
-  switch (v) {
+function VariantPickIcon({ variant }: { variant: Exclude<PhotoUiKind, "none"> }) {
+  const cls = "size-5 shrink-0";
+  switch (variant) {
     case "single_solid":
-      return Camera;
+      return <Camera className={cls} aria-hidden />;
     case "multiple_solid":
-      return ImageIcon;
+      return <ImageIcon className={cls} aria-hidden />;
     case "multiple_dashed":
-      return Images;
+      return <Images className={cls} aria-hidden />;
     default:
-      return ImagePlus;
+      return <ImagePlus className={cls} aria-hidden />;
   }
 }
 
@@ -61,7 +62,6 @@ export function ItemPhotos({
   className,
 }: ItemPhotosProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const Icon = variantIcon(variant);
 
   const onChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +176,7 @@ export function ItemPhotos({
                 "bg-muted text-foreground hover:bg-muted/80 dark:bg-slate-800",
             )}
           >
-            <Icon className="size-5 shrink-0" />
+            <VariantPickIcon variant={variant} />
             <span>{label}</span>
           </button>
         )

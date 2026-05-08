@@ -143,7 +143,8 @@ export function InspectionCard({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              menuOpen ? closeMenu() : openMenu();
+              if (menuOpen) closeMenu();
+              else openMenu();
             }}
           >
             <MoreVertical className="size-5" />

@@ -15,6 +15,7 @@ export default async function InspeccionSeccionPage({ params }: Props) {
 
   return (
     <SectionForm
+      key={`${id}-${config.id}`}
       sectionConfig={config}
       inspectionId={id as Id<"inspections">}
     />

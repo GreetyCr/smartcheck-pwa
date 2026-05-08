@@ -13,7 +13,7 @@ import {
   chunkArray,
   flattenFindingPhotos,
 } from "@/lib/pdf/findingSummary";
-import { countFindingsInDoc } from "@/lib/pdf/countFindings";
+import { countFindingsForSectionDoc } from "@/lib/inspection-findings";
 import { formatItemForPdf } from "@/lib/pdf/formatItem";
 import { pdfItemValueIsPositive } from "@/lib/pdf/itemPdfStyle";
 import { pdfStyles as styles } from "@/lib/pdf/reportStyles";
@@ -359,7 +359,7 @@ export function InspectionReportDocument({ data }: Props) {
         .map((sec) => {
           const cfg = SECTIONS_CONFIG.find((c) => c.table === sec.table);
           if (!cfg) return null;
-          const findings = countFindingsInDoc(sec.doc, sec.table);
+          const findings = countFindingsForSectionDoc(sec.table, sec.doc);
           const name = cfg.name;
           return (
             <Page key={sec.table} size="LETTER" style={styles.page}>

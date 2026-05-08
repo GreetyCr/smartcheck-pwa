@@ -88,14 +88,6 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   });
   const { awaitUploadsIdle, stats: uploadStats } = photoUpload;
 
-  useEffect(() => {
-    seeded.current = false;
-    userEdited.current = false;
-    setDirty(false);
-    setInvalidKeys(new Set());
-    setState({});
-  }, [sectionConfig.id]);
-
   const readonlyContext: ReadonlyUserContext = useMemo(
     () => ({
       name: user?.fullName ?? user?.firstName ?? undefined,

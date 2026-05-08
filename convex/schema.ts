@@ -12,25 +12,13 @@ import { v } from "convex/values";
 /* Tipos de respuesta reutilizables (catálogo: TIPOS DE RESPUESTA)               */
 /* -------------------------------------------------------------------------- */
 
-/** bien_reparacion */
-const itemBr = v.object({
-  value: v.union(v.literal("bien"), v.literal("reparacion")),
-  observation: v.optional(v.string()),
-});
-
-/** bien_reparacion_na */
+/** bien_reparacion_na (incluye datos históricos sin «na» en valor) */
 const itemBrNa = v.object({
   value: v.union(
     v.literal("bien"),
     v.literal("reparacion"),
     v.literal("na"),
   ),
-  observation: v.optional(v.string()),
-});
-
-/** si_no */
-const itemSn = v.object({
-  value: v.union(v.literal("si"), v.literal("no")),
   observation: v.optional(v.string()),
 });
 

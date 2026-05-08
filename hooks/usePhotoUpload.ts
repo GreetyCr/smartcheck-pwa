@@ -203,6 +203,7 @@ export function usePhotoUpload({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- drainPending solo en microtask; no re-fetch IDB al cambiar drainPending
   }, [inspectionId, sectionTable]);
 
   const addPhotosForItem = useCallback(

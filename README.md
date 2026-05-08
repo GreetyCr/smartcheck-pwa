@@ -36,7 +36,7 @@ Abrir [http://localhost:3000](http://localhost:3000). Build: `pnpm build`. Produ
 - `components/ui/` — Shadcn
 - `components/inspection/` — ClientForm, VehicleForm, SectionCard, InspectionItem, PhotoCapture, VoiceInput, ProgressBar
 - `components/layout/` — Header, MobileNav, OfflineIndicator
-- `components/providers/` — ConvexClientProvider, ClerkProvider
+- `components/providers/` — ConvexClientProvider (`ClerkProvider` en `app/layout.tsx` desde `@clerk/nextjs`)
 - `convex/` — schema, users, inspections, sections, images (stubs)
 - `lib/` — utils, uploadthing, offline (db, sync), pdf (generator)
 - `hooks/` — useOnlineStatus, useInspection, useSyncQueue

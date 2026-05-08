@@ -5,7 +5,7 @@ import {
   ConvexReactClient,
   ConvexProviderWithAuth,
 } from "convex/react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   convexSessionAudDependencyKey,
   getConvexStyleToken,
@@ -29,8 +29,10 @@ function useConvexAuthFromClerk() {
 
   const getTokenRef = useRef(getToken);
   const sessionClaimsRef = useRef(sessionClaims);
-  getTokenRef.current = getToken;
-  sessionClaimsRef.current = sessionClaims;
+  useEffect(() => {
+    getTokenRef.current = getToken;
+    sessionClaimsRef.current = sessionClaims;
+  });
 
   const audDep = convexSessionAudDependencyKey(sessionClaims);
 

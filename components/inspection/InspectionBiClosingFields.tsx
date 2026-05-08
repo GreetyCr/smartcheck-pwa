@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -12,18 +11,12 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
   const doc = useQuery(api.inspections.get, { id: inspectionId });
   const patchInspection = useMutation(api.inspections.patch);
 
-  const [commission, setCommission] = useState<"si" | "no" | null>(null);
-  const [condition, setCondition] = useState<1 | 2 | 3 | null>(null);
-
-  useEffect(() => {
-    if (doc === undefined || doc === null) return;
-    setCommission(doc.biCommission ?? null);
-    setCondition(doc.biVehicleCondition ?? null);
-  }, [doc?.biCommission, doc?.biVehicleCondition]);
-
   if (doc === undefined || doc === null) {
     return null;
   }
+
+  const commission = doc.biCommission ?? null;
+  const condition = doc.biVehicleCondition ?? null;
 
   const pill = (active: boolean) =>
     cn(
@@ -34,7 +27,6 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
     );
 
   const setCommissionAndSave = (v: "si" | "no") => {
-    setCommission(v);
     void patchInspection({
       id: inspectionId,
       patch: { biCommission: v },
@@ -42,7 +34,6 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
   };
 
   const setConditionAndSave = (n: 1 | 2 | 3) => {
-    setCondition(n);
     void patchInspection({
       id: inspectionId,
       patch: { biVehicleCondition: n },

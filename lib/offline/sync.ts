@@ -96,14 +96,3 @@ export async function syncPendingToConvex(
 
   return { ok, errors, timedOut };
 }
-
-export async function flushSyncQueue(): Promise<void> {
-  // Llamar desde el cliente con adapters (SyncContext) — sin Convex aquí.
-  console.warn(
-    "flushSyncQueue: usar syncPendingToConvex desde SyncContext con mutaciones de Convex",
-  );
-}
-
-export function enqueueInspection(_data: unknown): void {
-  // Ver useOfflineInspection / getDB
-}
