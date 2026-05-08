@@ -8,6 +8,11 @@ import {
   View,
 } from "@react-pdf/renderer";
 import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
+import {
+  buildPdfFindingRows,
+  chunkArray,
+  flattenFindingPhotos,
+} from "@/lib/pdf/findingSummary";
 import { countFindingsInDoc } from "@/lib/pdf/countFindings";
 import { formatItemForPdf } from "@/lib/pdf/formatItem";
 import { pdfItemValueIsPositive } from "@/lib/pdf/itemPdfStyle";
@@ -21,6 +26,9 @@ import {
 } from "@/lib/pdf/vehicleLabels";
 
 const DISCLAIMER = `El presente informe describe el estado aparente del vehículo en el momento y lugar de la inspección, con base en una revisión visual y funcional limitada. No constituye garantía de condición futura, ausencia de defectos ocultos ni valor comercial. Smartcheck y el inspector no se hacen responsables por defectos no detectables en esta evaluación, ni por reparaciones o decisiones de compra basadas en este documento. El cliente declara haber leído y comprendido estas limitaciones.`;
+
+const FINDING_TEXT_ROWS_PER_PAGE = 14;
+const FINDING_PHOTOS_PER_PAGE = 4;
 
 function plateLine(inspection: Record<string, unknown>): string {
   const idType = inspection.identifierType as string | undefined;
@@ -128,6 +136,17 @@ export function InspectionReportDocument({ data }: Props) {
   for (let i = 0; i < gallery.length; i += 4) {
     galleryChunks.push(gallery.slice(i, i + 4));
   }
+
+  const findingRows = buildPdfFindingRows(sections);
+  const findingPhotosFlat = flattenFindingPhotos(findingRows);
+  const findingTextChunks =
+    findingRows.length === 0
+      ? []
+      : chunkArray(findingRows, FINDING_TEXT_ROWS_PER_PAGE);
+  const findingPhotoChunks = chunkArray(
+    findingPhotosFlat,
+    FINDING_PHOTOS_PER_PAGE,
+  );
 
   const finalDoc = sections.find((s) => s.table === "section_finalizacion")?.doc;
   const inspectorName =
@@ -245,6 +264,96 @@ export function InspectionReportDocument({ data }: Props) {
         })()}
       </Page>
 
+      {findingRows.length === 0 ? (
+        <Page key="summary-exec-empty" size="LETTER" style={styles.page}>
+          <Text style={styles.pageHeader}>Smartcheck · {orderNo}</Text>
+          <Text style={styles.summaryExecutiveTitle}>
+            Resumen ejecutivo — Hallazgos
+          </Text>
+          <Text style={styles.summarySubtitle}>
+            En esta inspección no se registraron ítems marcados automáticamente como
+            hallazgos según las reglas del checklist (p. ej. «Atención», «No» cuando
+            indica problema, o «Sí» en ítems donde la presencia del defecto es la señal).
+            Las páginas siguientes muestran el detalle completo por sección y la galería
+            de fotos.
+          </Text>
+        </Page>
+      ) : (
+        findingTextChunks.map((chunk, si) => (
+          <Page
+            key={`summary-exec-${si}`}
+            size="LETTER"
+            style={styles.page}
+          >
+            <Text style={styles.pageHeader}>Smartcheck · {orderNo}</Text>
+            <Text style={styles.summaryExecutiveTitle}>
+              Resumen ejecutivo — Hallazgos
+              {findingTextChunks.length > 1
+                ? ` (${si + 1}/${findingTextChunks.length})`
+                : ""}
+            </Text>
+            {si === 0 ? (
+              <Text style={styles.summarySubtitle}>
+                Esta vista agrupa únicamente los ítems que el informe considera hallazgos.
+                Después viene el detalle completo del checklist sección por sección y la
+                galería de todas las fotos capturadas.
+              </Text>
+            ) : null}
+            {si === 0 ? (
+              <Text style={styles.summaryTotalLine}>
+                Total: {findingRows.length} hallazgo(s)
+              </Text>
+            ) : null}
+            {chunk.map((row, ri) => (
+              <View
+                key={`${row.sectionName}-${row.itemLabel}-${ri}`}
+                style={styles.summaryFindingBlock}
+              >
+                <Text style={styles.summarySectionTag}>{row.sectionName}</Text>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemLabel}>{row.itemLabel}</Text>
+                  <Text style={[styles.itemValue, styles.repair]}>
+                    {row.valueText}
+                  </Text>
+                </View>
+                {row.observation ? (
+                  <Text style={styles.observation}>→ {row.observation}</Text>
+                ) : null}
+              </View>
+            ))}
+          </Page>
+        ))
+      )}
+
+      {findingPhotosFlat.length > 0
+        ? findingPhotoChunks.map((chunk, pi) => (
+            <Page
+              key={`summary-photos-${pi}`}
+              size="LETTER"
+              style={styles.page}
+            >
+              <Text style={styles.pageHeader}>Smartcheck · {orderNo}</Text>
+              <Text style={styles.summaryPhotoTitle}>
+                Fotos vinculadas a hallazgos
+                {findingPhotoChunks.length > 1
+                  ? ` (${pi + 1}/${findingPhotoChunks.length})`
+                  : ""}
+              </Text>
+              <View style={styles.galleryGrid}>
+                {chunk.map((p, idx) => (
+                  <View
+                    key={`${p.url.slice(-40)}-${idx}`}
+                    style={styles.galleryCell}
+                  >
+                    <Image src={p.url} style={styles.galleryImg} />
+                    <Text style={styles.galleryCap}>{p.caption}</Text>
+                  </View>
+                ))}
+              </View>
+            </Page>
+          ))
+        : null}
+
       {sections
         .filter((sec) => sec.table !== "section_finalizacion")
         .map((sec) => {
@@ -344,7 +453,8 @@ export function InspectionReportDocument({ data }: Props) {
       {galleryChunks.map((chunk, pi) => (
         <Page key={`gal-${pi}`} size="LETTER" style={styles.page}>
           <Text style={styles.pageHeader}>
-            Galería de fotos (pág. {pi + 1} de {galleryChunks.length || 1})
+            Galería completa de fotos (pág. {pi + 1} de{" "}
+            {galleryChunks.length || 1})
           </Text>
           <View style={styles.galleryGrid}>
             {chunk.map((g) => (

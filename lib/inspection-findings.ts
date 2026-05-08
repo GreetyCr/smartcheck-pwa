@@ -28,6 +28,11 @@ function legacyCountInValue(val: unknown): number {
   return 0;
 }
 
+/** Ítem del checklist que cuenta como hallazgo (PDF / resúmenes). */
+export function itemCountsAsFinding(item: SectionItem, val: unknown): boolean {
+  return countChoiceItem(item, val) > 0;
+}
+
 function countChoiceItem(item: SectionItem, val: unknown): number {
   if (val === null || val === undefined) return 0;
   if (typeof val !== "object" || Array.isArray(val)) return 0;
