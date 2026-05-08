@@ -86,6 +86,7 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     getSavedPhotoCount,
     onPhotoUrl,
   });
+  const { awaitUploadsIdle, stats: uploadStats } = photoUpload;
 
   useEffect(() => {
     seeded.current = false;
@@ -162,8 +163,11 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
       });
       setSaveStatus("saved");
       globalThis.setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch {
+    } catch (e) {
       setSaveStatus("idle");
+      browserAlert(
+        e instanceof Error ? e.message : "No se pudo guardar la sección.",
+      );
     }
   }, [inspectionId, sectionConfig, state, upsertSection]);
 
@@ -244,6 +248,15 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   }, [photoEntries, photoUpload, sectionConfig.items]);
 
   const onContinue = useCallback(async () => {
+    try {
+      await awaitUploadsIdle();
+    } catch (e) {
+      browserAlert(
+        e instanceof Error ? e.message : "Esperando la subida de fotos…",
+      );
+      return;
+    }
+
     const v = validateSectionFormDetailed(sectionConfig, state);
     if (!v.ok) {
       const keys = new Set(v.errors.map((e) => e.key));
@@ -270,7 +283,15 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     } else {
       router.push(`/inspecciones/${inspectionId}`);
     }
-  }, [inspectionId, persist, router, routeSections, sectionConfig, state]);
+  }, [
+    awaitUploadsIdle,
+    inspectionId,
+    persist,
+    router,
+    routeSections,
+    sectionConfig,
+    state,
+  ]);
 
   useEffect(() => {
     if (inspection === undefined) return;
@@ -317,10 +338,16 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
         ) : null}
       </SectionFormShell>
       <UploadProgress
-        pending={photoUpload.stats.pending}
-        uploading={photoUpload.stats.uploading}
+        pending={uploadStats.pending}
+        uploading={uploadStats.uploading}
       />
-      <SectionFooter onClick={() => void onContinue()} />
+      <SectionFooter
+        onClick={() => void onContinue()}
+        disabled={uploadStats.active > 0}
+        label={
+          uploadStats.active > 0 ? "Subiendo fotos…" : "Guardar y continuar"
+        }
+      />
     </>
   );
 }

@@ -270,13 +270,38 @@ export function usePhotoUpload({
       }
 
       if (online) {
-        for (const entry of newEntries) {
-          await runUpload(entry);
-        }
+        await Promise.all(newEntries.map((entry) => runUpload(entry)));
       }
     },
     [inspectionId, maxPerItem, runUpload, sectionTable],
   );
+
+  /** Espera a que no queden fotos en cola (p. ej. antes de guardar y navegar). */
+  const awaitUploadsIdle = useCallback(async (timeoutMs = 90_000) => {
+    const start = Date.now();
+    return new Promise<void>((resolve, reject) => {
+      const tick = () => {
+        const flat = Object.values(pendingByItemRef.current).flat();
+        const busy = flat.some(
+          (p) => p.status === "pending" || p.status === "uploading",
+        );
+        if (!busy) {
+          resolve();
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          reject(
+            new Error(
+              "Las fotos tardaron demasiado en subir. Comprueba la red e inténtalo de nuevo.",
+            ),
+          );
+          return;
+        }
+        globalThis.setTimeout(tick, 120);
+      };
+      tick();
+    });
+  }, []);
 
   const removePendingPhoto = useCallback(
     async (itemKey: string, id: string) => {
@@ -314,5 +339,6 @@ export function usePhotoUpload({
     pendingForItem,
     pendingByItem,
     stats,
+    awaitUploadsIdle,
   };
 }
