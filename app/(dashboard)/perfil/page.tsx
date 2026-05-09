@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { LayoutDashboard, LogOut, Mail, Shield } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { APP_VERSION } from "@/lib/app-meta";
+import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { SessionDebugPanel } from "@/components/perfil/SessionDebugPanel";
 import { Button } from "@/components/ui/button";
 
@@ -14,11 +15,7 @@ export default function PerfilPage() {
   const me = useQuery(api.users.getMe, isLoaded ? {} : "skip");
 
   if (!isLoaded) {
-    return (
-      <div className="mx-auto max-w-lg px-4 pb-6 pt-4 text-sm text-muted-foreground">
-        Cargando perfil…
-      </div>
-    );
+    return <DashboardPageSkeleton variant="list" />;
   }
 
   const name =

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
@@ -10,6 +11,7 @@ import { SectionFormShell } from "@/components/inspection/SectionFormShell";
 import { SectionFooter } from "@/components/inspection/SectionFooter";
 import { SectionFormField } from "@/components/inspection/SectionFormField";
 import { InspectionBiClosingFields } from "@/components/inspection/InspectionBiClosingFields";
+import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { UploadProgress } from "@/components/inspection/UploadProgress";
 import type { PhotoEntry } from "@/components/inspection/items/ItemPhotos";
 import { usePhotoUpload } from "@/hooks/usePhotoUpload";
@@ -304,6 +306,25 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   }, [inspection, inspectionId, router, routeSections, sectionConfig.id]);
 
   const total = sectionConfig.items.length;
+
+  if (inspection === undefined) {
+    return <DashboardPageSkeleton variant="form" />;
+  }
+
+  if (inspection === null) {
+    return (
+      <div className="p-6">
+        <p className="text-destructive">Inspección no encontrada o sin permiso.</p>
+        <Link href="/" className="mt-2 inline-block text-primary underline">
+          Volver al inicio
+        </Link>
+      </div>
+    );
+  }
+
+  if (doc === undefined) {
+    return <DashboardPageSkeleton variant="form" />;
+  }
 
   return (
     <>

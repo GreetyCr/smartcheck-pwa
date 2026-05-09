@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   canAccessInspection,
   requireAdmin,
@@ -183,6 +183,35 @@ export const get = query({
     const allowed = await canAccessInspection(ctx, id);
     if (!allowed) throw new Error("No autorizado");
     return await ctx.db.get(id);
+  },
+});
+
+/** Inspección + URLs firmadas de fotos de cabecera (edición cliente/vehículo). */
+export const getCabeceraEdit = query({
+  args: { id: v.id("inspections") },
+  handler: async (ctx, { id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    if (!(await canAccessInspection(ctx, id))) return null;
+    const doc = await ctx.db.get(id);
+    if (!doc) return null;
+
+    const urlOf = async (ref: Id<"_storage"> | undefined) =>
+      ref ? ((await ctx.storage.getUrl(ref)) ?? null) : null;
+
+    return {
+      inspection: doc,
+      photoUrls: {
+        front: await urlOf(doc.vehiclePhotoFront ?? doc.vehiclePhoto ?? undefined),
+        sideLeft: await urlOf(doc.vehiclePhotoSideLeft ?? undefined),
+        sideRight: await urlOf(doc.vehiclePhotoSideRight ?? undefined),
+        rear: await urlOf(doc.vehiclePhotoRear ?? undefined),
+        dekra: await urlOf(doc.photoDekra ?? undefined),
+        plate: await urlOf(doc.photoPlate ?? undefined),
+        marchamo: await urlOf(doc.photoMarchamo ?? undefined),
+        vinSticker: await urlOf(doc.photoVinSticker ?? undefined),
+      },
+    };
   },
 });
 

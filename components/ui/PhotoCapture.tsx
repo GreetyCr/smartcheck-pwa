@@ -19,6 +19,8 @@ function clickFileInput(ref: RefObject<HTMLInputElement | null>) {
 
 type PhotoCaptureProps = {
   file: File | null;
+  /** Imagen ya guardada (p. ej. Convex Storage) mientras el usuario no elige archivo nuevo. */
+  existingImageUrl?: string | null;
   onFileChange: (file: File | null) => void;
   label?: string;
   className?: string;
@@ -27,6 +29,7 @@ type PhotoCaptureProps = {
 
 export function PhotoCapture({
   file,
+  existingImageUrl = null,
   onFileChange,
   label = "Foto de la Tarjeta de Circulación / Vehículo",
   className,
@@ -39,14 +42,13 @@ export function PhotoCapture({
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    setPreviewUrl(existingImageUrl?.trim() ? existingImageUrl : null);
+  }, [file, existingImageUrl]);
 
   const onPick = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

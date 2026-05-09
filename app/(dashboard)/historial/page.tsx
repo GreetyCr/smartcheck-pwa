@@ -10,6 +10,7 @@ import {
   type InspectionStatusFilter,
 } from "@/components/dashboard/InspectionFilters";
 import { InspectionCard } from "@/components/dashboard/InspectionCard";
+import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { Button } from "@/components/ui/button";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
@@ -53,11 +54,7 @@ export default function HistorialPage() {
     !searching && !loading && (list?.length ?? 0) === limit;
 
   if (!isLoaded) {
-    return (
-      <div className="mx-auto max-w-lg px-4 pb-6 pt-4 text-sm text-muted-foreground">
-        Cargando…
-      </div>
-    );
+    return <DashboardPageSkeleton variant="list" />;
   }
 
   if (!isSignedIn) {
@@ -79,7 +76,14 @@ export default function HistorialPage() {
       <InspectionFilters value={filter} onChange={setFilter} />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Cargando inspecciones…</p>
+        <div className="space-y-3 pt-2" aria-busy aria-label="Cargando lista">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[4.5rem] animate-pulse rounded-2xl bg-muted/80 dark:bg-muted/50"
+            />
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
           {searching

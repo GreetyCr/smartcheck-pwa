@@ -14,6 +14,7 @@ import { InspectionFooter } from "@/components/inspection/InspectionFooter";
 import { InspectionPdfExport } from "@/components/inspection/InspectionPdfExport";
 import { InspectionPdfStatus } from "@/components/inspection/InspectionPdfStatus";
 import type { SectionRowStatus } from "@/components/inspection/SectionItem";
+import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { browserAlert, browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
@@ -141,11 +142,7 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
       : 0;
 
   if (inspection === undefined || sectionData === undefined) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center px-4">
-        <p className="text-muted-foreground">Cargando…</p>
-      </div>
-    );
+    return <DashboardPageSkeleton variant="detail" />;
   }
 
   if (inspection === null) {
@@ -214,7 +211,14 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
                 aria-label="Cerrar menú"
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="absolute right-0 top-11 z-50 min-w-[200px] rounded-xl border border-border bg-card py-1 shadow-lg">
+              <div className="absolute right-0 top-11 z-50 min-w-[220px] rounded-xl border border-border bg-card py-1 shadow-lg">
+                <Link
+                  href={`/inspecciones/${inspectionId}/cabecera`}
+                  className="block px-4 py-2.5 text-sm hover:bg-muted"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Editar datos del informe
+                </Link>
                 <Link
                   href={`/inspecciones/${inspectionId}#informe-pdf`}
                   className="block px-4 py-2.5 text-sm hover:bg-muted"
@@ -240,10 +244,18 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
       </header>
 
       <div className="mx-auto w-full max-w-lg flex-1 space-y-4 px-4 pt-4">
-        <VehicleCard
-          plate={plate}
-          brandModelYear={brandModelYear || "Vehículo"}
-        />
+        <div className="space-y-2">
+          <VehicleCard
+            plate={plate}
+            brandModelYear={brandModelYear || "Vehículo"}
+          />
+          <Link
+            href={`/inspecciones/${inspectionId}/cabecera`}
+            className="block w-full rounded-xl border border-border bg-card px-4 py-3 text-center text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-muted/50"
+          >
+            Editar datos del informe (cliente, vehículo, fotos)
+          </Link>
+        </div>
         <ProgressCard
           percent={progressPercent}
           completed={completedCount}
