@@ -165,6 +165,26 @@ export function InspectionReportDocument({ data }: Props) {
 
   return (
     <Document>
+      <Page size="LETTER" style={styles.coverPage}>
+        <View style={styles.coverPageBody}>
+          <View style={styles.coverPageInner}>
+            <Text style={styles.coverPageBrand}>Smartcheck</Text>
+            <Text style={styles.coverPageReportTitle}>
+              Informe de inspección vehicular
+            </Text>
+            <View style={styles.coverPageInspectorBlock}>
+              <Text style={styles.coverPageInspectorLine}>
+                Nombre del inspector:
+              </Text>
+              <Text style={styles.coverPageInspectorName}>{inspectorName}</Text>
+            </View>
+          </View>
+        </View>
+        <Text style={styles.coverPageOrderFooter}>
+          N.º de orden: {orderNo}
+        </Text>
+      </Page>
+
       <Page size="LETTER" style={styles.page}>
         <View style={styles.coverHeader}>
           <Text style={styles.coverTitle}>SMARTCHECK</Text>

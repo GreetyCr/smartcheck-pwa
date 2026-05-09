@@ -23,6 +23,59 @@ export const pdfStyles = StyleSheet.create({
     fontSize: 11,
     opacity: 0.95,
   },
+  /** Portada inicial (solo título + inspector). */
+  coverPage: {
+    padding: 48,
+    fontFamily: "Helvetica",
+    color: "#1a1a1a",
+    flexDirection: "column",
+  },
+  coverPageBody: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  coverPageInner: {
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  coverPageBrand: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#1E3A5F",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  coverPageReportTitle: {
+    fontSize: 14,
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 36,
+    lineHeight: 1.4,
+  },
+  coverPageInspectorBlock: {
+    marginTop: 8,
+    alignItems: "center",
+    maxWidth: "100%",
+  },
+  coverPageInspectorLine: {
+    fontSize: 11,
+    color: "#333",
+    textAlign: "center",
+    lineHeight: 1.5,
+  },
+  coverPageInspectorName: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#1a1a1a",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  coverPageOrderFooter: {
+    fontSize: 8,
+    color: "#888",
+    textAlign: "center",
+    marginTop: 12,
+  },
   coverRow: {
     flexDirection: "row",
     justifyContent: "space-between",

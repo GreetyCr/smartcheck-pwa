@@ -28,6 +28,14 @@ function buildFileName(inspection: Record<string, unknown>): string {
 
 type Props = { inspectionId: Id<"inspections"> };
 
+function formatPdfSavedAt(generatedAt: number | undefined): string {
+  if (generatedAt == null || !Number.isFinite(generatedAt)) return "—";
+  return new Date(generatedAt).toLocaleString("es-CR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 export function InspectionPdfExport({ inspectionId }: Props) {
   const canExport = useQuery(api.users.exportPdfAllowed, {});
   const inspection = useQuery(
@@ -46,17 +54,20 @@ export function InspectionPdfExport({ inspectionId }: Props) {
   const markReportDelivered = useMutation(api.inspections.markReportDelivered);
   const [busy, setBusy] = useState(false);
   const [deliverBusy, setDeliverBusy] = useState(false);
+  const [cloudJustSaved, setCloudJustSaved] = useState(false);
 
   if (canExport !== true) {
     return null;
   }
 
   const deliveredAt = inspection?.reportDeliveredAt;
+  const latestLoading = latest === undefined;
   const hasPdfInCloud = Boolean(latest);
 
   const handleGenerate = async () => {
     if (!payload) return;
     setBusy(true);
+    setCloudJustSaved(false);
     try {
       const data = payload as PdfExportPayload;
       const blob = await generateInspectionPdfBlob(data);
@@ -72,14 +83,24 @@ export function InspectionPdfExport({ inspectionId }: Props) {
       URL.revokeObjectURL(href);
 
       if (typeof navigator !== "undefined" && navigator.onLine) {
-        const post = await genUrl();
-        const storageId = await uploadPdfBlobToConvex(post, blob);
-        await recordPdf({
-          inspectionId,
-          storageId,
-          fileName: name,
-          fileSize: blob.size,
-        });
+        try {
+          const post = await genUrl();
+          const storageId = await uploadPdfBlobToConvex(post, blob);
+          await recordPdf({
+            inspectionId,
+            storageId,
+            fileName: name,
+            fileSize: blob.size,
+          });
+          setCloudJustSaved(true);
+          globalThis.setTimeout(() => setCloudJustSaved(false), 5000);
+        } catch (uploadErr) {
+          browserAlert(
+            uploadErr instanceof Error
+              ? `El PDF se descargó, pero no quedó guardado en la nube: ${uploadErr.message}`
+              : "El PDF se descargó, pero no quedó guardado en la nube.",
+          );
+        }
       } else if (typeof navigator !== "undefined") {
         browserAlert(
           "PDF descargado en el dispositivo. Sin conexión: no se guardó en la nube; vuelve a generar cuando tengas red para archivarlo.",
@@ -108,7 +129,10 @@ export function InspectionPdfExport({ inspectionId }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div
+      id="informe-pdf"
+      className="scroll-mt-24 rounded-2xl border border-border bg-card p-4 shadow-sm"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-primary">Informe PDF</h2>
@@ -116,17 +140,22 @@ export function InspectionPdfExport({ inspectionId }: Props) {
             Genera el reporte completo (solo administradores). Se descarga en el
             dispositivo y se guarda en la nube si hay conexión.
           </p>
-          {latest ? (
+          {latestLoading ? (
             <p className="mt-2 text-xs text-muted-foreground">
-              Último PDF:{" "}
-              {new Date(latest.generatedAt).toLocaleString("es-CR", {
-                dateStyle: "short",
-                timeStyle: "short",
-              })}
+              Comprobando si hay PDF en la nube…
+            </p>
+          ) : latest ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Último PDF: {formatPdfSavedAt(latest.generatedAt)}
             </p>
           ) : (
             <p className="mt-2 text-xs text-amber-800">Aún no hay PDF guardado.</p>
           )}
+          {cloudJustSaved ? (
+            <p className="mt-2 text-xs font-medium text-emerald-800">
+              PDF guardado en la nube correctamente.
+            </p>
+          ) : null}
         </div>
         <Button
           type="button"

@@ -44,6 +44,18 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     void ensureRows({ inspectionId }).catch(() => {});
   }, [inspection, inspectionId, ensureRows]);
 
+  useEffect(() => {
+    if (typeof globalThis === "undefined" || !("location" in globalThis)) return;
+    const win = globalThis as unknown as { location: { hash: string } };
+    if (win.location.hash !== "#informe-pdf") return;
+    const t = globalThis.setTimeout(() => {
+      globalThis.document
+        ?.getElementById("informe-pdf")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => globalThis.clearTimeout(t);
+  }, [inspection, inspectionId]);
+
   const handleSaveDraft = useCallback(async () => {
     setSaving(true);
     try {
@@ -204,9 +216,10 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
               />
               <div className="absolute right-0 top-11 z-50 min-w-[200px] rounded-xl border border-border bg-card py-1 shadow-lg">
                 <Link
-                  href={`/inspecciones/${inspectionId}/pdf`}
+                  href={`/inspecciones/${inspectionId}#informe-pdf`}
                   className="block px-4 py-2.5 text-sm hover:bg-muted"
                   onClick={() => setMenuOpen(false)}
+                  scroll={false}
                 >
                   Ir al informe PDF
                 </Link>

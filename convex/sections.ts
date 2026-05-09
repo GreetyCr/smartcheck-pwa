@@ -3,6 +3,7 @@ import { mutation, query, type QueryCtx, type MutationCtx } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
 import { canAccessInspection, requireUser } from "./lib/auth";
+import { sanitizeSectionPatch } from "./lib/sanitizeSectionPatch";
 
 /** Orden del flujo (catálogo Módulo 2.2) — índice `by_inspection` en cada tabla. */
 export const SECTION_TABLE_ORDER = [
@@ -276,16 +277,33 @@ export const upsertSection = mutation({
     if (!isSectionTable(sectionTable)) {
       throw new Error("Tabla de sección no válida");
     }
-    const patch = data as Record<string, unknown>;
+    const patch = sanitizeSectionPatch(data as Record<string, unknown>);
     const existing = await getSectionDoc(ctx, sectionTable, inspectionId);
     if (existing) {
-      await ctx.db.patch(existing._id, patch);
+      if (Object.keys(patch).length === 0) {
+        return existing._id;
+      }
+      try {
+        await ctx.db.patch(existing._id, patch);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(
+          `No se pudo guardar la sección (${sectionTable}): ${msg}`,
+        );
+      }
       return existing._id;
     }
-    return await ctx.db.insert(sectionTable, {
-      inspectionId,
-      ...patch,
-    });
+    try {
+      return await ctx.db.insert(sectionTable, {
+        inspectionId,
+        ...patch,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `No se pudo crear la sección (${sectionTable}): ${msg}`,
+      );
+    }
   },
 });
 
