@@ -122,18 +122,30 @@ export function usePhotoUpload({
         updatePhoto(photo.id, { status: "pending" });
         return;
       }
-      updatePhoto(photo.id, { status: "uploading", errorMessage: undefined });
-      try {
-        const res = await startUpload([photo.file]);
-        const url = extractUploadedUrl(res);
-        if (!url) throw new Error("Respuesta sin URL");
-        onPhotoUrlRef.current(photo.itemKey, url);
-        await removePhotoQueue(photo.id).catch(() => {});
-        removePhotoLocal(photo.id);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        updatePhoto(photo.id, { status: "error", errorMessage: msg });
+      const maxAttempts = 3;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) =>
+            globalThis.setTimeout(r, 400 * attempt),
+          );
+        }
+        updatePhoto(photo.id, { status: "uploading", errorMessage: undefined });
+        try {
+          const res = await startUpload([photo.file]);
+          const url = extractUploadedUrl(res);
+          if (!url) throw new Error("Respuesta sin URL");
+          onPhotoUrlRef.current(photo.itemKey, url);
+          await removePhotoQueue(photo.id).catch(() => {});
+          removePhotoLocal(photo.id);
+          return;
+        } catch (e) {
+          lastErr = e;
+        }
       }
+      const msg =
+        lastErr instanceof Error ? lastErr.message : String(lastErr);
+      updatePhoto(photo.id, { status: "error", errorMessage: msg });
     },
     [removePhotoLocal, startUpload, updatePhoto],
   );

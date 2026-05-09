@@ -171,6 +171,15 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     return () => globalThis.clearTimeout(t);
   }, [state, dirty, persist]);
 
+  const uploadsWereActive = useRef(false);
+  useEffect(() => {
+    const active = uploadStats.active > 0;
+    if (uploadsWereActive.current && !active && dirty) {
+      void persist();
+    }
+    uploadsWereActive.current = active;
+  }, [uploadStats.active, dirty, persist]);
+
   const updateField = useCallback((key: string, value: unknown) => {
     userEdited.current = true;
     setDirty(true);

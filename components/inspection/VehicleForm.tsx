@@ -128,29 +128,35 @@ export function VehicleForm({ className }: { className?: string }) {
 
       const gen = () => generateUploadUrl();
 
-      const vehiclePhotoFront = await uploadOne(gen, draft.vehiclePhotoFrontFile);
-      const vehiclePhotoSideLeft = await uploadOne(
-        gen,
-        draft.vehiclePhotoSideLeftFile,
-      );
-      const vehiclePhotoSideRight = await uploadOne(
-        gen,
-        draft.vehiclePhotoSideRightFile,
-      );
-      const vehiclePhotoRear = await uploadOne(gen, draft.vehiclePhotoRearFile);
+      /** Las 4 ángulos obligatorios en paralelo (antes en serie → ~4× latencia). */
+      const [
+        vehiclePhotoFront,
+        vehiclePhotoSideLeft,
+        vehiclePhotoSideRight,
+        vehiclePhotoRear,
+      ] = await Promise.all([
+        uploadOne(gen, draft.vehiclePhotoFrontFile),
+        uploadOne(gen, draft.vehiclePhotoSideLeftFile),
+        uploadOne(gen, draft.vehiclePhotoSideRightFile),
+        uploadOne(gen, draft.vehiclePhotoRearFile),
+      ]);
 
-      const photoDekra = draft.photoDekraFile
-        ? await uploadOne(gen, draft.photoDekraFile)
-        : undefined;
-      const photoPlate = draft.photoPlateFile
-        ? await uploadOne(gen, draft.photoPlateFile)
-        : undefined;
-      const photoMarchamo = draft.photoMarchamoFile
-        ? await uploadOne(gen, draft.photoMarchamoFile)
-        : undefined;
-      const photoVinSticker = draft.photoVinStickerFile
-        ? await uploadOne(gen, draft.photoVinStickerFile)
-        : undefined;
+      /** Opcionales también en paralelo si existen. */
+      const [photoDekra, photoPlate, photoMarchamo, photoVinSticker] =
+        await Promise.all([
+          draft.photoDekraFile
+            ? uploadOne(gen, draft.photoDekraFile)
+            : Promise.resolve(undefined),
+          draft.photoPlateFile
+            ? uploadOne(gen, draft.photoPlateFile)
+            : Promise.resolve(undefined),
+          draft.photoMarchamoFile
+            ? uploadOne(gen, draft.photoMarchamoFile)
+            : Promise.resolve(undefined),
+          draft.photoVinStickerFile
+            ? uploadOne(gen, draft.photoVinStickerFile)
+            : Promise.resolve(undefined),
+        ]);
 
       const ids = resolvePrimaryVehicleId(draft.plate, draft.vinInput);
 
