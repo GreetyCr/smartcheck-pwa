@@ -80,30 +80,29 @@ export function InspectionPdfExport({ inspectionId }: Props) {
       a.href = href;
       a.download = name;
       a.click();
-      URL.revokeObjectURL(href);
+      /** Safari/iOS a veces corta la descarga si se revoca el blob al instante. */
+      globalThis.setTimeout(() => URL.revokeObjectURL(href), 4000);
 
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        try {
-          const post = await genUrl();
-          const storageId = await uploadPdfBlobToConvex(post, blob);
-          await recordPdf({
-            inspectionId,
-            storageId,
-            fileName: name,
-            fileSize: blob.size,
-          });
-          setCloudJustSaved(true);
-          globalThis.setTimeout(() => setCloudJustSaved(false), 5000);
-        } catch (uploadErr) {
-          browserAlert(
-            uploadErr instanceof Error
-              ? `El PDF se descargó, pero no quedó guardado en la nube: ${uploadErr.message}`
-              : "El PDF se descargó, pero no quedó guardado en la nube.",
-          );
-        }
-      } else if (typeof navigator !== "undefined") {
+      /**
+       * Intentar siempre subir a la nube: `navigator.onLine` en iOS Safari/PWA
+       * suele dar falso aun con datos; si falla la red, el catch lo indica.
+       */
+      try {
+        const post = await genUrl();
+        const storageId = await uploadPdfBlobToConvex(post, blob);
+        await recordPdf({
+          inspectionId,
+          storageId,
+          fileName: name,
+          fileSize: blob.size,
+        });
+        setCloudJustSaved(true);
+        globalThis.setTimeout(() => setCloudJustSaved(false), 5000);
+      } catch (uploadErr) {
         browserAlert(
-          "PDF descargado en el dispositivo. Sin conexión: no se guardó en la nube; vuelve a generar cuando tengas red para archivarlo.",
+          uploadErr instanceof Error
+            ? `El PDF se descargó, pero no quedó guardado en la nube: ${uploadErr.message}`
+            : "El PDF se descargó, pero no quedó guardado en la nube. Comprueba la conexión y vuelve a generar para archivarlo.",
         );
       }
     } catch (e) {

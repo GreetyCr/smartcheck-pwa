@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import {
   canAccessInspection,
   requireAdmin,
@@ -8,6 +9,19 @@ import {
   userHasFullAccess,
 } from "./lib/auth";
 import { SECTION_TABLE_ORDER } from "./sections";
+
+/** Fire-and-forget hacia n8n (no bloquea la mutación). Desactivar con N8N_WEBHOOK_DISABLED=true. */
+async function scheduleN8nNotify(
+  ctx: MutationCtx,
+  args: {
+    event: string;
+    inspectionId?: Id<"inspections">;
+    meta?: Record<string, unknown>;
+  },
+): Promise<void> {
+  if (process.env.N8N_WEBHOOK_DISABLED === "true") return;
+  await ctx.scheduler.runAfter(0, internal.n8nWebhook.deliver, args);
+}
 
 const inspectionStatus = v.union(
   v.literal("draft"),
@@ -145,11 +159,16 @@ export const createDraft = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-    return await ctx.db.insert("inspections", {
+    const id = await ctx.db.insert("inspections", {
       clerkUserId: user.clerkId,
       status: "draft",
       findingsCount: 0,
     });
+    await scheduleN8nNotify(ctx, {
+      event: "inspection_created",
+      inspectionId: id,
+    });
+    return id;
   },
 });
 
@@ -172,6 +191,11 @@ export const patch = mutation({
     const allowed = await canAccessInspection(ctx, id);
     if (!allowed) throw new Error("No autorizado");
     await ctx.db.patch(id, patch);
+    await scheduleN8nNotify(ctx, {
+      event: "inspection_patched",
+      inspectionId: id,
+      meta: { patchedKeys: Object.keys(patch) },
+    });
   },
 });
 
@@ -345,6 +369,10 @@ export const markReportDelivered = mutation({
       status: "report_delivered",
       reportDeliveredAt: Date.now(),
     });
+    await scheduleN8nNotify(ctx, {
+      event: "report_delivered",
+      inspectionId,
+    });
   },
 });
 
@@ -357,6 +385,10 @@ export const markSynced = mutation({
     await ctx.db.patch(id, {
       status: "synced",
       lastSyncedAt: Date.now(),
+    });
+    await scheduleN8nNotify(ctx, {
+      event: "inspection_marked_synced",
+      inspectionId: id,
     });
   },
 });
@@ -398,7 +430,7 @@ export const duplicateInspection = mutation({
     if (!src) throw new Error("No encontrado");
     const user = await requireUser(ctx);
 
-    return await ctx.db.insert("inspections", {
+    const newId = await ctx.db.insert("inspections", {
       clerkUserId: user.clerkId,
       status: "draft",
       findingsCount: 0,
@@ -425,5 +457,11 @@ export const duplicateInspection = mutation({
       mileage: src.mileage,
       mileageUnit: src.mileageUnit,
     });
+    await scheduleN8nNotify(ctx, {
+      event: "inspection_duplicated",
+      inspectionId: newId,
+      meta: { sourceInspectionId: sourceId },
+    });
+    return newId;
   },
 });

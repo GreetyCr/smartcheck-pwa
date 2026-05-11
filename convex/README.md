@@ -31,6 +31,13 @@ Tras `npx convex dev`, Convex añade/actualiza en `.env.local` (entre otras):
 - `CLERK_JWT_ISSUER_DOMAIN` — Frontend API URL de Clerk (validación de JWT; ver `auth.config.ts`)
 - `CLERK_WEBHOOK_SECRET` — Signing secret del webhook de Clerk (endpoint HTTP)
 
+**Automatización / n8n (solo Dashboard de Convex → Settings → Environment Variables):**
+
+- `N8N_WEBHOOK_URL` — URL del webhook n8n (POST JSON). Si está vacío, no se envía nada.
+- `N8N_WEBHOOK_DISABLED` — Opcional: `true` para desactivar todos los envíos sin quitar código.
+
+Las mutaciones relevantes encolan un `internalAction` asíncrono (no bloquean la UI). El cuerpo incluye `event`, `inspectionId`, `inspection` (documento actual de Convex) y `meta`.
+
 **JWT template en Clerk (obligatorio para `ConvexProviderWithClerk`):**
 
 1. Clerk Dashboard → **Configure** → **JWT Templates** → **New template**.

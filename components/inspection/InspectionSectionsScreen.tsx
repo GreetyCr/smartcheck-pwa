@@ -30,6 +30,10 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     inspectionId,
   });
   const me = useQuery(api.users.getMe, {});
+  /** PDF archivado en Convex (enlace firmado; no requiere sesión del cliente). */
+  const latestPdf = useQuery(api.pdfs.getLatestForInspection, {
+    inspectionId,
+  });
 
   const ensureRows = useMutation(api.sections.ensureSectionRows);
   const touchDraft = useMutation(api.sections.touchDraft);
@@ -72,27 +76,70 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
   }, [inspectionId, touchDraft]);
 
   const handleShare = useCallback(async () => {
-    const url =
-      typeof globalThis !== "undefined" && "location" in globalThis
-        ? (globalThis as unknown as { location: { href: string } }).location
-            .href
-        : "";
-    const nav = navigator as unknown as {
-      share?: (d: { title: string; url: string }) => Promise<void>;
-      clipboard: { writeText: (s: string) => Promise<void> };
-    };
-    try {
-      if (nav.share) {
-        await nav.share({ title: "Inspección Smartcheck", url });
-      } else {
-        await nav.clipboard.writeText(url);
-        setToast("Enlace copiado");
-        globalThis.setTimeout(() => setToast(null), 2000);
-      }
-    } catch {
-      /* usuario canceló share */
+    if (latestPdf === undefined) {
+      setToast("Cargando datos del informe…");
+      globalThis.setTimeout(() => setToast(null), 2200);
+      return;
     }
-  }, []);
+
+    type ShareNavigator = Navigator & {
+      share?: (data: ShareData & { files?: File[] }) => Promise<void>;
+      canShare?: (data: { files: File[] }) => boolean;
+    };
+    const nav = navigator as ShareNavigator;
+
+    const pdfUrl = latestPdf?.url?.trim() ?? "";
+    const pdfName =
+      latestPdf?.fileName && /\.pdf$/i.test(latestPdf.fileName)
+        ? latestPdf.fileName
+        : "Smartcheck-informe.pdf";
+
+    if (pdfUrl) {
+      try {
+        const res = await fetch(pdfUrl, { mode: "cors", credentials: "omit" });
+        if (res.ok) {
+          const blob = await res.blob();
+          const file = new File([blob], pdfName, { type: "application/pdf" });
+          if (
+            typeof nav.canShare === "function" &&
+            nav.canShare({ files: [file] }) &&
+            typeof nav.share === "function"
+          ) {
+            await nav.share({
+              files: [file],
+              title: "Informe Smartcheck",
+              text: "Informe de inspección vehicular",
+            });
+            return;
+          }
+        }
+      } catch {
+        /* sigue con enlace o portapapeles */
+      }
+
+      try {
+        if (typeof nav.share === "function") {
+          await nav.share({
+            title: "Informe Smartcheck",
+            text: "Informe de inspección vehicular (PDF)",
+            url: pdfUrl,
+          });
+          return;
+        }
+        await navigator.clipboard.writeText(pdfUrl);
+        setToast("Enlace del PDF copiado");
+        globalThis.setTimeout(() => setToast(null), 2500);
+        return;
+      } catch {
+        /* usuario canceló o falló */
+      }
+      return;
+    }
+
+    browserAlert(
+      "Aún no hay un PDF archivado en la nube para esta inspección. Un administrador debe generarlo en «Informe PDF»; después podrás compartir el archivo o el enlace del PDF con el cliente (sin necesidad de cuenta en Smartcheck).",
+    );
+  }, [latestPdf]);
 
   const handleDiscard = useCallback(async () => {
     if (!browserConfirm("¿Descartar esta inspección? Esta acción no se puede deshacer.")) {
