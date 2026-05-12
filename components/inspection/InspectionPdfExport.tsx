@@ -26,6 +26,18 @@ function buildFileName(inspection: Record<string, unknown>): string {
   return `Smartcheck_${raw}_${day}.pdf`;
 }
 
+function triggerPdfDownload(blob: Blob, name: string): void {
+  const href = URL.createObjectURL(blob);
+  const d = (globalThis as unknown as {
+    document: { createElement: (t: string) => WebDownloadLink };
+  }).document;
+  const a = d.createElement("a");
+  a.href = href;
+  a.download = name;
+  a.click();
+  globalThis.setTimeout(() => URL.revokeObjectURL(href), 4000);
+}
+
 type Props = { inspectionId: Id<"inspections"> };
 
 function formatPdfSavedAt(generatedAt: number | undefined): string {
@@ -72,39 +84,58 @@ export function InspectionPdfExport({ inspectionId }: Props) {
       const data = payload as PdfExportPayload;
       const blob = await generateInspectionPdfBlob(data);
       const name = buildFileName(data.inspection);
-      const href = URL.createObjectURL(blob);
-      const d = (globalThis as unknown as {
-        document: { createElement: (t: string) => WebDownloadLink };
-      }).document;
-      const a = d.createElement("a");
-      a.href = href;
-      a.download = name;
-      a.click();
-      /** Safari/iOS a veces corta la descarga si se revoca el blob al instante. */
-      globalThis.setTimeout(() => URL.revokeObjectURL(href), 4000);
 
       /**
-       * Intentar siempre subir a la nube: `navigator.onLine` en iOS Safari/PWA
-       * suele dar falso aun con datos; si falla la red, el catch lo indica.
+       * Orden importante en iOS Safari: primero subir a Convex y registrar la fila,
+       * luego disparar la descarga local. Si se hace al revés, la descarga puede
+       * competir con el POST al storage y la subida falla sin mensaje claro.
        */
+      let postUrl: string;
       try {
-        const post = await genUrl();
-        const storageId = await uploadPdfBlobToConvex(post, blob);
+        postUrl = await genUrl();
+      } catch (e) {
+        triggerPdfDownload(blob, name);
+        browserAlert(
+          `[1/3 Pedir URL de subida] Falló: ${
+            e instanceof Error ? e.message : String(e)
+          }. Se descargó el PDF en el dispositivo; no quedó en la nube.`,
+        );
+        return;
+      }
+
+      let storageId: Id<"_storage">;
+      try {
+        storageId = await uploadPdfBlobToConvex(postUrl, blob);
+      } catch (e) {
+        triggerPdfDownload(blob, name);
+        browserAlert(
+          `[2/3 Subir archivo a almacenamiento] Falló: ${
+            e instanceof Error ? e.message : String(e)
+          }. Se descargó el PDF localmente. Causas frecuentes en iPhone: red inestable, modo datos limitados, o extensión/PWA que bloquea dominios externos (Convex).`,
+        );
+        return;
+      }
+
+      try {
         await recordPdf({
           inspectionId,
           storageId,
           fileName: name,
           fileSize: blob.size,
         });
-        setCloudJustSaved(true);
-        globalThis.setTimeout(() => setCloudJustSaved(false), 5000);
-      } catch (uploadErr) {
+      } catch (e) {
+        triggerPdfDownload(blob, name);
         browserAlert(
-          uploadErr instanceof Error
-            ? `El PDF se descargó, pero no quedó guardado en la nube: ${uploadErr.message}`
-            : "El PDF se descargó, pero no quedó guardado en la nube. Comprueba la conexión y vuelve a generar para archivarlo.",
+          `[3/3 Registrar PDF en la base de datos] Falló: ${
+            e instanceof Error ? e.message : String(e)
+          }. El archivo puede haberse subido al storage pero sin enlace en la app; contacta soporte con este mensaje. Se descargó el PDF en el dispositivo.`,
         );
+        return;
       }
+
+      setCloudJustSaved(true);
+      globalThis.setTimeout(() => setCloudJustSaved(false), 5000);
+      triggerPdfDownload(blob, name);
     } catch (e) {
       browserAlert(
         e instanceof Error ? e.message : "No se pudo generar el PDF",
