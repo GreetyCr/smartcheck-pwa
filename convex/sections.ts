@@ -3,6 +3,7 @@ import { mutation, query, type QueryCtx, type MutationCtx } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
 import { canAccessInspection, requireUser } from "./lib/auth";
+import { normalizeStoredPhotoUrl } from "./lib/externalPhotoUrl";
 import { sanitizeSectionPatch } from "./lib/sanitizeSectionPatch";
 
 /** Orden del flujo (catálogo Módulo 2.2) — índice `by_inspection` en cada tabla. */
@@ -279,6 +280,19 @@ export const upsertSection = mutation({
     }
     const patch = sanitizeSectionPatch(data as Record<string, unknown>);
     const existing = await getSectionDoc(ctx, sectionTable, inspectionId);
+    if (existing && patch.itemPhotos && typeof patch.itemPhotos === "object") {
+      const prevRaw = (existing as unknown as Record<string, unknown>).itemPhotos;
+      const prev =
+        prevRaw &&
+        typeof prevRaw === "object" &&
+        !Array.isArray(prevRaw)
+          ? (prevRaw as Record<string, (Id<"_storage"> | string)[]>)
+          : {};
+      patch.itemPhotos = {
+        ...prev,
+        ...(patch.itemPhotos as Record<string, (Id<"_storage"> | string)[]>),
+      };
+    }
     if (existing) {
       if (Object.keys(patch).length === 0) {
         return existing._id;
@@ -332,14 +346,17 @@ export const getSectionItemPhotoEntries = query({
     for (const [key, refs] of Object.entries(itemPhotos)) {
       out[key] = [];
       for (const ref of refs) {
-        if (typeof ref === "string" && /^https?:\/\//i.test(ref)) {
-          out[key].push({ ref, url: ref });
-        } else {
-          const sid = ref as Id<"_storage">;
-          out[key].push({
-            ref: sid,
-            url: await ctx.storage.getUrl(sid),
-          });
+        if (typeof ref === "string") {
+          const ext = normalizeStoredPhotoUrl(ref);
+          if (ext) {
+            out[key].push({ ref, url: ext });
+          } else {
+            const sid = ref as Id<"_storage">;
+            out[key].push({
+              ref: sid,
+              url: await ctx.storage.getUrl(sid),
+            });
+          }
         }
       }
     }

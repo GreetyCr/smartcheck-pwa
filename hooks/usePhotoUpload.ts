@@ -15,6 +15,7 @@ import {
   type PhotoQueueRow,
 } from "@/lib/offline/photo-queue";
 import { useUploadThing } from "@/lib/uploadthing";
+import { normalizePublicPhotoUrl } from "@/lib/photoUrls";
 
 export type QueuedItemPhoto = {
   id: string;
@@ -28,14 +29,16 @@ export type QueuedItemPhoto = {
 function extractUploadedUrl(res: unknown): string | undefined {
   if (!Array.isArray(res) || res.length === 0) return undefined;
   const first = res[0] as Record<string, unknown>;
-  if (typeof first.ufsUrl === "string") return first.ufsUrl;
-  if (typeof first.url === "string") return first.url;
+  let raw: string | undefined;
+  if (typeof first.ufsUrl === "string") raw = first.ufsUrl;
+  else if (typeof first.url === "string") raw = first.url;
   const sd = first.serverData;
-  if (sd && typeof sd === "object" && "url" in sd) {
+  if (!raw && sd && typeof sd === "object" && "url" in sd) {
     const u = (sd as { url?: string }).url;
-    if (typeof u === "string") return u;
+    if (typeof u === "string") raw = u;
   }
-  return undefined;
+  if (!raw?.trim()) return undefined;
+  return normalizePublicPhotoUrl(raw);
 }
 
 type UsePhotoUploadOptions = {
@@ -118,10 +121,6 @@ export function usePhotoUpload({
 
   const runUpload = useCallback(
     async (photo: QueuedItemPhoto) => {
-      if (!navigator.onLine) {
-        updatePhoto(photo.id, { status: "pending" });
-        return;
-      }
       const maxAttempts = 3;
       let lastErr: unknown;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -151,7 +150,7 @@ export function usePhotoUpload({
   );
 
   const drainPending = useCallback(async () => {
-    if (!navigator.onLine || drainingRef.current) return;
+    if (drainingRef.current) return;
     drainingRef.current = true;
     try {
       const flat = Object.values(pendingByItemRef.current).flat();
@@ -209,7 +208,7 @@ export function usePhotoUpload({
         return merged;
       });
       queueMicrotask(() => {
-        if (navigator.onLine) void drainPending();
+        void drainPending();
       });
     })();
     return () => {
@@ -266,25 +265,7 @@ export function usePhotoUpload({
         [itemKey]: [...(prev[itemKey] ?? []), ...newEntries],
       }));
 
-      const online = navigator.onLine;
-
-      for (const entry of newEntries) {
-        const row: PhotoQueueRow = {
-          id: entry.id,
-          inspectionId,
-          sectionTable,
-          itemKey,
-          blob: entry.file,
-          createdAt: Date.now(),
-        };
-        if (!online) {
-          await enqueuePhotoQueue(row);
-        }
-      }
-
-      if (online) {
-        await Promise.all(newEntries.map((entry) => runUpload(entry)));
-      }
+      await Promise.all(newEntries.map((entry) => runUpload(entry)));
     },
     [inspectionId, maxPerItem, runUpload, sectionTable],
   );

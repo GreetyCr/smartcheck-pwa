@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Fuel, Play, Plug } from "lucide-react";
+import { ChevronDown, Fuel, Loader2, Play, Plug } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -29,6 +29,7 @@ import type {
   SellerTypeKey,
 } from "@/types/inspection-draft";
 import { cn } from "@/lib/utils";
+import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -208,6 +209,27 @@ export function VehicleForm({ className }: { className?: string }) {
   }
 
   return (
+    <>
+      {submitting ? (
+        <div
+          className="fixed inset-0 z-100 flex flex-col bg-background/95 backdrop-blur-sm"
+          role="alertdialog"
+          aria-busy
+          aria-label="Creando inspección"
+        >
+          <DashboardPageSkeleton variant="form" className="min-h-0 flex-1 bg-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-[max(2rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-2 px-4 text-center">
+            <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
+            <p className="text-sm font-semibold text-foreground">
+              Creando inspección…
+            </p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              Subiendo fotos del vehículo y guardando datos. Puede tardar un poco con
+              conexión móvil; no cierres la pantalla.
+            </p>
+          </div>
+        </div>
+      ) : null}
     <form
       onSubmit={(e) => void handleSubmit(e)}
       className={cn("mx-auto max-w-lg space-y-5 px-4 py-4", className)}
@@ -522,5 +544,6 @@ export function VehicleForm({ className }: { className?: string }) {
         </Button>
       </div>
     </form>
+    </>
   );
 }

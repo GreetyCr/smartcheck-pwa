@@ -12,7 +12,7 @@ import type * as admin from "../admin.js";
 import type * as http from "../http.js";
 import type * as inspections from "../inspections.js";
 import type * as lib_auth from "../lib/auth.js";
-import type * as lib_n8nSchedule from "../lib/n8nSchedule.js";
+import type * as lib_externalPhotoUrl from "../lib/externalPhotoUrl.js";
 import type * as lib_sanitizeSectionPatch from "../lib/sanitizeSectionPatch.js";
 import type * as migrations from "../migrations.js";
 import type * as n8nWebhook from "../n8nWebhook.js";
@@ -31,7 +31,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   inspections: typeof inspections;
   "lib/auth": typeof lib_auth;
-  "lib/n8nSchedule": typeof lib_n8nSchedule;
+  "lib/externalPhotoUrl": typeof lib_externalPhotoUrl;
   "lib/sanitizeSectionPatch": typeof lib_sanitizeSectionPatch;
   migrations: typeof migrations;
   n8nWebhook: typeof n8nWebhook;

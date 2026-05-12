@@ -2,6 +2,8 @@
  * Normaliza el payload de `upsertSection` antes de patch/insert para que pase el
  * validador de Convex (p. ej. `null` en `observation` opcional, refs blob locales).
  */
+import { normalizeStoredPhotoUrl } from "./externalPhotoUrl";
+
 export function sanitizeSectionPatch(
   patch: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -18,11 +20,14 @@ export function sanitizeSectionPatch(
       )) {
         if (!Array.isArray(arr)) continue;
         const refs = arr
-          .filter((x): x is string => typeof x === "string" && x.length > 0)
-          .filter(
-            (url) =>
-              !url.startsWith("blob:") && !url.startsWith("data:image"),
-          );
+          .map((x) => {
+            if (typeof x !== "string" || !x.trim()) return null;
+            const ext = normalizeStoredPhotoUrl(x);
+            if (ext) return ext;
+            if (x.startsWith("blob:") || x.startsWith("data:image")) return null;
+            return x.trim();
+          })
+          .filter((u): u is string => u !== null);
         if (refs.length > 0) cleaned[itemKey] = refs;
       }
       if (Object.keys(cleaned).length > 0) out.itemPhotos = cleaned;

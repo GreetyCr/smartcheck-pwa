@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { canAccessInspection, requireAdmin } from "./lib/auth";
+import { normalizeStoredPhotoUrl } from "./lib/externalPhotoUrl";
 import {
   getSectionDoc,
   SECTION_TABLE_ORDER,
@@ -50,11 +51,14 @@ export const getExportPayload = query({
         for (const [key, refs] of Object.entries(rawIp)) {
           const urls: string[] = [];
           for (const ref of refs) {
-            if (typeof ref === "string" && /^https?:\/\//i.test(ref)) {
-              urls.push(ref);
-            } else {
-              const u = await ctx.storage.getUrl(ref as Id<"_storage">);
-              if (u) urls.push(u);
+            if (typeof ref === "string") {
+              const ext = normalizeStoredPhotoUrl(ref);
+              if (ext) {
+                urls.push(ext);
+              } else {
+                const u = await ctx.storage.getUrl(ref as Id<"_storage">);
+                if (u) urls.push(u);
+              }
             }
           }
           itemPhotoUrls[key] = urls;
