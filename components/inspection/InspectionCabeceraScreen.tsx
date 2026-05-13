@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Fuel, Plug, Save } from "lucide-react";
+import { ArrowLeft, BatteryCharging, Fuel, Plug, Save } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -20,12 +20,14 @@ import {
 import type {
   CaptureSource,
   CountryOriginKey,
-  DraftEngineUi,
+  DraftCombustionFuel,
+  DraftEngineCategory,
   MileageUnitKey,
   SellerTypeKey,
 } from "@/types/inspection-draft";
 import {
   COUNTRY_OPTIONS,
+  convexEngineToDraft,
   draftEngineToConvex,
   isValidVinOptional17,
   parseMileage,
@@ -117,7 +119,11 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
   const [countryOfOrigin, setCountryOfOrigin] = useState<CountryOriginKey | "">(
     "",
   );
-  const [engineType, setEngineType] = useState<DraftEngineUi>("combustion");
+  const [engineCategory, setEngineCategory] =
+    useState<DraftEngineCategory>("combustion");
+  const [combustionFuel, setCombustionFuel] = useState<
+    DraftCombustionFuel | ""
+  >("");
 
   useEffect(() => {
     if (!payload || seeded.current) return;
@@ -146,7 +152,9 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
     setMileageInput(ins.mileage != null ? String(ins.mileage) : "");
     setMileageUnit((ins.mileageUnit as MileageUnitKey) ?? "km");
     setCountryOfOrigin(normalizeCountryForSelect(ins.countryOfOrigin));
-    setEngineType(ins.engineType === "electrico" ? "electrico" : "combustion");
+    const mapped = convexEngineToDraft(ins.engineType as string | undefined);
+    setEngineCategory(mapped.engineCategory);
+    setCombustionFuel(mapped.combustionFuel);
     setPlatePhotoNote(ins.platePhotoNote ?? "");
   }, [payload]);
 
@@ -176,6 +184,11 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
     const brandOk = brand.trim().length > 0;
     const countryOk = countryOfOrigin !== "";
     const mileageOk = mileageNum !== null;
+    const engineOk =
+      engineCategory !== "combustion" ||
+      combustionFuel === "gasolina" ||
+      combustionFuel === "diesel" ||
+      combustionFuel === "gas_lp";
     return (
       nameOk &&
       phoneOk &&
@@ -189,6 +202,7 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
       brandOk &&
       countryOk &&
       mileageOk &&
+      engineOk &&
       vinFormatOk
     );
   }, [
@@ -204,6 +218,8 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
     model,
     brand,
     countryOfOrigin,
+    engineCategory,
+    combustionFuel,
     vinFormatOk,
   ]);
 
@@ -288,7 +304,10 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
             mileage: mileageNum,
             mileageUnit,
             countryOfOrigin: countryOfOrigin as CountryOriginKey,
-            engineType: draftEngineToConvex(engineType),
+            engineType: draftEngineToConvex({
+              engineCategory,
+              combustionFuel,
+            }),
             vehiclePhoto: vehiclePhotoFront,
             vehiclePhotoFront,
             vehiclePhotoSideLeft,
@@ -337,7 +356,8 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
       model,
       mileageUnit,
       countryOfOrigin,
-      engineType,
+      engineCategory,
+      combustionFuel,
       platePhotoNote,
       patchInspection,
       inspectionId,
@@ -642,13 +662,22 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
           <ToggleButtonGroup
             labelId="ec-engine"
             variant="outline"
-            value={engineType}
-            onChange={(v) => setEngineType(v as DraftEngineUi)}
+            value={engineCategory}
+            onChange={(v) => {
+              const next = v as DraftEngineCategory;
+              setEngineCategory(next);
+              if (next !== "combustion") setCombustionFuel("");
+            }}
             options={[
               {
                 value: "combustion",
                 label: "Combustión",
                 icon: <Fuel className="text-inherit" />,
+              },
+              {
+                value: "hibrido",
+                label: "Híbrido",
+                icon: <BatteryCharging className="text-inherit" />,
               },
               {
                 value: "electrico",
@@ -657,6 +686,27 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
               },
             ]}
           />
+          {engineCategory === "combustion" ? (
+            <div className="space-y-1.5 pt-2">
+              <span
+                id="ec-engine-fuel"
+                className="text-sm font-medium text-foreground"
+              >
+                Combustible
+              </span>
+              <ToggleButtonGroup
+                labelId="ec-engine-fuel"
+                variant="outline"
+                value={combustionFuel}
+                onChange={(v) => setCombustionFuel(v as DraftCombustionFuel)}
+                options={[
+                  { value: "gasolina", label: "Gasolina" },
+                  { value: "diesel", label: "Diésel" },
+                  { value: "gas_lp", label: "Gas LP" },
+                ]}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">

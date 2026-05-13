@@ -60,6 +60,7 @@ const transmissionType = v.union(
 const engineType = v.union(
   v.literal("gasolina"),
   v.literal("diesel"),
+  v.literal("gas_lp"),
   v.literal("electrico"),
   v.literal("hibrido"),
 );

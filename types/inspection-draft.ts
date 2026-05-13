@@ -18,8 +18,11 @@ export type SellerTypeKey = "concesionaria" | "particular";
 
 export type MileageUnitKey = "km" | "millas";
 
-/** UI paso 2 — se mapea a `engineType` de Convex. */
-export type DraftEngineUi = "combustion" | "electrico";
+/** Categoría principal en el wizard de vehículo. */
+export type DraftEngineCategory = "combustion" | "hibrido" | "electrico";
+
+/** Solo si `engineCategory === "combustion"`. */
+export type DraftCombustionFuel = "gasolina" | "diesel" | "gas_lp";
 
 /** Borrador del wizard de inspección (pasos 1–4). */
 export interface InspectionDraft {
@@ -58,7 +61,10 @@ export interface InspectionDraft {
   mileageInput: string;
   mileageUnit: MileageUnitKey;
   countryOfOrigin: CountryOriginKey | "";
-  engineType: DraftEngineUi;
+  /** Combustión / Híbrido / Eléctrico. */
+  engineCategory: DraftEngineCategory;
+  /** Obligatorio si `engineCategory === "combustion"` (Gasolina, Diésel o Gas LP). */
+  combustionFuel: DraftCombustionFuel | "";
 }
 
 export function createEmptyInspectionDraft(): InspectionDraft {
@@ -88,6 +94,7 @@ export function createEmptyInspectionDraft(): InspectionDraft {
     mileageInput: "",
     mileageUnit: "km",
     countryOfOrigin: "",
-    engineType: "combustion",
+    engineCategory: "combustion",
+    combustionFuel: "",
   };
 }

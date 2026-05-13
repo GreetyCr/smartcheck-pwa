@@ -8,6 +8,7 @@ const transmission: Record<string, string> = {
 const engine: Record<string, string> = {
   gasolina: "Gasolina",
   diesel: "Diésel",
+  gas_lp: "Gas LP",
   electrico: "Eléctrico",
   hibrido: "Híbrido",
 };

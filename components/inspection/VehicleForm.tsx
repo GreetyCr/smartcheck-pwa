@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Fuel, Loader2, Play, Plug } from "lucide-react";
+import {
+  BatteryCharging,
+  ChevronDown,
+  Fuel,
+  Loader2,
+  Play,
+  Plug,
+} from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -25,6 +32,8 @@ import {
 import type {
   CaptureSource,
   CountryOriginKey,
+  DraftCombustionFuel,
+  DraftEngineCategory,
   MileageUnitKey,
   SellerTypeKey,
 } from "@/types/inspection-draft";
@@ -83,6 +92,11 @@ export function VehicleForm({ className }: { className?: string }) {
     const brandOk = draft.brand.trim().length > 0;
     const countryOk = draft.countryOfOrigin !== "";
     const mileageOk = mileageNum !== null;
+    const engineOk =
+      draft.engineCategory !== "combustion" ||
+      draft.combustionFuel === "gasolina" ||
+      draft.combustionFuel === "diesel" ||
+      draft.combustionFuel === "gas_lp";
     return (
       photosOk &&
       idOk &&
@@ -91,12 +105,15 @@ export function VehicleForm({ className }: { className?: string }) {
       brandOk &&
       countryOk &&
       mileageOk &&
+      engineOk &&
       vinFormatOk
     );
   }, [
     draft.brand,
     draft.model,
     draft.countryOfOrigin,
+    draft.engineCategory,
+    draft.combustionFuel,
     draft.vinInput,
     mileageNum,
     yearNum,
@@ -183,7 +200,10 @@ export function VehicleForm({ className }: { className?: string }) {
           mileage: mileageNum,
           mileageUnit,
           countryOfOrigin: draft.countryOfOrigin as CountryOriginKey,
-          engineType: draftEngineToConvex(draft.engineType),
+          engineType: draftEngineToConvex({
+            engineCategory: draft.engineCategory,
+            combustionFuel: draft.combustionFuel,
+          }),
           vehiclePhoto: vehiclePhotoFront,
           vehiclePhotoFront,
           vehiclePhotoSideLeft,
@@ -458,18 +478,29 @@ export function VehicleForm({ className }: { className?: string }) {
 
       <div className="space-y-1.5">
         <span id="engine-label" className="text-sm font-medium text-foreground">
-          Tipo de Motor
+          Tipo de motor
         </span>
         <ToggleButtonGroup
           labelId="engine-label"
           variant="outline"
-          value={draft.engineType}
-          onChange={(engineType) => setDraft({ engineType })}
+          value={draft.engineCategory}
+          onChange={(engineCategory) =>
+            setDraft({
+              engineCategory: engineCategory as DraftEngineCategory,
+              combustionFuel:
+                engineCategory === "combustion" ? draft.combustionFuel : "",
+            })
+          }
           options={[
             {
               value: "combustion" as const,
               label: "Combustión",
               icon: <Fuel className="text-inherit" />,
+            },
+            {
+              value: "hibrido" as const,
+              label: "Híbrido",
+              icon: <BatteryCharging className="text-inherit" />,
             },
             {
               value: "electrico" as const,
@@ -478,6 +509,31 @@ export function VehicleForm({ className }: { className?: string }) {
             },
           ]}
         />
+        {draft.engineCategory === "combustion" ? (
+          <div className="space-y-1.5 pt-2">
+            <span
+              id="engine-fuel-label"
+              className="text-sm font-medium text-foreground"
+            >
+              Combustible
+            </span>
+            <ToggleButtonGroup
+              labelId="engine-fuel-label"
+              variant="outline"
+              value={draft.combustionFuel}
+              onChange={(combustionFuel) =>
+                setDraft({
+                  combustionFuel: combustionFuel as DraftCombustionFuel,
+                })
+              }
+              options={[
+                { value: "gasolina" as const, label: "Gasolina" },
+                { value: "diesel" as const, label: "Diésel" },
+                { value: "gas_lp" as const, label: "Gas LP" },
+              ]}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">

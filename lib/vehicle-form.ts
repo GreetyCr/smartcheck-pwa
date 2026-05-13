@@ -1,7 +1,15 @@
 import type {
   CountryOriginKey,
-  DraftEngineUi,
+  DraftCombustionFuel,
+  DraftEngineCategory,
 } from "@/types/inspection-draft";
+
+export type ConvexEngineType =
+  | "gasolina"
+  | "diesel"
+  | "gas_lp"
+  | "electrico"
+  | "hibrido";
 
 /** ISO 3779: sin I, O, Q para evitar confusiones. */
 const VIN_BODY = "[A-HJ-NPR-Z0-9]{17}";
@@ -49,10 +57,36 @@ export function parseMileage(value: string): number | null {
   return n;
 }
 
-export function draftEngineToConvex(
-  ui: DraftEngineUi,
-): "gasolina" | "electrico" {
-  return ui === "electrico" ? "electrico" : "gasolina";
+export function draftEngineToConvex(params: {
+  engineCategory: DraftEngineCategory;
+  combustionFuel: DraftCombustionFuel | "";
+}): ConvexEngineType {
+  if (params.engineCategory === "electrico") return "electrico";
+  if (params.engineCategory === "hibrido") return "hibrido";
+  const f = params.combustionFuel;
+  if (f === "diesel") return "diesel";
+  if (f === "gas_lp") return "gas_lp";
+  return "gasolina";
+}
+
+/** Mapea `engineType` guardado en Convex al estado del formulario. */
+export function convexEngineToDraft(
+  stored: string | undefined,
+): {
+  engineCategory: DraftEngineCategory;
+  combustionFuel: DraftCombustionFuel | "";
+} {
+  if (stored === "electrico")
+    return { engineCategory: "electrico", combustionFuel: "" };
+  if (stored === "hibrido")
+    return { engineCategory: "hibrido", combustionFuel: "" };
+  if (stored === "diesel")
+    return { engineCategory: "combustion", combustionFuel: "diesel" };
+  if (stored === "gas_lp")
+    return { engineCategory: "combustion", combustionFuel: "gas_lp" };
+  if (stored === "gasolina")
+    return { engineCategory: "combustion", combustionFuel: "gasolina" };
+  return { engineCategory: "combustion", combustionFuel: "" };
 }
 
 export const BRAND_OPTIONS: string[] = [
