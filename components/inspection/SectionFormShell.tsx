@@ -10,7 +10,6 @@ type SectionFormShellProps = {
   backHref: string;
   progressCurrent: number;
   progressTotal: number;
-  saveStatus: "idle" | "saving" | "saved";
   children: React.ReactNode;
   className?: string;
 };
@@ -21,17 +20,9 @@ export function SectionFormShell({
   backHref,
   progressCurrent,
   progressTotal,
-  saveStatus,
   children,
   className,
 }: SectionFormShellProps) {
-  const statusText =
-    saveStatus === "saving"
-      ? "Guardando…"
-      : saveStatus === "saved"
-        ? "Guardado ✓"
-        : null;
-
   return (
     <div className={cn("min-h-dvh bg-[#f6f7f8] dark:bg-background", className)}>
       <div className="sticky top-0 z-30 border-b border-border bg-[#f6f7f8]/95 backdrop-blur-md dark:bg-background/95">
@@ -59,11 +50,6 @@ export function SectionFormShell({
             current={progressCurrent}
             total={progressTotal}
           />
-          {statusText ? (
-            <p className="mt-1 text-right text-xs text-muted-foreground">
-              {statusText}
-            </p>
-          ) : null}
         </div>
       </div>
 

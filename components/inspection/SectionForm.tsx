@@ -52,10 +52,6 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   const userEdited = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-    "idle",
-  );
-
   const getSavedPhotoCount = useCallback(
     (itemKey: string) => {
       const photos =
@@ -145,20 +141,15 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   const persist = useCallback(async () => {
     const patch = formStateToPatch(state, sectionConfig);
     if (Object.keys(patch).length === 0) {
-      setSaveStatus("idle");
       return;
     }
-    setSaveStatus("saving");
     try {
       await upsertSection({
         inspectionId,
         sectionTable: sectionConfig.table,
         data: patch,
       });
-      setSaveStatus("saved");
-      globalThis.setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (e) {
-      setSaveStatus("idle");
       browserAlert(
         e instanceof Error ? e.message : "No se pudo guardar la sección.",
       );
@@ -333,7 +324,6 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
         backHref={`/inspecciones/${inspectionId}`}
         progressCurrent={progress}
         progressTotal={total}
-        saveStatus={saveStatus}
       >
         {sectionConfig.id === "finalizacion" ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   Camera,
   Clock,
+  Download,
   ImageIcon,
   ImagePlus,
   Images,
@@ -12,6 +13,8 @@ import {
   X,
 } from "lucide-react";
 import { PhotoCapture } from "@/components/inspection/PhotoCapture";
+import { browserAlert } from "@/lib/browser-confirm";
+import { saveImageToDevice } from "@/lib/saveImageToDevice";
 import { cn } from "@/lib/utils";
 import type { PhotoUiKind } from "@/lib/section-form-ui";
 import { MAX_PHOTOS_PER_ITEM } from "@/lib/constants/photos";
@@ -62,6 +65,26 @@ export function ItemPhotos({
   className,
 }: ItemPhotosProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [savingRef, setSavingRef] = useState<string | null>(null);
+
+  const savePhotoToPhone = useCallback(
+    async (url: string, indexOneBased: number, ref: string) => {
+      setSavingRef(ref);
+      try {
+        await saveImageToDevice(url, label, indexOneBased);
+      } catch {
+        const w = globalThis.window.open(url, "_blank", "noopener,noreferrer");
+        if (!w) {
+          browserAlert(
+            "No se pudo guardar la imagen automáticamente. Mantén pulsada la miniatura y elige «Añadir a fotos» o «Guardar imagen».",
+          );
+        }
+      } finally {
+        setSavingRef(null);
+      }
+    },
+    [label],
+  );
 
   const onChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +116,12 @@ export function ItemPhotos({
     <div className={cn("space-y-3", className)}>
       {entries?.length ? (
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {entries.map((e) => (
+          {entries.map((e, photoIndex) => {
+            const canSaveToDevice =
+              Boolean(e.url) &&
+              e.status !== "uploading" &&
+              e.status !== "error";
+            return (
             <li
               key={e.ref}
               className="relative aspect-square overflow-hidden rounded-lg border bg-muted"
@@ -134,6 +162,26 @@ export function ItemPhotos({
                   ) : null}
                 </div>
               ) : null}
+              {canSaveToDevice ? (
+                <button
+                  type="button"
+                  disabled={disabled || savingRef === e.ref}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    if (!e.url) return;
+                    void savePhotoToPhone(e.url, photoIndex + 1, e.ref);
+                  }}
+                  className="absolute bottom-1 left-1 flex size-7 items-center justify-center rounded-full bg-black/65 text-white shadow-md transition-opacity hover:bg-black/80 disabled:opacity-50"
+                  aria-label={`Guardar en el teléfono: ${label}`}
+                  title="Guardar en el teléfono"
+                >
+                  {savingRef === e.ref ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="size-3.5" aria-hidden />
+                  )}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => onRemove(e.ref)}
@@ -143,7 +191,8 @@ export function ItemPhotos({
                 <X className="size-3.5" />
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
 
