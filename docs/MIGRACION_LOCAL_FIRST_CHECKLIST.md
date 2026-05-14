@@ -149,7 +149,7 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 |--------|---------|
 | Modificar | `DB_VERSION` **1 → 2**; migración no destructiva; **`localId === clientId`** invariante documentada en comentario junto al `createObjectStore`. |
 | Modificar tipo | `PendingInspectionRow`: `clientId`, `wizard?`, nuevos `syncStatus`, etc. |
-| Tests | `db-migration-v2.test.ts` verifica invariante `localId === clientId`. |
+| Tests | `lib/offline/__tests__/db-migration-v2.test.ts`, `db-invariants.test.ts`, `hooks/__tests__/usePendingInspectionDraft.test.tsx` (fake-indexeddb + happy-dom). Ver `docs/PR_C_FASE2_OPERATIVO.md`. |
 
 ---
 
@@ -177,8 +177,9 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 | Archivo | Fase | Notas |
 |---------|------|--------|
 | `components/inspection/VehicleForm.tsx` | **1 (hecho)** | Compresión en `onVehiclePhotoPicked` antes de `setDraft`; `PhotoCapture` sin cambios. |
-| `components/inspection/ClientForm.tsx` | 2 | `clientId` al entrar al wizard. |
-| `components/inspection/InspectionWizard.tsx` / `nueva/layout.tsx` | 2 | Inicialización IDB. |
+| `hooks/usePendingInspectionDraft.ts` | **PR-C** | Debounce coalescer, `pagehide` / `visibilitychange`, `flush()`; sin cablear wizard hasta Fase 3. |
+| `components/inspection/ClientForm.tsx` | 2+ | `clientId` al entrar al wizard (integración con hook / IDB en PR posterior al PR-C si aplica). |
+| `components/inspection/InspectionWizard.tsx` / `nueva/layout.tsx` | 2+ | Inicialización IDB (tras PR-C). |
 | `components/ui/PhotoCapture.tsx` | — | **Sin** prop `compressOnPick`; permanece dumb. |
 | `components/inspection/InspectionSectionsScreen.tsx` | 3, 6 | Resolver + UI `not_found` + estado sync. |
 | `components/inspection/SectionForm.tsx` | 3 | Local vs Convex. |
@@ -193,7 +194,9 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 |---------|------|--------|
 | `lib/images/compressVehiclePhoto.test.ts` | 1 | Vitest `node` + mocks mínimos; `tsconfig` excluye `*.test.ts` del `tsc` de app. |
 | `tests/convex/inspections.test.ts` | PR-B | `convex-test` + `edge-runtime`; Vitest project separado; no forma parte de PR-A. |
-| `lib/offline/__tests__/db-migration-v2.test.ts` | 7 | — |
+| `lib/offline/__tests__/db-migration-v2.test.ts` | PR-C | fake-indexeddb; 20 filas, idempotencia, no pisar `clientId` existente. |
+| `lib/offline/__tests__/db-invariants.test.ts` | PR-C | `localId === clientId` tras crear / migrar. |
+| `hooks/__tests__/usePendingInspectionDraft.test.tsx` | PR-C | debounce coalescer, `flush`, `pagehide` (happy-dom). |
 | `lib/offline/__tests__/syncQueue.test.ts` | 7 | — |
 | Test CI | 4+ | Esquema Zod cliente vs validación servidor (`inspectionDraft`). |
 
@@ -218,7 +221,7 @@ Backfill de `clientId` o fallback `get({ id })` con Id válido de Convex (parser
 | Trabajo | Archivos principalmente tocados |
 |---------|-----------------------------------|
 | **Fase 1** | `lib/images/compressVehiclePhoto.ts`, `VehicleForm.tsx` |
-| **Fase 2** | `lib/offline/db.ts`, wizard layout, hooks draft |
+| **Fase 2 (PR-C)** | `lib/offline/db.ts`, `lib/types/clientId.ts`, `hooks/usePendingInspectionDraft.ts`, tests offline |
 | **Fase 4** | `convex/schema.ts`, `convex/inspections.ts`, `convex/lib/auth.ts`, `lib/validation/`, `convex/lib/validateInspectionDraft.ts` |
 
 **Fase 4 puede arrancar en paralelo con Fase 1** (sin solapamiento de archivos); el camino crítico baja.
