@@ -8,9 +8,9 @@ import {
   OFFLINE_DB_NAME,
   getDB,
   migratePendingInspectionsClientIds,
-  resetOfflineDbForTests,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
+import { resetOfflineDbForTests } from "@/lib/offline/db.testing";
 
 function createV1Stores(db: IDBDatabase) {
   if (!db.objectStoreNames.contains("pendingInspections")) {

@@ -5,8 +5,8 @@ import {
   createEmptyPendingInspectionRow,
   getDB,
   OFFLINE_DB_NAME,
-  resetOfflineDbForTests,
 } from "@/lib/offline/db";
+import { resetOfflineDbForTests } from "@/lib/offline/db.testing";
 import { ClientId as toClientId } from "@/lib/types/clientId";
 
 describe("IDB invariantes localId === clientId", () => {

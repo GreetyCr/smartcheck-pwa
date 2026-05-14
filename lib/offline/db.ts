@@ -1,4 +1,4 @@
-import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { ClientId } from "@/lib/types/clientId";
 import { ClientId as toClientId } from "@/lib/types/clientId";
 
@@ -87,9 +87,26 @@ export function getOfflineDbMigrationDegraded(): boolean {
   return offlineDbMigrationDegraded;
 }
 
-/** Solo tests. */
+/** @internal Solo tests / `lib/offline/db.testing.ts`. No usar en app. */
 export function __resetOfflineDbMigrationDegradedForTests(): void {
   offlineDbMigrationDegraded = false;
+}
+
+/**
+ * Cierra la conexión y anula la promesa cacheada.
+ * @internal Solo `lib/offline/db.testing.ts`.
+ */
+export async function __closeOfflineDbConnectionForTesting(): Promise<void> {
+  const pending = dbPromise;
+  dbPromise = null;
+  if (pending) {
+    try {
+      const db = await pending;
+      db.close();
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
@@ -165,13 +182,13 @@ export async function migratePendingInspectionsClientIds(
           await tx.store.put(ensureClientIdOnRow(row));
         }
       } catch (rowErr) {
-        console.error("[smartcheck IDB v2 migration] fila", row.localId, rowErr);
+        console.error("[offline-db] migration_row_failed", row.localId, rowErr);
       }
     }
     await tx.done;
     offlineDbMigrationDegraded = false;
   } catch (e) {
-    console.error("[smartcheck IDB v2 migration] transacción", e);
+    console.error("[offline-db] migration_degraded", "transaction_failed", e);
     offlineDbMigrationDegraded = true;
   }
 }
@@ -206,30 +223,25 @@ export function getDB(): Promise<IDBPDatabase<SmartcheckDB>> {
           // La migración de datos corre post-open en `migratePendingInspectionsClientIds`.
         }
       },
+      blocked(currentVersion, blockedVersion, _event) {
+        console.warn(
+          "[offline-db] idb_blocked",
+          "Otra pestaña mantiene IndexedDB abierta; cerrá las demás o recargá.",
+          { currentVersion, blockedVersion },
+        );
+        console.error(
+          "[offline-db] migration_degraded",
+          "idb_blocked_pending_upgrade",
+          { currentVersion, blockedVersion },
+        );
+        offlineDbMigrationDegraded = true;
+      },
     }).then(async (db) => {
       await migratePendingInspectionsClientIds(db);
       return db;
     });
   }
   return dbPromise;
-}
-
-/**
- * Cierra la instancia en memoria y borra la base (solo tests).
- */
-export async function resetOfflineDbForTests(): Promise<void> {
-  const pending = dbPromise;
-  dbPromise = null;
-  offlineDbMigrationDegraded = false;
-  if (pending) {
-    try {
-      const db = await pending;
-      db.close();
-    } catch {
-      /* ignore */
-    }
-  }
-  await deleteDB(DB_NAME).catch(() => undefined);
 }
 
 /**

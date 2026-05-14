@@ -149,7 +149,7 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 |--------|---------|
 | Modificar | `DB_VERSION` **1 → 2**; migración no destructiva; **`localId === clientId`** invariante documentada en comentario junto al `createObjectStore`. |
 | Modificar tipo | `PendingInspectionRow`: `clientId`, `wizard?`, nuevos `syncStatus`, etc. |
-| Tests | `lib/offline/__tests__/db-migration-v2.test.ts`, `db-invariants.test.ts`, `hooks/__tests__/usePendingInspectionDraft.test.tsx` (fake-indexeddb + happy-dom). Ver `docs/PR_C_FASE2_OPERATIVO.md`. |
+| Tests | `db-migration-v2`, `db-invariants`, `shouldFlushOnPageHide`, `usePendingInspectionDraft` (fake-indexeddb / happy-dom). `resetOfflineDbForTests` solo desde `@/lib/offline/db.testing`. Ver `docs/PR_C_FASE2_OPERATIVO.md`. |
 
 ---
 
@@ -196,7 +196,7 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 | `tests/convex/inspections.test.ts` | PR-B | `convex-test` + `edge-runtime`; Vitest project separado; no forma parte de PR-A. |
 | `lib/offline/__tests__/db-migration-v2.test.ts` | PR-C | fake-indexeddb; 20 filas, idempotencia, no pisar `clientId` existente. |
 | `lib/offline/__tests__/db-invariants.test.ts` | PR-C | `localId === clientId` tras crear / migrar. |
-| `hooks/__tests__/usePendingInspectionDraft.test.tsx` | PR-C | debounce coalescer, `flush`, `pagehide` (happy-dom). |
+| `lib/offline/__tests__/shouldFlushOnPageHide.test.ts` | PR-C | `persisted` true/false (Node). |
 | `lib/offline/__tests__/syncQueue.test.ts` | 7 | — |
 | Test CI | 4+ | Esquema Zod cliente vs validación servidor (`inspectionDraft`). |
 

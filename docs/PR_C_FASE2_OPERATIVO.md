@@ -4,10 +4,12 @@ Este documento resume el alcance **PR-C** y las reglas que el team lead dejó pa
 
 ## Alcance PR-C (infra aislada)
 
-- `lib/offline/db.ts`: versión **2**, migración **aditiva** e **idempotente** (`clientId` solo si falta; nunca pisar `clientId` existente).
+- `lib/offline/db.ts`: versión **2**, migración **aditiva** e **idempotente** (`clientId` solo si falta; nunca pisar `clientId` existente). Callback **`blocked`** en `openDB` con `console.warn` + `console.error` bajo `[offline-db] migration_degraded`. Logs de fallo: `[offline-db] migration_degraded`, `[offline-db] migration_row_failed`.
+- `lib/offline/db.testing.ts`: **`resetOfflineDbForTests`** solo para Vitest (no importar desde app; no entra en bundle de producción).
+- `lib/offline/shouldFlushOnPageHide.ts`: política **bfcache** (`persisted`) compartida con el hook y tests puros en Node.
 - `lib/types/clientId.ts`: tipo **branded** `ClientId`.
-- `hooks/usePendingInspectionDraft.ts`: debounce con **coalescer** (un solo `put` con último estado), `flush()`, `pagehide` (`persisted === false`) y `visibilitychange` (`hidden`); en lifecycle **sin** `await` del `put`.
-- Tests: `lib/offline/__tests__/db-migration-v2.test.ts`, `db-invariants.test.ts`, `hooks/__tests__/usePendingInspectionDraft.test.tsx` (`fake-indexeddb`, `happy-dom`).
+- `hooks/usePendingInspectionDraft.ts`: debounce con **coalescer** (un solo `put` con último estado), `flush()`, `pagehide` vía `shouldFlushOnPageHide` (`persisted === false`) y `visibilitychange` (`hidden`); **flush en cleanup** del efecto de carga (SPA sin `pagehide`). En lifecycle **sin** `await` del `put`.
+- Tests: `lib/offline/__tests__/…`, `lib/offline/__tests__/shouldFlushOnPageHide.test.ts`, `hooks/__tests__/usePendingInspectionDraft.test.tsx` (`fake-indexeddb`, `happy-dom`).
 
 ## Qué NO tocar en este PR
 
@@ -24,7 +26,9 @@ Este documento resume el alcance **PR-C** y las reglas que el team lead dejó pa
 
 Si la migración IDB falla en un navegador raro: se registra error, `getOfflineDbMigrationDegraded()` pasa a `true` y el hook entra en **solo lectura** (no bloquear el wizard entero).
 
-## Reglas IDB (recordatorio)
+## Pendiente (fuera de PR-C)
+
+- **Backfill Convex `clientId`** (`convex/migrations.ts`, PR pequeño): conviene **antes de Fase 3** para no mezclar filas con/sin `clientId` cuando el cliente empiece a usar `getByClientId`. Mutación interna que itera inspecciones sin `clientId` y asigna UUID; verificable en el Dashboard.
 
 1. Solo **añadir** campos en upgrades; nunca quitar ni renombrar una vez en producción.
 2. Migración **idempotente**: fila ya con `clientId` no se sobreescribe.

@@ -11,6 +11,7 @@ import {
   type PendingInspectionDraftPatch,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
+import { shouldFlushOnPageHide } from "@/lib/offline/shouldFlushOnPageHide";
 
 const DEFAULT_DEBOUNCE_MS = 400;
 
@@ -39,7 +40,7 @@ export type UsePendingInspectionDraftResult = {
  * Borrador local con debounce y flush en `pagehide` / `visibilitychange`.
  *
  * - **Debounce:** coalescer merges y un solo `put` tras `debounceMs` sin nuevos `save`.
- * - **pagehide:** con `event.persisted === false` (pestaña que se cierra de verdad, no bfcache).
+ * - **pagehide:** `shouldFlushOnPageHide` — con `persisted === false` se hace flush; con `persisted === true` (bfcache / Safari) **no** (tests en `shouldFlushOnPageHide.test.ts`).
  * - **visibilitychange:** `document.visibilityState === "hidden"` como red de seguridad (iOS).
  * - En los handlers de lifecycle **no** se hace `await` del `put`: fire-and-forget (Safari puede matar la pestaña).
  *
@@ -110,6 +111,9 @@ export function usePendingInspectionDraft(
     await flushImmediate();
   }, [flushImmediate]);
 
+  const flushImmediateRef = useRef(flushImmediate);
+  flushImmediateRef.current = flushImmediate;
+
   const flushLifecycleNoAwait = useCallback(() => {
     clearTimer();
     if (readOnlyRef.current || !dirtyRef.current || !draftRef.current) return;
@@ -160,12 +164,14 @@ export function usePendingInspectionDraft(
     return () => {
       cancelled = true;
       clearTimer();
+      /** SPA: no hay `pagehide`; persistir borrador al desmontar (p. ej. cliente → vehículo). */
+      void flushImmediateRef.current();
     };
   }, [localKey, clearTimer]);
 
   useEffect(() => {
     const onPageHide = (ev: PageTransitionEvent) => {
-      if (ev.persisted) return;
+      if (!shouldFlushOnPageHide(ev)) return;
       flushLifecycleNoAwait();
     };
     const onVisibility = () => {
