@@ -24,7 +24,9 @@ pnpm install
 pnpm dev
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000). Build: `pnpm build`. Producción: `pnpm start`. Lint: `pnpm lint`.
+Abrir [http://localhost:3000](http://localhost:3000). Build: `pnpm build`. Producción: `pnpm start`. Lint: `pnpm lint`. Tests: `pnpm test` (Vitest: `lib/**/*.test.ts` y `tests/convex/**/*.test.ts`).
+
+Si **`npm install`** falla con `Cannot read properties of null (reading 'matches')`, suele deberse a mezclar **npm** con un árbol **`pnpm`** (`pnpm-lock.yaml`). Usa **`pnpm install`** o elimina `node_modules` y vuelve a instalar con un solo gestor.
 
 ## Estructura básica
 

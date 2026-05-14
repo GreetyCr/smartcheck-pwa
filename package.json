@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "convex:dev": "convex dev",
     "convex:once": "convex dev --once"
   },
@@ -30,16 +32,19 @@
     "uploadthing": "^7.7.4"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@serwist/turbopack": "^9.5.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "convex-test": "^0.0.38",
     "esbuild": "^0.28.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "serwist": "^9.5.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

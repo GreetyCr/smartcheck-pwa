@@ -76,6 +76,34 @@ export async function canAccessInspection(
   return inspection.clerkUserId === identity.subject;
 }
 
+/** Inspección por `clientId` (índice `by_client_id`). */
+export async function inspectionByClientId(
+  ctx: Ctx,
+  clientId: string,
+): Promise<Doc<"inspections"> | null> {
+  return await ctx.db
+    .query("inspections")
+    .withIndex("by_client_id", (q) => q.eq("clientId", clientId))
+    .first();
+}
+
+/**
+ * Misma regla que `canAccessInspection` pero por `clientId` público.
+ * Usar en `getByClientId` y antes de patchear en `createOrUpdateFromDraft`.
+ *
+ * Convex no tiene índice único declarativo: la idempotencia real va en una sola mutación
+ * con lectura + insert/patch; dos mutaciones concurrentes con el mismo `clientId` son raras
+ * (UUID); si ocurren, documentar reintento en cliente.
+ */
+export async function canAccessInspectionByClientId(
+  ctx: Ctx,
+  clientId: string,
+): Promise<boolean> {
+  const doc = await inspectionByClientId(ctx, clientId);
+  if (!doc) return false;
+  return canAccessInspection(ctx, doc._id);
+}
+
 /** Exportar PDF: solo admin (según matriz de permisos). */
 export function canExportPdf(user: Doc<"users"> | null): boolean {
   return user?.role === "admin";

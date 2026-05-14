@@ -54,7 +54,7 @@ Sin esto suele fallar: `POST .../tokens/convex` **404**.
 
 - Tabla `users` sincronizada con Clerk vía webhook HTTP (`/clerk-webhook`).
 - **Primer usuario** en la BD → `admin`; el resto → `tecnico`.
-- Helpers en `lib/auth.ts`: `getCurrentUser`, `requireAuth`, `requireUser`, `requireAdmin`, `canAccessInspection`, `canExportPdf`.
+- Helpers en `convex/lib/auth.ts`: `getCurrentUser`, `requireAuth`, `requireUser`, `requireAdmin`, `canAccessInspection`, `canAccessInspectionByClientId`, `inspectionByClientId`, `canExportPdf`.
 - `users.promoteToAdmin` — solo admin.
 - `users.exportPdfAllowed` — `true` solo para admin (UI de exportar PDF).
 
@@ -69,7 +69,7 @@ Eventos: `user.created`, `user.updated`, `user.deleted`.
 | Tabla | Descripción |
 |-------|-------------|
 | `users` | `clerkId`, `email`, `name`, `imageUrl`, `role` (`tecnico` \| `admin`), timestamps |
-| `inspections` | Información general (cliente, vehículo, tarifas, fotos storage) |
+| `inspections` | Información general (cliente, vehículo, tarifas, fotos storage); **`clientId`** opcional (UUID estable para URL local-first; índice `by_client_id`) |
 | `section_motor` … `section_finalizacion` | 18 secciones; cada ítem es `{ value, observation? }` según tipo (br, brNa, sn, snNa) |
 
 Los valores de select/listas del catálogo se modelan como literales en inglés/snake_case (ej. `captureSource`: `publicidad`, `tiktok`, …).
@@ -82,8 +82,22 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 ## Funciones
 
 - `inspections.createDraft` — borrador; usuario actual (JWT Clerk)
+- **`inspections.createOrUpdateFromDraft`** — mutación idempotente por **`clientId`**: si ya existe fila con ese `clientId` y el caller tiene acceso, hace **patch**; si no, **inserta** borrador con `clerkUserId` del usuario. Sin **`photoManifest`** hasta Fase 5. Antes de patchear comprueba **`canAccessInspectionByClientId`**. Notificaciones n8n (si no están desactivadas) se encolan con **`ctx.scheduler.runAfter(0, internal.n8nWebhook.deliver, …)`** para no bloquear la mutación.
+- **`inspections.getByClientId`** — query por `clientId`; devuelve el documento solo si **`canAccessInspectionByClientId`** (misma regla de propiedad que `get` por `_id`). Si no hay sesión, no hay acceso o no existe fila → `null`.
 - `inspections.patch` / `get` — con control de acceso (técnico: propias; admin: todas)
 - `inspections.listByClerkUser` — técnico: propias; admin: todas
 - `users.getMe`, `users.list` (admin), `users.promoteToAdmin`, `users.exportPdfAllowed`
+
+**Backfill** de `clientId` en inspecciones legacy: va en un PR aparte (`convex/migrations.ts`), después de mergear los cambios de esquema y mutaciones.
+
+## Tests (`convex-test`)
+
+Tras `pnpm install` (incluye `convex-test`, `@edge-runtime/vm`, `vitest`):
+
+```bash
+pnpm test
+```
+
+`tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
 
 Las mutaciones por sección se pueden añadir en `sections.ts` o archivos por dominio.
