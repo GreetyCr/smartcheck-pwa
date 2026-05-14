@@ -1,0 +1,230 @@
+# Checklist archivo por archivo — Local-first «Iniciar inspección»
+
+Orden de fases acordado: **1 → 2 → 4 → 3 (flag) → 5 → 6 ∥ 7**.
+
+Convenciones cerradas:
+
+- **IDB**: un solo modelo; `PendingInspectionRow` evoluciona (versión DB **2**), sin `wizardDrafts` separado.
+- **URL**: `/inspecciones/[clientId]` con `clientId` = UUID v4 estable; no cambia tras sync.
+- **Legacy**: `useOfflineInspection` + `syncPendingToConvex` conviven detrás de **`useUnifiedDraftFlow`** hasta retirada en PR de limpieza.
+
+---
+
+## Refinamientos baseline (previos a Fase 1 — incorporados)
+
+1. **`lib/offline/syncQueue.ts` tipado**: el adaptador que llama a Convex **no** usa `unknown`. Tras existir la mutación, usar por ejemplo `import type { FunctionArgs } from "convex/server";` y `export type CreateOrUpdateFromDraftArgs = FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>` (o el helper que exporte el proyecto) para que un cambio de contrato rompa compilación en la cola.
+
+2. **`photoManifest` con `slot`**: cada ítem incluye `{ clientPhotoId, storageId, slot }` donde `slot` es un literal de cabecera, p. ej. `"vehicleFront" | "vehicleSideLeft" | "vehicleSideRight" | "vehicleRear" | "dekra" | "plate" | "marchamo" | "vinSticker"` (alinear nombres con campos `patch` / storage). Sin `slot`, la mutación no puede mapear fotos sin un patch posterior (estados intermedios frágiles).
+
+3. **Validador compartido obligatorio (Fase 4)**: `lib/validation/inspectionDraft.ts` (Zod) + `convex/lib/validateInspectionDraft.ts` que reutiliza o importa el mismo esquema. **Bloqueante** en Fase 4: servidor debe rechazar payloads viejos tras deploy. Recomendación: test en CI que compare salida/keys de ambos esquemas para evitar deriva.
+
+4. **Política de purga**: módulo **`lib/offline/retention.ts`** (Fase 7): al boot, en filas `syncStatus === "synced"`, si `syncedAt < now - 7d` → quitar `wizard` y blobs; conservar metadatos ligeros hasta `now - 30d` luego purgar fila según política. Constantes editables y texto operativo en **`docs/MIGRACION_LOCAL_FIRST_OPERACION.md`**.
+
+5. **`resolveInspectionRef` y `not_found`**: contrato de UI en pantalla detalle: si `kind === "not_found"`, render fijo «Inspección no encontrada» con CTA a `/inspecciones/nueva` — evita spinner infinito con enlaces inválidos.
+
+6. **Fuente de verdad de sync**: documentado en **`hooks/useSyncQueue.ts`** (comentario de módulo) y en operación: IDB autoritativa mientras `syncStatus !== "synced"`; tras `synced`, Convex manda. UI Fase 6 no mezcla ambas en el mismo indicador.
+
+7. **`PhotoCapture`**: sin prop de compresión; permanece «dumb». La compresión vive en el padre que conoce el flujo (**`VehicleForm`** para wizard; otros padres según pantalla).
+
+8. **HEIC / formatos**: política práctica — intentar `createImageBitmap(file)`; si falla, UX clara (mensaje usuario); sin librerías HEIC extra. Implementado en **`lib/images/compressVehiclePhoto.ts`**.
+
+9. **IndexedDB `keyPath`**: mantener **`keyPath: "localId"`** sin migración destructiva; invariante **`localId === clientId`** en código. Comentario junto al store + aserción en **`lib/offline/__tests__/db-migration-v2.test.ts`**. Renombrar `keyPath` solo en PR final de limpieza.
+
+10. **Índice único lógico en Convex**: no hay `unique` declarativo; patrón **`withIndex("by_client_id").unique()`** + insert o patch en **una sola mutación**; concurrencia optimista de Convex. Dejar **comentario breve en `convex/inspections.ts`** junto a `createOrUpdateFromDraft` para evitar «doble lectura defensiva» que reintroduzca condiciones de carrera.
+
+11. **Webhook n8n**: si `inspection_created` (u otro) se dispara desde `createOrUpdateFromDraft`, usar **`ctx.scheduler.runAfter(0, internal.n8nWebhook.deliver, …)`** para no romper atomicidad de la mutación. Ver también `docs/MIGRACION_LOCAL_FIRST_OPERACION.md`.
+
+12. **`docs/FLUJO_CREACION_INFORME.html`**: actualización en Fase 7 con criterio de alto nivel (modelo local-first, `clientId`, cola); **omitir** detalle interno de cabecera.
+
+13. **`convex/lib/auth.ts`**: **`canAccessInspectionByClientId`** es **obligatorio** en `getByClientId` (y cualquier query por `clientId`) — misma regla de propiedad que `get` actual; evita fuga por UUID adivinado.
+
+---
+
+## 1. Archivos nuevos (crear)
+
+| Archivo | Fase | Rol |
+|---------|------|-----|
+| `lib/images/compressVehiclePhoto.ts` | **1 (hecho)** | JPEG calidad **0.82** (`VEHICLE_PHOTO_JPEG_QUALITY`), lado mayor **1600**; `createImageBitmap` + canvas; `ImageBitmap` cerrado en `finally` (`closeBitmapSafe`); `File` con `type: image/jpeg` y nombre `.jpg`; carrera en **`VehicleForm`** con generación por slot. |
+| `lib/featureFlags.ts` | 3–5 | `useUnifiedDraftFlow`, etc. |
+| `lib/validation/inspectionDraft.ts` | **4 (oblig.)** | Esquema Zod compartido (wizard + payload mutación). |
+| `convex/lib/validateInspectionDraft.ts` | **4 (oblig.)** | Validación servidor; importa o duplica controlada vs `lib/validation`. |
+| `lib/inspection/resolveInspectionRef.ts` | 3 | IDB → `getByClientId` → legacy `get` por `_id` (ventana migración). |
+| `hooks/usePendingInspectionDraft.ts` | 2 | Debounce + `pagehide` / `beforeunload`. |
+| `hooks/useUnifiedInspection.ts` | 3+ | Bajo flag. |
+| `lib/offline/syncQueue.ts` | 5 | Cola; adapters tipados con `FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>`. |
+| `lib/offline/retention.ts` | 7 | Purga 7d / retención metadatos 30d; ver `MIGRACION_LOCAL_FIRST_OPERACION.md`. |
+| `docs/MIGRACION_LOCAL_FIRST_OPERACION.md` | **7 (creado)** | Retención, fuente de verdad sync, n8n, criterio doc HTML. |
+
+~~`lib/images/photoMeta.ts`~~ — no hace falta para Fase 1 si el draft sigue usando `File` comprimido.
+
+### Firmas sugeridas (TypeScript)
+
+#### `lib/images/compressVehiclePhoto.ts` (implementado)
+
+Exporta `VEHICLE_PHOTO_MAX_EDGE`, `VEHICLE_PHOTO_JPEG_QUALITY` (0.82), `VEHICLE_PHOTO_OUTPUT_MIME`, `computeScaledDimensions` (tests puros), `compressVehiclePhoto`.
+
+```ts
+export async function compressVehiclePhoto(file: File, options?: { maxEdge?: number; quality?: number }): Promise<CompressedVehiclePhoto>;
+```
+
+Tests: `lib/images/compressVehiclePhoto.test.ts` (`pnpm test`, Vitest `environment: node` + mocks mínimos de `document` / `createImageBitmap`).
+
+#### `lib/inspection/resolveInspectionRef.ts` (cliente)
+
+```ts
+export type ResolvedInspection =
+  | { kind: "local_only"; row: PendingInspectionRow }
+  | { kind: "convex"; clientId: string; convexId: Id<"inspections"> }
+  | { kind: "not_found" };
+
+export async function resolveInspectionRef(ref: string): Promise<ResolvedInspection>;
+```
+
+**UI**: si `kind === "not_found"` → pantalla con CTA a `/inspecciones/nueva`.
+
+#### `lib/offline/syncQueue.ts` (Fase 5)
+
+```ts
+import type { FunctionArgs } from "convex/server";
+import { api } from "@/convex/_generated/api";
+
+export type CreateOrUpdateFromDraftArgs = FunctionArgs<
+  typeof api.inspections.createOrUpdateFromDraft
+>;
+
+export async function processSyncQueue(adapters: {
+  generateUploadUrl: () => Promise<string>;
+  createOrUpdateFromDraft: (
+    args: CreateOrUpdateFromDraftArgs,
+  ) => Promise<{ inspectionId: string }>;
+}): Promise<{ processed: number; errors: number }>;
+```
+
+(Ajustar import de `FunctionArgs` a la ruta válida del stack Convex del repo cuando se cablee.)
+
+#### `createOrUpdateFromDraft` — `photoManifest` con `slot`
+
+```ts
+photoManifest: v.optional(
+  v.array(
+    v.object({
+      clientPhotoId: v.string(),
+      storageId: v.id("_storage"),
+      slot: v.union(
+        v.literal("vehicleFront"),
+        v.literal("vehicleSideLeft"),
+        v.literal("vehicleSideRight"),
+        v.literal("vehicleRear"),
+        v.literal("dekra"),
+        v.literal("plate"),
+        v.literal("marchamo"),
+        v.literal("vinSticker"),
+      ),
+    }),
+  ),
+),
+```
+
+---
+
+## 2. Convex — modificar / crear
+
+| Archivo | Acción | Contenido |
+|---------|--------|-------------|
+| `convex/schema.ts` | **PR-B** | `clientId` opcional + índice `by_client_id`. |
+| `convex/inspections.ts` | **PR-B** | `getByClientId`, `createOrUpdateFromDraft` (sin `photoManifest`); comentario concurrencia. |
+| `convex/lib/auth.ts` | **PR-B** | `inspectionByClientId`, `canAccessInspectionByClientId`. |
+| `tests/convex/inspections.test.ts` | **PR-B** | `convex-test` + `edge-runtime`; glob `../../convex/**/*.ts` (tests fuera de `convex/` para no romper `convex codegen`). |
+| `convex/migrations.ts` | Modificar | Backfill `clientId`. |
+| `convex/n8nWebhook.ts` | Modificar si aplica | Payload con `clientId`. |
+| `convex/README.md` | Modificar | Nuevas APIs y reglas de acceso. |
+
+Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recibiendo **`Id<"inspections">`** tras resolver una vez en el boundary.
+
+---
+
+## 3. IndexedDB — `lib/offline/db.ts`
+
+| Acción | Detalle |
+|--------|---------|
+| Modificar | `DB_VERSION` **1 → 2**; migración no destructiva; **`localId === clientId`** invariante documentada en comentario junto al `createObjectStore`. |
+| Modificar tipo | `PendingInspectionRow`: `clientId`, `wizard?`, nuevos `syncStatus`, etc. |
+| Tests | `db-migration-v2.test.ts` verifica invariante `localId === clientId`. |
+
+---
+
+## 4. Sincronización — `lib/offline/sync.ts`, `contexts/SyncContext.tsx`
+
+| Archivo | Acción |
+|---------|--------|
+| `lib/offline/sync.ts` | Evolucionar / delegar en `syncQueue` bajo flag. |
+| `contexts/SyncContext.tsx` | `visibilitychange`, cola unificada cuando flag activo. |
+
+---
+
+## 5. App Router — `app/(dashboard)/inspecciones/`
+
+| Archivo | Acción |
+|---------|--------|
+| `[id]/page.tsx` | Resolver `clientId`; `not_found` + CTA. |
+| `[id]/cabecera/page.tsx` | Igual; Convex opcional hasta sync. |
+| `[id]/seccion/[seccionId]/page.tsx` | Pasar `convexId` resuelto. |
+
+---
+
+## 6. Componentes e hooks — modificar
+
+| Archivo | Fase | Notas |
+|---------|------|--------|
+| `components/inspection/VehicleForm.tsx` | **1 (hecho)** | Compresión en `onVehiclePhotoPicked` antes de `setDraft`; `PhotoCapture` sin cambios. |
+| `components/inspection/ClientForm.tsx` | 2 | `clientId` al entrar al wizard. |
+| `components/inspection/InspectionWizard.tsx` / `nueva/layout.tsx` | 2 | Inicialización IDB. |
+| `components/ui/PhotoCapture.tsx` | — | **Sin** prop `compressOnPick`; permanece dumb. |
+| `components/inspection/InspectionSectionsScreen.tsx` | 3, 6 | Resolver + UI `not_found` + estado sync. |
+| `components/inspection/SectionForm.tsx` | 3 | Local vs Convex. |
+| `hooks/useSyncQueue.ts` | 5–6 | **Comentario de fuente de verdad** IDB vs Convex (ver operación). |
+| `docs/FLUJO_CREACION_INFORME.html` | 7 | Alto nivel según refinamiento 12. |
+
+---
+
+## 7. Tests
+
+| Archivo | Fase | Notas |
+|---------|------|--------|
+| `lib/images/compressVehiclePhoto.test.ts` | 1 | Vitest `node` + mocks mínimos; `tsconfig` excluye `*.test.ts` del `tsc` de app. |
+| `tests/convex/inspections.test.ts` | PR-B | `convex-test` + `edge-runtime`; Vitest project separado; no forma parte de PR-A. |
+| `lib/offline/__tests__/db-migration-v2.test.ts` | 7 | — |
+| `lib/offline/__tests__/syncQueue.test.ts` | 7 | — |
+| Test CI | 4+ | Esquema Zod cliente vs validación servidor (`inspectionDraft`). |
+
+---
+
+## 8. Borrar (PR final de limpieza)
+
+| Elemento |
+|------------|
+| `useOfflineInspection` y rama antigua de `sync.ts` cuando `useUnifiedDraftFlow` sea único camino. |
+
+---
+
+## 9. URL `clientId` e historial legacy
+
+Backfill de `clientId` o fallback `get({ id })` con Id válido de Convex (parser oficial, no regex UUID). Documentar en PR Fase 4.
+
+---
+
+## 10. Paralelización sin colisiones
+
+| Trabajo | Archivos principalmente tocados |
+|---------|-----------------------------------|
+| **Fase 1** | `lib/images/compressVehiclePhoto.ts`, `VehicleForm.tsx` |
+| **Fase 2** | `lib/offline/db.ts`, wizard layout, hooks draft |
+| **Fase 4** | `convex/schema.ts`, `convex/inspections.ts`, `convex/lib/auth.ts`, `lib/validation/`, `convex/lib/validateInspectionDraft.ts` |
+
+**Fase 4 puede arrancar en paralelo con Fase 1** (sin solapamiento de archivos); el camino crítico baja.
+
+Evitar dos PRs tocando **`VehicleForm.tsx`** y **`db.ts`** a la vez sin coordinar.
+
+---
+
+*Baseline aprobado con refinamientos 1–13. PR-A: `compressVehiclePhoto` + `VehicleForm` + `npm run test` + docs; smoke iOS en `MIGRACION_LOCAL_FIRST_OPERACION.md`.*
