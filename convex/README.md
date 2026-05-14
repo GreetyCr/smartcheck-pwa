@@ -88,7 +88,12 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 - `inspections.listByClerkUser` — técnico: propias; admin: todas
 - `users.getMe`, `users.list` (admin), `users.promoteToAdmin`, `users.exportPdfAllowed`
 
-**Backfill** de `clientId` en inspecciones legacy: va en un PR aparte (`convex/migrations.ts`), después de mergear los cambios de esquema y mutaciones.
+**Backfill** de `clientId` en inspecciones legacy (`convex/migrations.ts`):
+
+1. Dashboard → Functions → ejecutar **`migrations.backfillInspectionClientIds`** como usuario **admin** (una vez; idempotente).
+2. Verificar con **`migrations.countInspectionsMissingClientId`** → debe devolver **0**.
+
+Tests: `tests/convex/migrations.test.ts`.
 
 ## Tests (`convex-test`)
 
@@ -98,6 +103,6 @@ Tras `pnpm install` (incluye `convex-test`, `@edge-runtime/vm`, `vitest`):
 pnpm test
 ```
 
-`tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
+`tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. `tests/convex/migrations.test.ts` cubre el backfill admin de `clientId` en Convex. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
 
 Las mutaciones por sección se pueden añadir en `sections.ts` o archivos por dominio.
