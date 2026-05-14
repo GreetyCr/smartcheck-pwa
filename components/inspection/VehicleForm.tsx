@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BatteryCharging,
@@ -39,9 +39,26 @@ import type {
 } from "@/types/inspection-draft";
 import { cn } from "@/lib/utils";
 import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
+import {
+  compressVehiclePhoto,
+  CompressVehiclePhotoError,
+} from "@/lib/images/compressVehiclePhoto";
+import type { InspectionDraft } from "@/types/inspection-draft";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
+
+type VehicleWizardPhotoKey = keyof Pick<
+  InspectionDraft,
+  | "vehiclePhotoFrontFile"
+  | "vehiclePhotoSideLeftFile"
+  | "vehiclePhotoSideRightFile"
+  | "vehiclePhotoRearFile"
+  | "photoDekraFile"
+  | "photoPlateFile"
+  | "photoMarchamoFile"
+  | "photoVinStickerFile"
+>;
 
 async function uploadOne(
   generateUploadUrl: () => Promise<string>,
@@ -60,6 +77,44 @@ export function VehicleForm({ className }: { className?: string }) {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [photoPickError, setPhotoPickError] = useState<string | null>(null);
+  /** Por slot: solo el último pick gana si el usuario cambia foto antes de que termine la compresión. */
+  const photoPickGen = useRef<Partial<Record<VehicleWizardPhotoKey, number>>>({});
+
+  const onVehiclePhotoPicked = useCallback(
+    async (key: VehicleWizardPhotoKey, file: File | null) => {
+      const nextGen = (photoPickGen.current[key] ?? 0) + 1;
+      photoPickGen.current[key] = nextGen;
+
+      if (!file) {
+        setDraft({ [key]: null } as Partial<InspectionDraft>);
+        setPhotoPickError(null);
+        return;
+      }
+      try {
+        const { file: compressed } = await compressVehiclePhoto(file);
+        if (photoPickGen.current[key] !== nextGen) {
+          return;
+        }
+        setDraft({ [key]: compressed } as Partial<InspectionDraft>);
+        setPhotoPickError(null);
+      } catch (err) {
+        if (photoPickGen.current[key] !== nextGen) {
+          return;
+        }
+        if (err instanceof CompressVehiclePhotoError) {
+          setPhotoPickError(err.message);
+        } else {
+          setPhotoPickError(
+            err instanceof Error
+              ? err.message
+              : "No se pudo procesar la imagen.",
+          );
+        }
+      }
+    },
+    [setDraft],
+  );
 
   useEffect(() => {
     if (
@@ -261,28 +316,37 @@ export function VehicleForm({ className }: { className?: string }) {
         <p className="text-xs text-muted-foreground">
           Cuatro ángulos obligatorios: frontal, dos laterales y trasera.
         </p>
+        {photoPickError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {photoPickError}
+          </p>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <PhotoCapture
             file={draft.vehiclePhotoFrontFile}
-            onFileChange={(f) => setDraft({ vehiclePhotoFrontFile: f })}
+            onFileChange={(f) => void onVehiclePhotoPicked("vehiclePhotoFrontFile", f)}
             disabled={submitting}
             label="Frontal"
           />
           <PhotoCapture
             file={draft.vehiclePhotoSideLeftFile}
-            onFileChange={(f) => setDraft({ vehiclePhotoSideLeftFile: f })}
+            onFileChange={(f) =>
+              void onVehiclePhotoPicked("vehiclePhotoSideLeftFile", f)
+            }
             disabled={submitting}
             label="Lateral izquierdo"
           />
           <PhotoCapture
             file={draft.vehiclePhotoSideRightFile}
-            onFileChange={(f) => setDraft({ vehiclePhotoSideRightFile: f })}
+            onFileChange={(f) =>
+              void onVehiclePhotoPicked("vehiclePhotoSideRightFile", f)
+            }
             disabled={submitting}
             label="Lateral derecho"
           />
           <PhotoCapture
             file={draft.vehiclePhotoRearFile}
-            onFileChange={(f) => setDraft({ vehiclePhotoRearFile: f })}
+            onFileChange={(f) => void onVehiclePhotoPicked("vehiclePhotoRearFile", f)}
             disabled={submitting}
             label="Trasera"
           />
@@ -542,13 +606,13 @@ export function VehicleForm({ className }: { className?: string }) {
         </p>
         <PhotoCapture
           file={draft.photoDekraFile}
-          onFileChange={(f) => setDraft({ photoDekraFile: f })}
+          onFileChange={(f) => void onVehiclePhotoPicked("photoDekraFile", f)}
           disabled={submitting}
           label="Foto Dekra"
         />
         <PhotoCapture
           file={draft.photoPlateFile}
-          onFileChange={(f) => setDraft({ photoPlateFile: f })}
+          onFileChange={(f) => void onVehiclePhotoPicked("photoPlateFile", f)}
           disabled={submitting}
           label="Foto de placa"
         />
@@ -570,13 +634,15 @@ export function VehicleForm({ className }: { className?: string }) {
         </div>
         <PhotoCapture
           file={draft.photoMarchamoFile}
-          onFileChange={(f) => setDraft({ photoMarchamoFile: f })}
+          onFileChange={(f) => void onVehiclePhotoPicked("photoMarchamoFile", f)}
           disabled={submitting}
           label="Foto de marchamo"
         />
         <PhotoCapture
           file={draft.photoVinStickerFile}
-          onFileChange={(f) => setDraft({ photoVinStickerFile: f })}
+          onFileChange={(f) =>
+            void onVehiclePhotoPicked("photoVinStickerFile", f)
+          }
           disabled={submitting}
           label="Foto de VIN (etiqueta)"
         />
