@@ -15,9 +15,14 @@ export default defineConfig({
     passWithNoTests: true,
     environmentMatchGlobs: [
       ["tests/convex/**", "edge-runtime"],
+      ["hooks/__tests__/**", "happy-dom"],
       ["**", "node"],
     ],
-    include: ["lib/**/*.test.ts", "tests/convex/**/*.test.ts"],
+    include: [
+      "lib/**/*.test.ts",
+      "tests/convex/**/*.test.ts",
+      "hooks/__tests__/**/*.test.tsx",
+    ],
     env: {
       N8N_WEBHOOK_DISABLED: "true",
       CLERK_JWT_ISSUER_DOMAIN: "https://test.clerk.accounts.dev",
