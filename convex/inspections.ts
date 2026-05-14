@@ -4,6 +4,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
   canAccessInspection,
+  canAccessInspectionByClientId,
+  inspectionByClientId,
   requireAdmin,
   requireUser,
   userHasFullAccess,
@@ -40,6 +42,7 @@ const countryOfOriginUnion = v.union(
 );
 
 const patchFields = v.object({
+  clientId: v.optional(v.string()),
   clientName: v.optional(v.string()),
   clientPhone: v.optional(v.string()),
   clientEmail: v.optional(v.string()),
@@ -200,6 +203,70 @@ export const patch = mutation({
   },
 });
 
+/** Quita `undefined` para no borrar campos en `db.patch` por accidente. */
+function omitUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined),
+  );
+}
+
+/**
+ * Crea o actualiza una inspección por `clientId` (idempotente en una sola mutación).
+ * Sin `photoManifest` aún (Fase 5).
+ *
+ * Convex no garantiza unicidad declarativa de `clientId`: el patrón es leer por índice
+ * `by_client_id` y luego insert o patch en esta misma mutación; reintentos concurrentes
+ * con el mismo UUID son improbables; si ocurrieran, el cliente debe reintentar.
+ */
+export const createOrUpdateFromDraft = mutation({
+  args: {
+    clientId: v.string(),
+    payload: patchFields,
+  },
+  returns: v.object({
+    inspectionId: v.id("inspections"),
+    created: v.boolean(),
+  }),
+  handler: async (ctx, { clientId, payload }) => {
+    const trimmed = clientId.trim();
+    if (!trimmed) throw new Error("clientId inválido");
+
+    const user = await requireUser(ctx);
+    const existing = await inspectionByClientId(ctx, trimmed);
+
+    if (existing) {
+      if (!(await canAccessInspectionByClientId(ctx, trimmed))) {
+        throw new Error("No autorizado");
+      }
+      const clean = omitUndefined({
+        ...payload,
+        clientId: trimmed,
+      }) as Record<string, unknown>;
+      await ctx.db.patch(existing._id, clean);
+      await scheduleN8nNotify(ctx, {
+        event: "inspection_patched",
+        inspectionId: existing._id,
+        meta: { patchedKeys: Object.keys(clean), clientId: trimmed },
+      });
+      return { inspectionId: existing._id, created: false };
+    }
+
+    const id = await ctx.db.insert("inspections", {
+      ...omitUndefined(payload),
+      clerkUserId: user.clerkId,
+      clientId: trimmed,
+      status: "draft",
+      findingsCount: 0,
+    });
+    await scheduleN8nNotify(ctx, {
+      event: "inspection_created",
+      inspectionId: id,
+      meta: { clientId: trimmed },
+    });
+    return { inspectionId: id, created: true };
+  },
+});
+
 export const get = query({
   args: { id: v.id("inspections") },
   handler: async (ctx, { id }) => {
@@ -208,6 +275,17 @@ export const get = query({
     const allowed = await canAccessInspection(ctx, id);
     if (!allowed) throw new Error("No autorizado");
     return await ctx.db.get(id);
+  },
+});
+
+/** Inspección por `clientId` estable (local-first). `null` si no existe o sin acceso. */
+export const getByClientId = query({
+  args: { clientId: v.string() },
+  handler: async (ctx, { clientId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    if (!(await canAccessInspectionByClientId(ctx, clientId))) return null;
+    return await inspectionByClientId(ctx, clientId);
   },
 });
 

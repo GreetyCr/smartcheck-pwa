@@ -184,7 +184,14 @@ export default defineSchema({
     biVehicleCondition: v.optional(
       v.union(v.literal(1), v.literal(2), v.literal(3)),
     ),
-  }).index("by_clerk_user", ["clerkUserId"]),
+    /**
+     * Identificador estable del cliente (UUID v4) para URL y sync idempotente.
+     * Opcional en datos legacy; nuevas inspecciones local-first lo setean siempre.
+     */
+    clientId: v.optional(v.string()),
+  })
+    .index("by_clerk_user", ["clerkUserId"])
+    .index("by_client_id", ["clientId"]),
 
   /** PDFs generados del reporte de inspección (solo admin puede crear). */
   pdfs: defineTable({
