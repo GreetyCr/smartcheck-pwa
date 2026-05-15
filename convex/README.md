@@ -90,8 +90,12 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 
 **Backfill** de `clientId` en inspecciones legacy (`convex/migrations.ts`):
 
-1. Dashboard → Functions → ejecutar **`migrations.backfillInspectionClientIds`** como usuario **admin** (una vez; idempotente).
-2. Verificar con **`migrations.countInspectionsMissingClientId`** → debe devolver **0**.
+**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId` (o usá `countInspectionsMissingClientId`). Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
+
+1. **Snapshot previo:** ejecutar **`migrations.countInspectionsMissingClientId`** y anotar el número (denominador esperado de patches si nadie inserta filas nuevas sin `clientId` durante la ventana).
+2. **Tandas:** como **`migrations.backfillInspectionClientIds`** (admin). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
+3. **Verificación opcional durante:** sumá `patched` de todas las tandas; si coincide con el snapshot previo (salvo inserciones concurrentes), mejor.
+4. **Snapshot final:** **`countInspectionsMissingClientId` === 0**.
 
 Tests: `tests/convex/migrations.test.ts`.
 

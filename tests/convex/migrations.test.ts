@@ -63,7 +63,14 @@ test("backfillInspectionClientIds: asigna UUID solo donde falta; count en cero; 
     api.migrations.backfillInspectionClientIds,
     {},
   );
-  expect(first).toEqual({ scanned: 3, patched: 2, skipped: 1 });
+  expect(first).toMatchObject({
+    scanned: 3,
+    patched: 2,
+    skipped: 1,
+    errors: [],
+    done: true,
+  });
+  expect(first.nextCursor).toBeUndefined();
 
   expect(
     await asAdmin.query(api.migrations.countInspectionsMissingClientId, {}),
@@ -80,7 +87,74 @@ test("backfillInspectionClientIds: asigna UUID solo donde falta; count en cero; 
     api.migrations.backfillInspectionClientIds,
     {},
   );
-  expect(second).toEqual({ scanned: 3, patched: 0, skipped: 3 });
+  expect(second).toMatchObject({
+    scanned: 3,
+    patched: 0,
+    skipped: 3,
+    errors: [],
+    done: true,
+  });
+});
+
+test("backfillInspectionClientIds: repite con cursor hasta done (tandas pequeñas)", async () => {
+  const t = convexTest(schema, convexModules);
+  const now = Date.now();
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("users", {
+      clerkId: adminSubject,
+      email: "admin-mig-batch@example.com",
+      role: "admin",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("users", {
+      clerkId: techSubject,
+      email: "tecnico-mig-batch@example.com",
+      role: "tecnico",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (let i = 0; i < 5; i++) {
+      await ctx.db.insert("inspections", {
+        clerkUserId: techSubject,
+        status: "draft",
+        findingsCount: 0,
+      });
+    }
+  });
+
+  const asAdmin = t.withIdentity({ subject: adminSubject });
+  expect(
+    await asAdmin.query(api.migrations.countInspectionsMissingClientId, {}),
+  ).toBe(5);
+
+  let cursor: string | null = null;
+  let totalPatched = 0;
+  let sawDone = false;
+  for (let step = 0; step < 20; step++) {
+    const r = await asAdmin.mutation(api.migrations.backfillInspectionClientIds, {
+      cursor,
+      batchSize: 2,
+    });
+    totalPatched += r.patched;
+    expect(r.errors).toEqual([]);
+    if (r.done) {
+      expect(r.nextCursor).toBeUndefined();
+      sawDone = true;
+      break;
+    }
+    expect(r.nextCursor).toBeDefined();
+    cursor = r.nextCursor!;
+  }
+
+  expect(sawDone).toBe(true);
+  expect(totalPatched).toBe(5);
+  expect(
+    await asAdmin.query(api.migrations.countInspectionsMissingClientId, {}),
+  ).toBe(0);
 });
 
 test("backfillInspectionClientIds: técnico no admin no puede ejecutar", async () => {
