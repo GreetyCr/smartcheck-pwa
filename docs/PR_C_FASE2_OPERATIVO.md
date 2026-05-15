@@ -24,6 +24,17 @@ Este documento resume el alcance **PR-C** y las reglas que el team lead dejó pa
 
 Si la migración IDB falla en un navegador raro: se registra error, `getOfflineDbMigrationDegraded()` pasa a `true` y el hook entra en **solo lectura** (no bloquear el wizard entero).
 
+## Catálogo de logs `[offline-db]` (cliente)
+
+Formato: prefijo **`[offline-db]`** + tipo + razón o contexto (greppable; apto para mapear a tags en Sentry u otro APM). Detalle breve en [`lib/offline/README.md`](../lib/offline/README.md).
+
+| Log | Significado |
+|-----|-------------|
+| `[offline-db] migration_degraded` `transaction_failed` + error | Falló la transacción de migración de `clientId` en IndexedDB (post-open). |
+| `[offline-db] migration_degraded` `idb_blocked_pending_upgrade` + `{ currentVersion, blockedVersion }` | Otra pestaña bloqueó `upgradeneeded`; cerrar otras pestañas o recargar. |
+| `[offline-db] migration_row_failed` + `localId` + error | Error al migrar una fila concreta en IDB (se sigue con el resto). |
+| `[offline-db] idb_blocked` (warn) + texto + versión | Aviso antes del estado degradado por bloqueo de versión de IDB. |
+
 ## Reglas IDB (recordatorio)
 
 1. Solo **añadir** campos en upgrades; nunca quitar ni renombrar una vez en producción.

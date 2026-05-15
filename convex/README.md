@@ -88,7 +88,16 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 - `inspections.listByClerkUser` — técnico: propias; admin: todas
 - `users.getMe`, `users.list` (admin), `users.promoteToAdmin`, `users.exportPdfAllowed`
 
-**Backfill** de `clientId` en inspecciones legacy: va en un PR aparte (`convex/migrations.ts`), después de mergear los cambios de esquema y mutaciones.
+**Backfill** de `clientId` en inspecciones legacy (`convex/migrations.ts`):
+
+**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId` (o usá `countInspectionsMissingClientId`). Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
+
+1. **Snapshot previo:** ejecutar **`migrations.countInspectionsMissingClientId`** y anotar el número (denominador esperado de patches si nadie inserta filas nuevas sin `clientId` durante la ventana).
+2. **Tandas:** como **`migrations.backfillInspectionClientIds`** (admin). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
+3. **Verificación opcional durante:** sumá `patched` de todas las tandas; si coincide con el snapshot previo (salvo inserciones concurrentes), mejor.
+4. **Snapshot final:** **`countInspectionsMissingClientId` === 0**.
+
+Tests: `tests/convex/migrations.test.ts`.
 
 ## Tests (`convex-test`)
 
@@ -98,6 +107,6 @@ Tras `pnpm install` (incluye `convex-test`, `@edge-runtime/vm`, `vitest`):
 pnpm test
 ```
 
-`tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
+`tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. `tests/convex/migrations.test.ts` cubre el backfill admin de `clientId` en Convex. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
 
 Las mutaciones por sección se pueden añadir en `sections.ts` o archivos por dominio.
