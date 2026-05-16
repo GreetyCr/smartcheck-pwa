@@ -10,6 +10,18 @@ Convenciones cerradas:
 
 ---
 
+## Decisiones cerradas pre-PR-E (check-in Fase 3)
+
+1. **`resolveInspectionRef`** — Orden de resolución: **IDB → UUID v4 (`getByClientId`) → id Convex `inspections` (`get`) → `not_found`**. Clasificación por forma: **`lib/inspection/idValidation.ts`** — `isUuidV4` (RFC, sin regex “casero” opaco: un solo patrón explícito) y `looksLikeConvexInspectionId` (heurística de longitud/charset; reemplazable si Convex publica helper). En servidor, **`normalizeId("inspections", ref)`** sigue siendo la verificación de pertenencia a tabla. **Redirect canónico** cuando `kind === "convex"` y se conoce `clientId`: `router.replace` (no `push`) a `/inspecciones/{clientId}/…`, solo si hay **acceso confirmado** e **inspección existente**; si no hay acceso o el doc no existe → **`not_found`** directo (sin redirect a URL muerta).
+
+2. **`InspectionCabeceraScreen` (pre-sync)** — **Solo lectura** + hint visible (copy base: «Se podrá editar cuando el informe esté sincronizado») + CTA opcional «Sincronizar ahora». El CTA debe invocar el **mismo** `processSyncQueue` que el lifecycle automático (una sola fuente de verdad).
+
+3. **`SectionForm` (modo local)** — Catálogo de ítems ya es **estático en bundle** (`lib/constants/sectionItems.ts`). Estado por sección en IDB: forma **alineada** a lo que devuelve `sections.getSection`, menos campos server-only. Preferible **`toUpsertPayload(localSectionRow): UpsertSectionArgs`** único (sin lógica por sección). **`upsertSection` solo** cuando exista **`convexId`** del padre; hasta entonces solo IDB. La cola debe **crear/actualizar primero la inspección** (`createOrUpdateFromDraft`) y **después** las secciones de esa inspección. Fotos: **misma cola** que Fase 5 / cabecera (sin canal paralelo).
+
+4. **`useUnifiedDraftFlow`** — Implementado en **`lib/featureFlags.ts`**: boolean por entorno (`NEXT_PUBLIC_USE_UNIFIED_DRAFT_FLOW`, lectura con `trim` + `toLowerCase`). Regla de cola documentada **en comentario junto a la función** (entrada bajo flag; **sync siempre drena**). En cliente: **`console.info("[smartcheck] useUnifiedDraftFlow:", …)`** y **`window.__smartcheck.useUnifiedDraftFlow`** al cargar el bundle (QA / soporte). Granularidad por usuario → segunda iteración si hace falta.
+
+---
+
 ## Refinamientos baseline (previos a Fase 1 — incorporados)
 
 1. **`lib/offline/syncQueue.ts` tipado**: el adaptador que llama a Convex **no** usa `unknown`. Tras existir la mutación, usar por ejemplo `import type { FunctionArgs } from "convex/server";` y `export type CreateOrUpdateFromDraftArgs = FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>` (o el helper que exporte el proyecto) para que un cambio de contrato rompa compilación en la cola.
@@ -45,10 +57,11 @@ Convenciones cerradas:
 | Archivo | Fase | Rol |
 |---------|------|-----|
 | `lib/images/compressVehiclePhoto.ts` | **1 (hecho)** | JPEG calidad **0.82** (`VEHICLE_PHOTO_JPEG_QUALITY`), lado mayor **1600**; `createImageBitmap` + canvas; `ImageBitmap` cerrado en `finally` (`closeBitmapSafe`); `File` con `type: image/jpeg` y nombre `.jpg`; carrera en **`VehicleForm`** con generación por slot. |
-| `lib/featureFlags.ts` | 3–5 | `useUnifiedDraftFlow`, etc. |
+| `lib/featureFlags.ts` | **3 (hecho)** | `useUnifiedDraftFlow()` + env normalizado + log `[smartcheck]` + `window.__smartcheck`; import side-effect en `ConvexClientProvider.tsx`. |
+| `lib/inspection/idValidation.ts` | **3 (hecho)** | `isUuidV4`, `looksLikeConvexInspectionId`; tests `lib/inspection/idValidation.test.ts`. |
 | `lib/validation/inspectionDraft.ts` | **4 (oblig.)** | Esquema Zod compartido (wizard + payload mutación). |
 | `convex/lib/validateInspectionDraft.ts` | **4 (oblig.)** | Validación servidor; importa o duplica controlada vs `lib/validation`. |
-| `lib/inspection/resolveInspectionRef.ts` | 3 | IDB → `getByClientId` → legacy `get` por `_id` (ventana migración). |
+| `lib/inspection/resolveInspectionRef.ts` | 3 | Usa `idValidation`; IDB → `getByClientId` → legacy `get`. |
 | `hooks/usePendingInspectionDraft.ts` | 2 | Debounce + `pagehide` / `beforeunload`. |
 | `hooks/useUnifiedInspection.ts` | 3+ | Bajo flag. |
 | `lib/offline/syncQueue.ts` | 5 | Cola; adapters tipados con `FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>`. |
@@ -80,7 +93,7 @@ export type ResolvedInspection =
 export async function resolveInspectionRef(ref: string): Promise<ResolvedInspection>;
 ```
 
-**UI**: si `kind === "not_found"` → pantalla con CTA a `/inspecciones/nueva`.
+Orden: **IDB → UUID v4 → id Convex** (ver «Decisiones cerradas pre-PR-E»). Clasificación: **`lib/inspection/idValidation.ts`**. **UI**: `not_found` → pantalla fija + CTA a `/inspecciones/nueva`. **`kind === "convex"`** con `clientId` conocido → redirect canónico con **`router.replace`** (condiciones de acceso y existencia cumplidas).
 
 #### `lib/offline/syncQueue.ts` (Fase 5)
 
@@ -166,9 +179,9 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 
 | Archivo | Acción |
 |---------|--------|
-| `[id]/page.tsx` | Resolver `clientId`; `not_found` + CTA. |
-| `[id]/cabecera/page.tsx` | Igual; Convex opcional hasta sync. |
-| `[id]/seccion/[seccionId]/page.tsx` | Pasar `convexId` resuelto. |
+| `[id]/page.tsx` | `resolveInspectionRef`; `not_found` + CTA; redirect canónico `replace` cuando aplique. |
+| `[id]/cabecera/page.tsx` | Misma resolución; cabecera solo lectura + hint + CTA sync → `processSyncQueue` compartido. |
+| `[id]/seccion/[seccionId]/page.tsx` | Pasar refs resueltos; `SectionForm` local vs Convex según plan. |
 
 ---
 
@@ -212,7 +225,7 @@ Las mutaciones **`sections.*`**, **`pdfs.*`**, **`usePhotoUpload`** siguen recib
 
 ## 9. URL `clientId` e historial legacy
 
-Backfill de `clientId` o fallback `get({ id })` con Id válido de Convex (parser oficial, no regex UUID). Documentar en PR Fase 4.
+Backfill Convex de `clientId` (**PR-D**). Resolución: clasificador explícito + `getByClientId` / `get` según tipo de ref; links legacy con `_id` siguen válidos; redirect canónico a URL por `clientId` cuando `kind === "convex"` (ver pre-PR-E).
 
 ---
 
