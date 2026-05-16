@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 
 const convexModules = Object.fromEntries(
@@ -155,6 +155,23 @@ test("backfillInspectionClientIds: repite con cursor hasta done (tandas pequeña
   expect(
     await asAdmin.query(api.migrations.countInspectionsMissingClientId, {}),
   ).toBe(0);
+});
+
+test("countInspectionsMissingClientIdInternal: sin sesión Clerk (solo internal)", async () => {
+  const t = convexTest(schema, convexModules);
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+    });
+  });
+
+  const n = await t.query(
+    internal.migrations.countInspectionsMissingClientIdInternal,
+    {},
+  );
+  expect(n).toBe(1);
 });
 
 test("backfillInspectionClientIds: técnico no admin no puede ejecutar", async () => {
