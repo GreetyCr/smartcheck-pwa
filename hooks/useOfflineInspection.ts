@@ -11,14 +11,25 @@ import {
   type SectionData,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
+import { looksLikeConvexInspectionId } from "@/lib/inspection/idValidation";
 
-type Options = { inspectionId?: string };
+type Options = {
+  inspectionId?: string;
+  /**
+   * Flujo unificado (PR-E2): id Convex para `get` cuando ya está resuelto.
+   * `undefined` = inferir como hoy; `null` = no consultar Convex.
+   */
+  convexInspectionIdForOnline?: Id<"inspections"> | null;
+};
 
 /**
  * Abstrae guardado y lectura de inspección online (Convex) / offline (IndexedDB).
  * RF-17, RF-18, RF-19.
  */
-export function useOfflineInspection({ inspectionId }: Options) {
+export function useOfflineInspection({
+  inspectionId,
+  convexInspectionIdForOnline,
+}: Options) {
   const { isOnline, refreshPendingCount } = useSync();
   const [localRow, setLocalRow] = useState<PendingInspectionRow | null>(null);
   const [loadingLocal, setLoadingLocal] = useState(false);
@@ -43,7 +54,12 @@ export function useOfflineInspection({ inspectionId }: Options) {
         );
         if (!row) {
           const all = await db.getAll("pendingInspections");
-          row = all.find((r) => r.convexId === inspectionId);
+          row = all.find(
+            (r) =>
+              r.convexId === inspectionId ||
+              String(r.clientId ?? "") === inspectionId ||
+              r.localId === inspectionId,
+          );
         }
         setLocalRow(row ?? null);
       } finally {
@@ -53,14 +69,19 @@ export function useOfflineInspection({ inspectionId }: Options) {
   }, [inspectionId, isOnline]);
 
   const queryId = useMemo((): Id<"inspections"> | null => {
+    if (convexInspectionIdForOnline !== undefined) {
+      return convexInspectionIdForOnline;
+    }
     if (!isOnline) return null;
     if (localRow) {
       if (localRow.convexId) return localRow.convexId as Id<"inspections">;
       return null;
     }
-    if (inspectionId) return inspectionId as Id<"inspections">;
+    if (inspectionId && looksLikeConvexInspectionId(inspectionId)) {
+      return inspectionId as Id<"inspections">;
+    }
     return null;
-  }, [isOnline, localRow, inspectionId]);
+  }, [isOnline, localRow, inspectionId, convexInspectionIdForOnline]);
 
   const convexInspection = useQuery(
     api.inspections.get,

@@ -73,11 +73,25 @@ const CAPTURE_ORDER: CaptureSource[] = [
   "referido",
 ];
 
-type Props = { inspectionId: Id<"inspections"> };
+import { useSync } from "@/contexts/SyncContext";
+import {
+  inspectionPathSegment,
+  type InspectionRouteContextValue,
+} from "@/components/inspection/InspectionRouteResolver";
+import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
-export function InspectionCabeceraScreen({ inspectionId }: Props) {
+type Props = { routeCtx: InspectionRouteContextValue };
+
+export function InspectionCabeceraScreen({ routeCtx }: Props) {
   const router = useRouter();
-  const payload = useQuery(api.inspections.getCabeceraEdit, { id: inspectionId });
+  const pathSeg = inspectionPathSegment(routeCtx);
+  const convexMutationId = routeCtx.convexInspectionId;
+  const { syncNow, isSyncing } = useSync();
+
+  const payload = useQuery(
+    api.inspections.getCabeceraEdit,
+    convexMutationId ? { id: convexMutationId } : "skip",
+  );
   const generateUploadUrl = useMutation(api.inspections.generateUploadUrl);
   const patchInspection = useMutation(api.inspections.patch);
 
@@ -286,7 +300,7 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
         const ids = resolvePrimaryVehicleId(plate, vinInput);
 
         await patchInspection({
-          id: inspectionId,
+          id: convexMutationId!,
           patch: {
             clientName: clientName.trim(),
             clientPhone: phoneDigits,
@@ -321,7 +335,7 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
           },
         });
 
-        router.push(`/inspecciones/${String(inspectionId)}`);
+        router.push(`/inspecciones/${pathSeg}`);
       } catch (err) {
         setSubmitError(
           err instanceof Error ? err.message : "No se pudo guardar los cambios.",
@@ -360,10 +374,45 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
       combustionFuel,
       platePhotoNote,
       patchInspection,
-      inspectionId,
+      convexMutationId,
+      pathSeg,
       router,
     ],
   );
+
+  if (routeCtx.unifiedFlow && convexMutationId === null) {
+    return (
+      <div className="flex min-h-dvh flex-col bg-[#F8F9FA] pb-28">
+        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card px-2 py-3">
+          <Link
+            href={`/inspecciones/${pathSeg}`}
+            className="flex size-10 items-center justify-center rounded-full text-primary hover:bg-muted"
+            aria-label="Volver"
+          >
+            <ArrowLeft className="size-6" />
+          </Link>
+          <div className="min-w-0 flex-1 text-center">
+            <h1 className="text-base font-bold text-primary">Cabecera del informe</h1>
+            <p className="text-xs text-muted-foreground">Solo lectura hasta sincronizar</p>
+          </div>
+          <span className="size-10 shrink-0" aria-hidden />
+        </header>
+        <div className="mx-auto max-w-lg flex-1 space-y-4 px-4 pt-6">
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            {INSPECTION_ROUTE_COPY.CABECERA_HINT_READONLY}
+          </p>
+          <Button
+            type="button"
+            className="w-full rounded-xl"
+            disabled={isSyncing}
+            onClick={() => void syncNow()}
+          >
+            {isSyncing ? "Sincronizando…" : INSPECTION_ROUTE_COPY.CABECERA_CTA_SYNC}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (payload === undefined) {
     return <DashboardPageSkeleton variant="form" />;
@@ -386,7 +435,7 @@ export function InspectionCabeceraScreen({ inspectionId }: Props) {
     <div className="flex min-h-dvh flex-col bg-[#F8F9FA] pb-28">
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card px-2 py-3">
         <Link
-          href={`/inspecciones/${inspectionId}`}
+          href={`/inspecciones/${pathSeg}`}
           className="flex size-10 items-center justify-center rounded-full text-primary hover:bg-muted"
           aria-label="Volver"
         >
