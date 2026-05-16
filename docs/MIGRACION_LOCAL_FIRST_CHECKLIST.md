@@ -12,13 +12,38 @@ Convenciones cerradas:
 
 ## Decisiones cerradas pre-PR-E (check-in Fase 3)
 
-1. **`resolveInspectionRef`** — Orden de resolución: **IDB → UUID v4 (`getByClientId`) → id Convex `inspections` (`get`) → `not_found`**. Clasificación por forma: **`lib/inspection/idValidation.ts`** — `isUuidV4` (RFC, sin regex “casero” opaco: un solo patrón explícito) y `looksLikeConvexInspectionId` (heurística de longitud/charset; reemplazable si Convex publica helper). En servidor, **`normalizeId("inspections", ref)`** sigue siendo la verificación de pertenencia a tabla. **Redirect canónico** cuando `kind === "convex"` y se conoce `clientId`: `router.replace` (no `push`) a `/inspecciones/{clientId}/…`, solo si hay **acceso confirmado** e **inspección existente**; si no hay acceso o el doc no existe → **`not_found`** directo (sin redirect a URL muerta).
+1. **`resolveInspectionRef`** — Orden de resolución: **IDB → UUID v4 (`getByClientId`) → id Convex `inspections` (`get`) → `not_found`**. Si `ref` **parece UUID v4** y **no** hay fila en IDB, **igual** hay que intentar Convex (`getByClientId` + acceso): es el caso link en **otro dispositivo** (p. ej. WhatsApp) con IDB vacío; **no** devolver `not_found` solo por ausencia local. Clasificación por forma: **`lib/inspection/idValidation.ts`** — `isUuidV4` (RFC, un solo patrón explícito) y `looksLikeConvexInspectionId` (heurística de longitud/charset; reemplazable si Convex publica helper). En servidor, **`normalizeId("inspections", ref)`** sigue siendo la verificación de pertenencia a tabla. **Redirect canónico** cuando `kind === "convex"` y se conoce `clientId`: `router.replace` (no `push`) a `/inspecciones/{clientId}/…`, solo si hay **acceso confirmado** e **inspección existente**; si no hay acceso o el doc no existe → **`not_found`** directo (sin redirect a URL muerta).
 
 2. **`InspectionCabeceraScreen` (pre-sync)** — **Solo lectura** + hint visible (copy base: «Se podrá editar cuando el informe esté sincronizado») + CTA opcional «Sincronizar ahora». El CTA debe invocar el **mismo** `processSyncQueue` que el lifecycle automático (una sola fuente de verdad).
 
 3. **`SectionForm` (modo local)** — Catálogo de ítems ya es **estático en bundle** (`lib/constants/sectionItems.ts`). Estado por sección en IDB: forma **alineada** a lo que devuelve `sections.getSection`, menos campos server-only. Preferible **`toUpsertPayload(localSectionRow): UpsertSectionArgs`** único (sin lógica por sección). **`upsertSection` solo** cuando exista **`convexId`** del padre; hasta entonces solo IDB. La cola debe **crear/actualizar primero la inspección** (`createOrUpdateFromDraft`) y **después** las secciones de esa inspección. Fotos: **misma cola** que Fase 5 / cabecera (sin canal paralelo).
 
 4. **`useUnifiedDraftFlow`** — Implementado en **`lib/featureFlags.ts`**: boolean por entorno (`NEXT_PUBLIC_USE_UNIFIED_DRAFT_FLOW`, lectura con `trim` + `toLowerCase`). Regla de cola documentada **en comentario junto a la función** (entrada bajo flag; **sync siempre drena**). En cliente: **`console.info("[smartcheck] useUnifiedDraftFlow:", …)`** y **`window.__smartcheck.useUnifiedDraftFlow`** al cargar el bundle (QA / soporte). Granularidad por usuario → segunda iteración si hace falta.
+
+---
+
+## Fase 3 — PR-E (greenlight y plan de PRs)
+
+**Insumos listos:** decisiones en este doc; **`lib/featureFlags.ts`** (regla cola comentada); **`lib/inspection/idValidation.ts`** + tests; **backfill `clientId` en prod** (count final 0).
+
+### Partir en PR-E1 + PR-E2 (recomendado)
+
+| PR | Alcance | Objetivo |
+|----|---------|----------|
+| **PR-E1** | Solo módulos puros: `lib/inspection/resolveInspectionRef.ts` (orden IDB → UUID v4 → Convex id legacy → `not_found`, usando `idValidation.ts`); `hooks/useUnifiedInspection.ts` (consume resolver, expone `kind`, `clientId?`, `convexId?`, `syncStatus`, …); **tests** con fixtures (p. ej. fake-indexeddb + mocks Convex). **Sin** tocar rutas ni componentes de pantalla. | Review chica; decisiones del resolver aisladas del ruido de UI. |
+| **PR-E2** | Tras merge de E1: `app/(dashboard)/inspecciones/[id]/page.tsx`, `[id]/cabecera/page.tsx`, `[id]/seccion/[seccionId]/page.tsx`, `nueva/layout.tsx`; `VehicleForm`, `InspectionSectionsScreen`, `InspectionCabeceraScreen`; `clientId` al entrar al wizard; cableado bajo **`useUnifiedDraftFlow`**; smoke manual **documentado en el cuerpo del PR**. | Review centrada en integración y routing. |
+
+**Un solo PR-E** es defendible si el smoke manual es exhaustivo; el equipo puede elegir velocidad vs tractabilidad.
+
+### Obligatorio en tests de PR-E1
+
+**UUID con forma v4 y sin fila en IDB** → el resolver **debe** seguir a Convex (`getByClientId` / acceso) y **no** devolver `not_found` solo por no estar en IDB (otro dispositivo / IDB limpio).
+
+### Smoke antes de aprobar merge de PR-E2
+
+1. **Flag OFF** en `.env.local`: wizard **igual que hoy** — crear inspección y verificar persistencia en Convex por el flujo actual.
+2. **Flag ON:** tap «Iniciar inspección» usable sin red; completar wizard **offline**; al restaurar red, la inspección aparece en Convex **sin** pasos extra del usuario.
+3. **Flag ON**, URL legacy `/inspecciones/{idConvex}` (document `_id` de Convex): debe resolver y, según decisión cerrada, **`router.replace`** a `/inspecciones/{clientId}`.
 
 ---
 
@@ -61,9 +86,9 @@ Convenciones cerradas:
 | `lib/inspection/idValidation.ts` | **3 (hecho)** | `isUuidV4`, `looksLikeConvexInspectionId`; tests `lib/inspection/idValidation.test.ts`. |
 | `lib/validation/inspectionDraft.ts` | **4 (oblig.)** | Esquema Zod compartido (wizard + payload mutación). |
 | `convex/lib/validateInspectionDraft.ts` | **4 (oblig.)** | Validación servidor; importa o duplica controlada vs `lib/validation`. |
-| `lib/inspection/resolveInspectionRef.ts` | 3 | Usa `idValidation`; IDB → `getByClientId` → legacy `get`. |
+| `lib/inspection/resolveInspectionRef.ts` | **PR-E1** | § Fase 3 — PR-E; `idValidation`; orden IDB → UUID → legacy `get`. |
 | `hooks/usePendingInspectionDraft.ts` | 2 | Debounce + `pagehide` / `beforeunload`. |
-| `hooks/useUnifiedInspection.ts` | 3+ | Bajo flag. |
+| `hooks/useUnifiedInspection.ts` | **PR-E1** | § Fase 3 — PR-E; consume resolver; UI bajo flag en PR-E2. |
 | `lib/offline/syncQueue.ts` | 5 | Cola; adapters tipados con `FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>`. |
 | `lib/offline/retention.ts` | 7 | Purga 7d / retención metadatos 30d; ver `MIGRACION_LOCAL_FIRST_OPERACION.md`. |
 | `docs/MIGRACION_LOCAL_FIRST_OPERACION.md` | **7 (creado)** | Retención, fuente de verdad sync, n8n, criterio doc HTML. |
