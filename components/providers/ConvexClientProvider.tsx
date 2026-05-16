@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/featureFlags";
 import { useAuth } from "@clerk/nextjs";
 import {
   ConvexReactClient,

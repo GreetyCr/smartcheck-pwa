@@ -57,7 +57,7 @@ Convenciones cerradas:
 | Archivo | Fase | Rol |
 |---------|------|-----|
 | `lib/images/compressVehiclePhoto.ts` | **1 (hecho)** | JPEG calidad **0.82** (`VEHICLE_PHOTO_JPEG_QUALITY`), lado mayor **1600**; `createImageBitmap` + canvas; `ImageBitmap` cerrado en `finally` (`closeBitmapSafe`); `File` con `type: image/jpeg` y nombre `.jpg`; carrera en **`VehicleForm`** con generación por slot. |
-| `lib/featureFlags.ts` | **3 (hecho)** | `useUnifiedDraftFlow()` + env normalizado + log `[smartcheck]` + `window.__smartcheck`; comentario «cola siempre drena». |
+| `lib/featureFlags.ts` | **3 (hecho)** | `useUnifiedDraftFlow()` + env normalizado + log `[smartcheck]` + `window.__smartcheck`; import side-effect en `ConvexClientProvider.tsx`. |
 | `lib/inspection/idValidation.ts` | **3 (hecho)** | `isUuidV4`, `looksLikeConvexInspectionId`; tests `lib/inspection/idValidation.test.ts`. |
 | `lib/validation/inspectionDraft.ts` | **4 (oblig.)** | Esquema Zod compartido (wizard + payload mutación). |
 | `convex/lib/validateInspectionDraft.ts` | **4 (oblig.)** | Validación servidor; importa o duplica controlada vs `lib/validation`. |
