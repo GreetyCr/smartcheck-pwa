@@ -88,7 +88,13 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 - `inspections.listByClerkUser` — técnico: propias; admin: todas
 - `users.getMe`, `users.list` (admin), `users.promoteToAdmin`, `users.exportPdfAllowed`
 
-**Backfill** de `clientId` en inspecciones legacy (`convex/migrations.ts`):
+## Migraciones de datos — convención (`convex/migrations.ts`)
+
+- **Por defecto:** migraciones masivas o operadas por ops se implementan como **`internalMutation`** / **`internalQuery`** (nombre explícito, p. ej. sufijo `Internal`). Se ejecutan con **`npx convex run --prod migrations:nombreInternal '{}'`** (o sin `--prod` en dev). No requieren JWT de Clerk; el Dashboard de Convex **no** envía sesión de Clerk a las funciones públicas.
+- **Excepción:** si la misma lógica debe invocarse **desde la app** con admin autenticado, se añade una **`mutation`/`query` pública** con `requireAdmin` que **delega** en el **mismo helper** que la variante internal. Así el batching / paginación / manejo de errores vive en **un solo sitio**; las dos rutas heredan el mismo arreglo si aparece un bug.
+- **Lección:** el patrón heredado de solo `mutation` + `requireAdmin` (como `migrateLegacyCountryOfOrigin`) **no sirve** para Functions del Dashboard ni para CLI sin `--identity`. Las migraciones **nuevas** deberían seguir el patrón internal-first de arriba; las legacy se pueden dejar como están hasta que alguien las toque.
+
+**Backfill** de `clientId` en inspecciones legacy:
 
 **Auth:** las funciones **públicas** `countInspectionsMissingClientId` y `backfillInspectionClientIds` usan **`requireAdmin`** → hace falta **JWT de Clerk** (sesión admin en la app). El **Dashboard de Convex → Functions** al ejecutar una función pública **no** envía ese token: obtendrás `No autenticado`. Para operar **sin** sesión Clerk usá las variantes **internal** desde la terminal (mismo cuerpo, sin auth):
 
@@ -102,10 +108,10 @@ npx convex run migrations:backfillInspectionClientIdsInternal '{}'
 
 Las funciones son **internal** en el código (no accesibles desde `ConvexReactClient` en el browser), pero el CLI las referencia como `migrations:nombreInternal`.
 
-**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId`, o usá el `internal:…count…` de arriba. Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
+**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId`, o usá `migrations:countInspectionsMissingClientIdInternal` desde CLI (arriba). Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
 
-1. **Snapshot previo:** `internal:…countInspectionsMissingClientIdInternal` (o la query pública **solo** con sesión admin en la app) y anotar el número.
-2. **Tandas:** `internal:…backfillInspectionClientIdsInternal` (o la mutación pública con admin en la app). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
+1. **Snapshot previo:** `migrations:countInspectionsMissingClientIdInternal` (o la query pública **solo** con sesión admin en la app) y anotar el número.
+2. **Tandas:** `migrations:backfillInspectionClientIdsInternal` (o la mutación pública con admin en la app). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
 3. **Verificación opcional durante:** sumá `patched` de todas las tandas; si coincide con el snapshot previo (salvo inserciones concurrentes), mejor.
 4. **Snapshot final:** conteo **0** (misma función de conteo que en el paso 1).
 

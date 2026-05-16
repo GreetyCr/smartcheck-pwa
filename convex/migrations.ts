@@ -29,6 +29,7 @@ function clampClientIdBackfillBatchSize(raw: number | undefined): number {
   );
 }
 
+/** Cuerpo compartido de `countInspectionsMissingClientId` y `countInspectionsMissingClientIdInternal`. */
 async function countInspectionsMissingClientIdImpl(
   ctx: QueryCtx,
 ): Promise<number> {
@@ -57,6 +58,7 @@ const backfillArgs = {
   batchSize: v.optional(v.number()),
 };
 
+/** Cuerpo compartido de `backfillInspectionClientIds` y `backfillInspectionClientIdsInternal`. */
 async function backfillInspectionClientIdsImpl(
   ctx: MutationCtx,
   args: {
@@ -198,7 +200,7 @@ export const countInspectionsMissingClientId = query({
 /**
  * Igual que `countInspectionsMissingClientId` pero **sin** Clerk.
  * Solo API **internal** (no accesible desde el browser público).
- * Verificación en prod: `npx convex run internal:migrations/countInspectionsMissingClientIdInternal`
+ * Verificación en prod: `npx convex run migrations:countInspectionsMissingClientIdInternal`
  */
 export const countInspectionsMissingClientIdInternal = internalQuery({
   args: {},
@@ -226,7 +228,7 @@ export const backfillInspectionClientIds = mutation({
 
 /**
  * Igual que `backfillInspectionClientIds` pero **sin** Clerk.
- * Solo API **internal**. Ej.: `npx convex run internal:migrations/backfillInspectionClientIdsInternal`
+ * Solo API **internal**. Ej.: `npx convex run migrations:backfillInspectionClientIdsInternal`
  */
 export const backfillInspectionClientIdsInternal = internalMutation({
   args: backfillArgs,
