@@ -1,7 +1,6 @@
 "use client";
 
 import { SectionItem, type SectionRowStatus } from "@/components/inspection/SectionItem";
-import type { Id } from "@/convex/_generated/dataModel";
 import type { SectionDefinition } from "@/lib/constants/sections";
 
 type Summary = {
@@ -11,14 +10,14 @@ type Summary = {
 };
 
 type SectionsListProps = {
-  inspectionId: Id<"inspections">;
+  pathSegment: string;
   summaries: Summary[];
   /** Orden y filtrado (p. ej. sin tracción en 2WD). */
   sections: SectionDefinition[];
 };
 
 export function SectionsList({
-  inspectionId,
+  pathSegment,
   summaries,
   sections,
 }: SectionsListProps) {
@@ -37,7 +36,7 @@ export function SectionsList({
           return (
             <li key={sec.id}>
               <SectionItem
-                href={`/inspecciones/${inspectionId}/seccion/${sec.id}`}
+                href={`/inspecciones/${pathSegment}/seccion/${sec.id}`}
                 name={sec.name}
                 subtitle={sec.subtitle}
                 icon={sec.icon}

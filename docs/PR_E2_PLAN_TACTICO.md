@@ -58,7 +58,7 @@ Revisar en PR-E2 solo si aparece un link directo a detalle con `_id` legacy; el 
 | `InspectionSectionsScreen` | `inspectionId` |
 | `InspectionCabeceraScreen` | `inspectionId` |
 | `SectionForm` | `inspectionId` |
-| `SectionsList` | `inspectionId` (links sección) |
+| `SectionsList` | `pathSegment` (links `/inspecciones/{segment}/seccion/…`) |
 | `InspectionPdfStatus` | `inspectionId` |
 | `InspectionPdfExport` | `inspectionId` |
 | `InspectionBiClosingFields` | `inspectionId` |
