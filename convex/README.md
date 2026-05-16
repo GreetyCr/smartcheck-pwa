@@ -90,12 +90,24 @@ Los valores de select/listas del catálogo se modelan como literales en inglés/
 
 **Backfill** de `clientId` en inspecciones legacy (`convex/migrations.ts`):
 
-**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId` (o usá `countInspectionsMissingClientId`). Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
+**Auth:** las funciones **públicas** `countInspectionsMissingClientId` y `backfillInspectionClientIds` usan **`requireAdmin`** → hace falta **JWT de Clerk** (sesión admin en la app). El **Dashboard de Convex → Functions** al ejecutar una función pública **no** envía ese token: obtendrás `No autenticado`. Para operar **sin** sesión Clerk usá las variantes **internal** desde la terminal (mismo cuerpo, sin auth):
 
-1. **Snapshot previo:** ejecutar **`migrations.countInspectionsMissingClientId`** y anotar el número (denominador esperado de patches si nadie inserta filas nuevas sin `clientId` durante la ventana).
-2. **Tandas:** como **`migrations.backfillInspectionClientIds`** (admin). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
+```bash
+# Conteo (prod: añadí --prod si corresponde)
+npx convex run migrations:countInspectionsMissingClientIdInternal '{}'
+
+# Una tanda de backfill (repetir con cursor hasta done: true)
+npx convex run migrations:backfillInspectionClientIdsInternal '{}'
+```
+
+Las funciones son **internal** en el código (no accesibles desde `ConvexReactClient` en el browser), pero el CLI las referencia como `migrations:nombreInternal`.
+
+**Volumen en producción:** este repo no tiene visibilidad del conteo real. En **Convex Dashboard → Data → `inspections`** revisá cuántas filas hay y cuántas carecen de `clientId`, o usá el `internal:…count…` de arriba. Si son **miles** o más, asumí límites de mutación (~1s) y usá tandas; si son **cientos**, pocas invocaciones bastan.
+
+1. **Snapshot previo:** `internal:…countInspectionsMissingClientIdInternal` (o la query pública **solo** con sesión admin en la app) y anotar el número.
+2. **Tandas:** `internal:…backfillInspectionClientIdsInternal` (o la mutación pública con admin en la app). Argumentos opcionales: `batchSize` (1–1000, **defecto 500**), `cursor` (`null` u omitido en la primera tanda; luego el `nextCursor` devuelto). Repetir hasta **`done === true`**. En cada respuesta: `scanned` = documentos leídos en esa tanda; `patched` / `skipped` solo en esa tanda; **`errors`** lista `{ id, reason }` por fila cuyo `patch` falló (el resto de la tanda sigue).
 3. **Verificación opcional durante:** sumá `patched` de todas las tandas; si coincide con el snapshot previo (salvo inserciones concurrentes), mejor.
-4. **Snapshot final:** **`countInspectionsMissingClientId` === 0**.
+4. **Snapshot final:** conteo **0** (misma función de conteo que en el paso 1).
 
 Tests: `tests/convex/migrations.test.ts`.
 

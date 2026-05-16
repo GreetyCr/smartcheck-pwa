@@ -1,6 +1,13 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 
 function inspectionNeedsClientIdBackfill(
@@ -20,6 +27,85 @@ function clampClientIdBackfillBatchSize(raw: number | undefined): number {
     CLIENT_ID_BACKFILL_BATCH_MAX,
     Math.max(CLIENT_ID_BACKFILL_BATCH_MIN, n),
   );
+}
+
+async function countInspectionsMissingClientIdImpl(
+  ctx: QueryCtx,
+): Promise<number> {
+  const rows = await ctx.db.query("inspections").collect();
+  return rows.filter((d) =>
+    inspectionNeedsClientIdBackfill(d.clientId),
+  ).length;
+}
+
+const backfillReturns = v.object({
+  scanned: v.number(),
+  patched: v.number(),
+  skipped: v.number(),
+  errors: v.array(
+    v.object({
+      id: v.id("inspections"),
+      reason: v.string(),
+    }),
+  ),
+  done: v.boolean(),
+  nextCursor: v.optional(v.string()),
+});
+
+const backfillArgs = {
+  cursor: v.optional(v.union(v.string(), v.null())),
+  batchSize: v.optional(v.number()),
+};
+
+async function backfillInspectionClientIdsImpl(
+  ctx: MutationCtx,
+  args: {
+    cursor?: string | null;
+    batchSize?: number;
+  },
+): Promise<{
+  scanned: number;
+  patched: number;
+  skipped: number;
+  errors: Array<{ id: Id<"inspections">; reason: string }>;
+  done: boolean;
+  nextCursor?: string;
+}> {
+  const batchSize = clampClientIdBackfillBatchSize(args.batchSize);
+  const cursor = args.cursor === undefined ? null : args.cursor;
+
+  const { page, isDone, continueCursor } = await ctx.db
+    .query("inspections")
+    .fullTableScan()
+    .order("asc")
+    .paginate({ numItems: batchSize, cursor });
+
+  const errors: Array<{ id: Id<"inspections">; reason: string }> = [];
+  let patched = 0;
+  let skipped = 0;
+
+  for (const doc of page) {
+    if (!inspectionNeedsClientIdBackfill(doc.clientId)) {
+      skipped++;
+      continue;
+    }
+    try {
+      await ctx.db.patch(doc._id, { clientId: crypto.randomUUID() });
+      patched++;
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      errors.push({ id: doc._id, reason });
+    }
+  }
+
+  return {
+    scanned: page.length,
+    patched,
+    skipped,
+    errors,
+    done: isDone,
+    ...(isDone ? {} : { nextCursor: continueCursor }),
+  };
 }
 
 /** Valores antiguos del wizard → catálogo actual. */
@@ -96,19 +182,29 @@ export const migrateLegacyTechnicianApproval = mutation({
 
 /**
  * Cuenta inspecciones sin `clientId` útil (ausente o solo espacios).
- * Solo admin. Tras completar todas las tandas de `backfillInspectionClientIds`
- * debe ser **0**. O(n) en filas; para volúmenes muy altos conviene cruzar con
- * el conteo aproximado en el Dashboard de Convex.
+ * Requiere **sesión Clerk de admin** (p. ej. desde la app). El Dashboard de Convex
+ * no envía JWT de Clerk: para operación sin usuario usar
+ * `countInspectionsMissingClientIdInternal` + `npx convex run` (ver README).
  */
 export const countInspectionsMissingClientId = query({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const rows = await ctx.db.query("inspections").collect();
-    return rows.filter((d) =>
-      inspectionNeedsClientIdBackfill(d.clientId),
-    ).length;
+    return await countInspectionsMissingClientIdImpl(ctx);
+  },
+});
+
+/**
+ * Igual que `countInspectionsMissingClientId` pero **sin** Clerk.
+ * Solo API **internal** (no accesible desde el browser público).
+ * Verificación en prod: `npx convex run internal:migrations/countInspectionsMissingClientIdInternal`
+ */
+export const countInspectionsMissingClientIdInternal = internalQuery({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    return await countInspectionsMissingClientIdImpl(ctx);
   },
 });
 
@@ -116,67 +212,26 @@ export const countInspectionsMissingClientId = query({
  * Asigna `clientId` (UUID v4) a filas legacy que no lo tienen.
  * Idempotente: no pisa `clientId` no vacío.
  *
- * Procesa **una tanda** de hasta `batchSize` documentos (orden de table scan)
- * para no acercarse al límite de tiempo de mutación en tablas grandes.
- * Repetir con `nextCursor` hasta `done === true` (ver `convex/README.md`).
+ * Requiere **sesión Clerk de admin**. Para Dashboard / CLI sin JWT usar
+ * `backfillInspectionClientIdsInternal`.
  */
 export const backfillInspectionClientIds = mutation({
-  args: {
-    /** Cursor devuelto por la invocación anterior; omitir o `null` en la primera. */
-    cursor: v.optional(v.union(v.string(), v.null())),
-    /** Filas leídas por tanda (1–1000; defecto 500). */
-    batchSize: v.optional(v.number()),
-  },
-  returns: v.object({
-    /** Documentos inspeccionados en esta tanda (= tamaño de página leída). */
-    scanned: v.number(),
-    patched: v.number(),
-    skipped: v.number(),
-    errors: v.array(
-      v.object({
-        id: v.id("inspections"),
-        reason: v.string(),
-      }),
-    ),
-    done: v.boolean(),
-    nextCursor: v.optional(v.string()),
-  }),
+  args: backfillArgs,
+  returns: backfillReturns,
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const batchSize = clampClientIdBackfillBatchSize(args.batchSize);
-    const cursor = args.cursor === undefined ? null : args.cursor;
+    return await backfillInspectionClientIdsImpl(ctx, args);
+  },
+});
 
-    const { page, isDone, continueCursor } = await ctx.db
-      .query("inspections")
-      .fullTableScan()
-      .order("asc")
-      .paginate({ numItems: batchSize, cursor });
-
-    const errors: Array<{ id: Id<"inspections">; reason: string }> = [];
-    let patched = 0;
-    let skipped = 0;
-
-    for (const doc of page) {
-      if (!inspectionNeedsClientIdBackfill(doc.clientId)) {
-        skipped++;
-        continue;
-      }
-      try {
-        await ctx.db.patch(doc._id, { clientId: crypto.randomUUID() });
-        patched++;
-      } catch (e) {
-        const reason = e instanceof Error ? e.message : String(e);
-        errors.push({ id: doc._id, reason });
-      }
-    }
-
-    return {
-      scanned: page.length,
-      patched,
-      skipped,
-      errors,
-      done: isDone,
-      ...(isDone ? {} : { nextCursor: continueCursor }),
-    };
+/**
+ * Igual que `backfillInspectionClientIds` pero **sin** Clerk.
+ * Solo API **internal**. Ej.: `npx convex run internal:migrations/backfillInspectionClientIdsInternal`
+ */
+export const backfillInspectionClientIdsInternal = internalMutation({
+  args: backfillArgs,
+  returns: backfillReturns,
+  handler: async (ctx, args) => {
+    return await backfillInspectionClientIdsImpl(ctx, args);
   },
 });
