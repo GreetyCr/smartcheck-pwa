@@ -5,6 +5,7 @@ import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
 import { canAccessInspection, requireUser } from "./lib/auth";
 import { normalizeStoredPhotoUrl } from "./lib/externalPhotoUrl";
 import { sanitizeSectionPatch } from "./lib/sanitizeSectionPatch";
+import { countFindingsForSectionDoc } from "@/lib/inspection-findings";
 
 /** Orden del flujo (catálogo Módulo 2.2) — índice `by_inspection` en cada tabla. */
 export const SECTION_TABLE_ORDER = [
@@ -85,32 +86,6 @@ function countFilledItemFields(doc: Record<string, unknown>): number {
   return n;
 }
 
-function countFindingsInValue(val: unknown): number {
-  if (val === null || val === undefined) return 0;
-  if (typeof val === "object" && !Array.isArray(val)) {
-    const o = val as Record<string, unknown>;
-    if ("value" in o) {
-      const vv = o.value;
-      if (vv === "reparacion" || vv === "no") return 1;
-    }
-    let sum = 0;
-    for (const k of Object.keys(o)) {
-      sum += countFindingsInValue(o[k]);
-    }
-    return sum;
-  }
-  return 0;
-}
-
-function countFindingsInDoc(doc: Record<string, unknown>): number {
-  let sum = 0;
-  for (const key of Object.keys(doc)) {
-    if (!isItemFieldKey(key)) continue;
-    sum += countFindingsInValue(doc[key]);
-  }
-  return sum;
-}
-
 export async function getSectionDoc(
   ctx: QueryCtx | MutationCtx,
   table: SectionTable,
@@ -164,7 +139,7 @@ export const listSectionSummaries = query({
       }
       const plain = doc as unknown as Record<string, unknown>;
       const filled = countFilledItemFields(plain);
-      const findings = countFindingsInDoc(plain);
+      const findings = countFindingsForSectionDoc(table, plain);
       const complete = total > 0 && filled >= total;
       rows.push({ table, filled, total, findings, complete });
     }

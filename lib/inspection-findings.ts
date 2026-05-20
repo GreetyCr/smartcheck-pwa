@@ -11,24 +11,7 @@ const SKIP = new Set([
   "_creationTime",
 ]);
 
-function legacyCountInValue(val: unknown): number {
-  if (val === null || val === undefined) return 0;
-  if (typeof val === "object" && !Array.isArray(val)) {
-    const o = val as Record<string, unknown>;
-    if ("value" in o) {
-      const vv = o.value;
-      if (vv === "reparacion" || vv === "no") return 1;
-    }
-    let s = 0;
-    for (const k of Object.keys(o)) {
-      s += legacyCountInValue(o[k]);
-    }
-    return s;
-  }
-  return 0;
-}
-
-/** Ítem del checklist que cuenta como hallazgo (PDF / resúmenes). */
+/** Ítem del checklist que cuenta como hallazgo (PDF / resúmenes / Convex). */
 export function itemCountsAsFinding(item: SectionItem, val: unknown): boolean {
   return countChoiceItem(item, val) > 0;
 }
@@ -40,7 +23,7 @@ function countChoiceItem(item: SectionItem, val: unknown): number {
   if (!("value" in o)) return 0;
 
   const vv = o.value as string | undefined;
-  if (vv === undefined) return 0;
+  if (vv === undefined || vv === "na") return 0;
 
   const t = item.type;
 
@@ -49,18 +32,39 @@ function countChoiceItem(item: SectionItem, val: unknown): number {
   }
 
   if (t === "si_no" || t === "si_no_na") {
-    if (item.positiveWhenNo) {
-      return vv === "si" ? 1 : 0;
+    if (item.findingWhenNo) {
+      return vv === "no" ? 1 : 0;
     }
-    return vv === "no" ? 1 : 0;
+    /** Defecto o anomalía presente (default y `positiveWhenNo`). */
+    return vv === "si" ? 1 : 0;
   }
 
   return legacyCountInValue(val);
 }
 
+function legacyCountInValue(val: unknown): number {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === "object" && !Array.isArray(val)) {
+    const o = val as Record<string, unknown>;
+    if ("value" in o) {
+      const vv = o.value;
+      if (vv === "reparacion" || vv === "si") return 1;
+    }
+    let s = 0;
+    for (const k of Object.keys(o)) {
+      s += legacyCountInValue(o[k]);
+    }
+    return s;
+  }
+  return 0;
+}
+
 /**
- * Hallazgos por sección para PDF y listados.
- * `positiveWhenNo`: ausencia del defecto es buena (ej. «No» en herrumbre).
+ * Hallazgos por sección (PDF, listado de secciones, resumen ejecutivo).
+ *
+ * - Ítems tipo defecto/anomalía (ej. «Ruidos anormales», «Reparación prematura»): **Sí** = hallazgo.
+ * - `positiveWhenNo`: pregunta «¿Hay X malo?» — **Sí** = hallazgo, **No** = OK.
+ * - `findingWhenNo`: pieza o condición deseable — **No** = hallazgo (falta o no cumple).
  */
 export function countFindingsForSectionDoc(
   sectionTable: string,

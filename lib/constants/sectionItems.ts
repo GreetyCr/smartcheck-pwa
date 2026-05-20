@@ -38,9 +38,15 @@ export interface SectionItem {
   /** Solo `readonly`: ver `ReadonlySource`. */
   readonlySource?: ReadonlySource;
   /**
-   * PDF / hallazgos: en Sí/No, «No» indica ausencia del defecto (ej. sin herrumbre = bueno).
+   * Sí/No con pregunta explícita de presencia de defecto (ej. «¿Presencia de herrumbre?»).
+   * **Sí** = hallazgo, **No** = sin defecto (OK). Misma regla que el default tras el fix de hallazgos.
    */
   positiveWhenNo?: boolean;
+  /**
+   * Sí/No donde **No** = falla o ausencia de algo deseable (ej. sin llanta de repuesto,
+   * temperatura no normal, líneas no congruentes). **Sí** = OK.
+   */
+  findingWhenNo?: boolean;
 }
 
 export interface SectionConfig {
@@ -352,8 +358,18 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         type: "bien_reparacion_na",
         showPhotos: true,
       },
-      { key: "catalizador", label: "Catalizador", type: "si_no_na" },
-      { key: "silenciador", label: "Silenciador", type: "si_no_na" },
+      {
+        key: "catalizador",
+        label: "Catalizador",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
+      {
+        key: "silenciador",
+        label: "Silenciador",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
     ],
   },
   {
@@ -389,7 +405,12 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
     table: "section_combustible",
     icon: "Fuel",
     items: [
-      { key: "tapa_deposito", label: "Tapa del depósito", type: "si_no_na" },
+      {
+        key: "tapa_deposito",
+        label: "Tapa del depósito",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
       {
         key: "fugas",
         label: "Fugas",
@@ -415,11 +436,13 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "temperatura_refrigerante_normal",
         label: "Temperatura de refrigerante normal",
         type: "si_no_na",
+        findingWhenNo: true,
       },
       {
         key: "temperatura_aceites_normal",
         label: "Temperatura de aceites normal",
         type: "si_no_na",
+        findingWhenNo: true,
       },
       {
         key: "asistencia_conduccion",
@@ -526,17 +549,20 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "accionamiento_sistema",
         label: "Activación del sistema",
         type: "si_no_na",
+        findingWhenNo: true,
       },
       {
         key: "enfria_sin_dificultad",
         label: "Enfría sin dificultad",
         type: "si_no_na",
+        findingWhenNo: true,
         showPhotos: true,
       },
       {
         key: "calefaccion_supera_ambiente",
         label: "Calefacción supera ambiente",
         type: "si_no_na",
+        findingWhenNo: true,
       },
     ],
   },
@@ -550,16 +576,33 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "llanta_repuesto",
         label: "Llanta de repuesto",
         type: "si_no_na",
+        findingWhenNo: true,
         showPhotos: true,
       },
-      { key: "llave_ranas", label: "Llave de ranas", type: "si_no_na" },
-      { key: "gata", label: "Gata", type: "si_no_na" },
-      { key: "kit_emergencia", label: "Kit de emergencia", type: "si_no_na" },
-      { key: "extintor", label: "Extintor", type: "si_no_na" },
+      {
+        key: "llave_ranas",
+        label: "Llave de ranas",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
+      { key: "gata", label: "Gata", type: "si_no_na", findingWhenNo: true },
+      {
+        key: "kit_emergencia",
+        label: "Kit de emergencia",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
+      {
+        key: "extintor",
+        label: "Extintor",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
       {
         key: "cubo_seguridad_ranas",
         label: "Cubo de seguridad de ranas",
         type: "si_no_na",
+        findingWhenNo: true,
       },
     ],
   },
@@ -573,6 +616,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "vidrios_fabrica",
         label: "Vidrios de fábrica",
         type: "si_no_na",
+        findingWhenNo: true,
         showObservation: true,
       },
       {
@@ -595,7 +639,12 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         showPhotos: true,
         showObservation: true,
       },
-      { key: "lineas_congruentes", label: "Líneas congruentes", type: "si_no_na" },
+      {
+        key: "lineas_congruentes",
+        label: "Líneas congruentes",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
       {
         key: "puntas_chasis_reparadas_torcidas",
         label: "Puntas de chasis reparadas/torcidas",
@@ -616,8 +665,18 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         type: "si_no_na",
         showPhotos: true,
       },
-      { key: "tuercas_completas", label: "Tuercas completas", type: "si_no_na" },
-      { key: "tuerca_seguridad", label: "Tuerca de seguridad", type: "si_no_na" },
+      {
+        key: "tuercas_completas",
+        label: "Tuercas completas",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
+      {
+        key: "tuerca_seguridad",
+        label: "Tuerca de seguridad",
+        type: "si_no_na",
+        findingWhenNo: true,
+      },
     ],
   },
   {

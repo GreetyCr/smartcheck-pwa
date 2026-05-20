@@ -11,13 +11,17 @@ export function pdfItemValueIsPositive(
 ): boolean | null {
   const v = line.value;
   if (v === "—") return null;
-  if (
-    item.positiveWhenNo &&
-    (item.type === "si_no" || item.type === "si_no_na")
-  ) {
-    if (v === "No") return true;
-    if (v === "Sí") return false;
-    if (v === "N/A") return null;
+  if (item.type === "si_no" || item.type === "si_no_na") {
+    if (item.findingWhenNo) {
+      if (v === "No") return false;
+      if (v === "Sí") return true;
+      if (v === "N/A") return null;
+    }
+    if (item.positiveWhenNo || !item.findingWhenNo) {
+      if (v === "No") return true;
+      if (v === "Sí") return false;
+      if (v === "N/A") return null;
+    }
   }
   return null;
 }
