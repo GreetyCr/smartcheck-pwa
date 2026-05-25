@@ -27,23 +27,57 @@ import {
   type SectionFormState,
 } from "@/lib/section-form-utils";
 
+import {
+  inspectionPathSegment,
+  type InspectionRouteContextValue,
+} from "@/components/inspection/InspectionRouteResolver";
+import { useOfflineInspection } from "@/hooks/useOfflineInspection";
+import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
+
 type SectionFormProps = {
   sectionConfig: SectionConfig;
-  inspectionId: Id<"inspections">;
+  routeCtx: InspectionRouteContextValue;
 };
 
-export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
+export function SectionForm({ sectionConfig, routeCtx }: SectionFormProps) {
   const router = useRouter();
+  const pathSeg = inspectionPathSegment(routeCtx);
+  const convexMutationId = routeCtx.convexInspectionId;
+
   const { user } = useUser();
-  const inspection = useQuery(api.inspections.get, { id: inspectionId });
-  const doc = useQuery(api.sections.getSection, {
-    inspectionId,
-    sectionTable: sectionConfig.table,
+
+  const inspectionFromConvex = useQuery(
+    api.inspections.get,
+    convexMutationId ? { id: convexMutationId } : "skip",
+  );
+
+  const offline = useOfflineInspection({
+    inspectionId: routeCtx.routeRef,
+    convexInspectionIdForOnline: routeCtx.unifiedFlow
+      ? convexMutationId
+      : undefined,
   });
-  const photoEntries = useQuery(api.sections.getSectionItemPhotoEntries, {
-    inspectionId,
-    sectionTable: sectionConfig.table,
-  });
+
+  const inspection = useMemo(() => {
+    if (convexMutationId) {
+      if (inspectionFromConvex === undefined) return undefined;
+      return inspectionFromConvex ?? offline.inspection;
+    }
+    return offline.inspection;
+  }, [convexMutationId, inspectionFromConvex, offline.inspection]);
+
+  const doc = useQuery(
+    api.sections.getSection,
+    convexMutationId
+      ? { inspectionId: convexMutationId, sectionTable: sectionConfig.table }
+      : "skip",
+  );
+  const photoEntries = useQuery(
+    api.sections.getSectionItemPhotoEntries,
+    convexMutationId
+      ? { inspectionId: convexMutationId, sectionTable: sectionConfig.table }
+      : "skip",
+  );
 
   const upsertSection = useMutation(api.sections.upsertSection);
 
@@ -78,8 +112,11 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     });
   }, []);
 
+  const photoUploadKey =
+    convexMutationId ?? (routeCtx.routeRef as Id<"inspections">);
+
   const photoUpload = usePhotoUpload({
-    inspectionId,
+    inspectionId: photoUploadKey,
     sectionTable: sectionConfig.table,
     getSavedPhotoCount,
     onPhotoUrl,
@@ -139,13 +176,19 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
   );
 
   const persist = useCallback(async () => {
+    if (!convexMutationId) {
+      browserAlert(
+        "Sincroniza el borrador para guardar esta sección en el servidor.",
+      );
+      return;
+    }
     const patch = formStateToPatch(state, sectionConfig);
     if (Object.keys(patch).length === 0) {
       return;
     }
     try {
       await upsertSection({
-        inspectionId,
+        inspectionId: convexMutationId,
         sectionTable: sectionConfig.table,
         data: patch,
       });
@@ -154,7 +197,7 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
         e instanceof Error ? e.message : "No se pudo guardar la sección.",
       );
     }
-  }, [inspectionId, sectionConfig, state, upsertSection]);
+  }, [convexMutationId, sectionConfig, state, upsertSection]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -273,13 +316,13 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     const idx = routeSections.findIndex((s) => s.id === sectionConfig.id);
     const next = idx >= 0 ? routeSections[idx + 1] : undefined;
     if (next) {
-      router.push(`/inspecciones/${inspectionId}/seccion/${next.id}`);
+      router.push(`/inspecciones/${pathSeg}/seccion/${next.id}`);
     } else {
-      router.push(`/inspecciones/${inspectionId}`);
+      router.push(`/inspecciones/${pathSeg}`);
     }
   }, [
     awaitUploadsIdle,
-    inspectionId,
+    pathSeg,
     persist,
     router,
     routeSections,
@@ -292,13 +335,42 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     if (inspection === null) return;
     const allowed = routeSections.some((s) => s.id === sectionConfig.id);
     if (!allowed) {
-      router.replace(`/inspecciones/${inspectionId}`);
+      router.replace(`/inspecciones/${pathSeg}`);
     }
-  }, [inspection, inspectionId, router, routeSections, sectionConfig.id]);
+  }, [inspection, pathSeg, router, routeSections, sectionConfig.id]);
 
   const total = sectionConfig.items.length;
 
-  if (inspection === undefined) {
+  if (routeCtx.unifiedFlow && convexMutationId === null) {
+    if (offline.isLoading) return <DashboardPageSkeleton variant="form" />;
+    if (!inspection) {
+      return (
+        <div className="p-6">
+          <p className="text-destructive">Inspección no encontrada o sin permiso.</p>
+          <Link href="/" className="mt-2 inline-block text-primary underline">
+            Volver al inicio
+          </Link>
+        </div>
+      );
+    }
+    return (
+      <SectionFormShell
+        title={sectionConfig.name}
+        backHref={`/inspecciones/${pathSeg}`}
+        progressCurrent={0}
+        progressTotal={total}
+      >
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          {INSPECTION_ROUTE_COPY.SECTIONS_OFFLINE_HINT}
+        </p>
+      </SectionFormShell>
+    );
+  }
+
+  const docLoading = convexMutationId !== null && doc === undefined;
+  const photoLoading = convexMutationId !== null && photoEntries === undefined;
+
+  if (inspection === undefined || docLoading || photoLoading) {
     return <DashboardPageSkeleton variant="form" />;
   }
 
@@ -313,15 +385,19 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
     );
   }
 
-  if (doc === undefined) {
-    return <DashboardPageSkeleton variant="form" />;
+  if (doc === null) {
+    return (
+      <div className="p-6">
+        <p className="text-muted-foreground">Inicia sesión para ver esta sección.</p>
+      </div>
+    );
   }
 
   return (
     <>
       <SectionFormShell
         title={sectionConfig.name}
-        backHref={`/inspecciones/${inspectionId}`}
+        backHref={`/inspecciones/${pathSeg}`}
         progressCurrent={progress}
         progressTotal={total}
       >
@@ -345,8 +421,8 @@ export function SectionForm({ sectionConfig, inspectionId }: SectionFormProps) {
             onRemovePhoto={removePhotoForItem}
           />
         ))}
-        {sectionConfig.id === "finalizacion" ? (
-          <InspectionBiClosingFields inspectionId={inspectionId} />
+        {sectionConfig.id === "finalizacion" && convexMutationId ? (
+          <InspectionBiClosingFields inspectionId={convexMutationId} />
         ) : null}
       </SectionFormShell>
       <UploadProgress

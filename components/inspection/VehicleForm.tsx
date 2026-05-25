@@ -13,6 +13,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { useUnifiedDraftFlow } from "@/lib/featureFlags";
 import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { PhotoCapture } from "@/components/ui/PhotoCapture";
@@ -70,6 +71,7 @@ async function uploadOne(
 
 export function VehicleForm({ className }: { className?: string }) {
   const router = useRouter();
+  const unifiedDraft = useUnifiedDraftFlow();
   const { draft, setDraft } = useInspectionWizard();
   const createDraft = useMutation(api.inspections.createDraft);
   const generateUploadUrl = useMutation(api.inspections.generateUploadUrl);
@@ -195,6 +197,7 @@ export function VehicleForm({ className }: { className?: string }) {
     setSubmitting(true);
 
     try {
+      const newClientId = unifiedDraft ? crypto.randomUUID() : undefined;
       const inspectionId = (await createDraft()) as Id<"inspections">;
       const source = draft.captureSource as CaptureSource;
       const sellerType = draft.sellerType as SellerTypeKey;
@@ -238,6 +241,7 @@ export function VehicleForm({ className }: { className?: string }) {
       await patchInspection({
         id: inspectionId,
         patch: {
+          ...(newClientId ? { clientId: newClientId } : {}),
           clientName: draft.clientName.trim(),
           clientPhone: draft.clientPhone.trim(),
           clientEmail: draft.clientEmail.trim() || undefined,
@@ -273,7 +277,11 @@ export function VehicleForm({ className }: { className?: string }) {
         },
       });
 
-      router.push(`/inspecciones/${String(inspectionId)}`);
+      const nextPath =
+        newClientId !== undefined
+          ? `/inspecciones/${newClientId}`
+          : `/inspecciones/${String(inspectionId)}`;
+      router.push(nextPath);
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : "No se pudo guardar la inspección.",

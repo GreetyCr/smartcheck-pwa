@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import type { Id } from "@/convex/_generated/dataModel";
+import { InspectionRouteResolver } from "@/components/inspection/InspectionRouteResolver";
 import { SectionForm } from "@/components/inspection/SectionForm";
 import { getSectionConfig } from "@/lib/constants/sectionItems";
 
@@ -14,10 +14,14 @@ export default async function InspeccionSeccionPage({ params }: Props) {
   if (!config) notFound();
 
   return (
-    <SectionForm
-      key={`${id}-${config.id}`}
-      sectionConfig={config}
-      inspectionId={id as Id<"inspections">}
-    />
+    <InspectionRouteResolver routeRef={id}>
+      {(ctx) => (
+        <SectionForm
+          key={`${id}-${config.id}`}
+          sectionConfig={config}
+          routeCtx={ctx}
+        />
+      )}
+    </InspectionRouteResolver>
   );
 }

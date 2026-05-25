@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, MoreVertical } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import {
+  inspectionPathSegment,
+  type InspectionRouteContextValue,
+} from "@/components/inspection/InspectionRouteResolver";
 import { VehicleCard } from "@/components/inspection/VehicleCard";
 import { ProgressCard } from "@/components/inspection/ProgressCard";
 import { SectionsList } from "@/components/inspection/SectionsList";
@@ -18,22 +21,48 @@ import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton
 import { browserAlert, browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
+import { useOfflineInspection } from "@/hooks/useOfflineInspection";
+import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
 type Props = {
-  inspectionId: Id<"inspections">;
+  routeCtx: InspectionRouteContextValue;
 };
 
-export function InspectionSectionsScreen({ inspectionId }: Props) {
+export function InspectionSectionsScreen({ routeCtx }: Props) {
   const router = useRouter();
-  const inspection = useQuery(api.inspections.get, { id: inspectionId });
-  const sectionData = useQuery(api.sections.listSectionSummaries, {
-    inspectionId,
+  const pathSeg = inspectionPathSegment(routeCtx);
+  const convexMutationId = routeCtx.convexInspectionId;
+
+  const inspectionFromConvex = useQuery(
+    api.inspections.get,
+    convexMutationId ? { id: convexMutationId } : "skip",
+  );
+
+  const offline = useOfflineInspection({
+    inspectionId: routeCtx.routeRef,
+    convexInspectionIdForOnline: routeCtx.unifiedFlow
+      ? convexMutationId
+      : undefined,
   });
+
+  const inspection = useMemo(() => {
+    if (convexMutationId) {
+      if (inspectionFromConvex === undefined) return undefined;
+      return inspectionFromConvex ?? offline.inspection;
+    }
+    return offline.inspection;
+  }, [convexMutationId, inspectionFromConvex, offline.inspection]);
+
+  const sectionData = useQuery(
+    api.sections.listSectionSummaries,
+    convexMutationId ? { inspectionId: convexMutationId } : "skip",
+  );
+
   const me = useQuery(api.users.getMe, {});
-  /** PDF archivado en Convex (enlace firmado; no requiere sesión del cliente). */
-  const latestPdf = useQuery(api.pdfs.getLatestForInspection, {
-    inspectionId,
-  });
+  const latestPdf = useQuery(
+    api.pdfs.getLatestForInspection,
+    convexMutationId ? { inspectionId: convexMutationId } : "skip",
+  );
 
   const ensureRows = useMutation(api.sections.ensureSectionRows);
   const touchDraft = useMutation(api.sections.touchDraft);
@@ -43,11 +72,17 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  const showLocalDraftBanner =
+    routeCtx.unifiedFlow &&
+    routeCtx.resolution?.kind === "local_only" &&
+    convexMutationId === null;
+
   useEffect(() => {
+    if (!convexMutationId) return;
     if (inspection === undefined) return;
     if (inspection === null) return;
-    void ensureRows({ inspectionId }).catch(() => {});
-  }, [inspection, inspectionId, ensureRows]);
+    void ensureRows({ inspectionId: convexMutationId }).catch(() => {});
+  }, [inspection, convexMutationId, ensureRows]);
 
   useEffect(() => {
     if (typeof globalThis === "undefined" || !("location" in globalThis)) return;
@@ -59,12 +94,17 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
     return () => globalThis.clearTimeout(t);
-  }, [inspection, inspectionId]);
+  }, [inspection, pathSeg]);
 
   const handleSaveDraft = useCallback(async () => {
+    if (!convexMutationId) {
+      setToast("Sincroniza el borrador para guardar en el servidor.");
+      globalThis.setTimeout(() => setToast(null), 2500);
+      return;
+    }
     setSaving(true);
     try {
-      await touchDraft({ inspectionId });
+      await touchDraft({ inspectionId: convexMutationId });
       setToast("Borrador guardado");
       globalThis.setTimeout(() => setToast(null), 2500);
     } catch {
@@ -73,9 +113,15 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [inspectionId, touchDraft]);
+  }, [convexMutationId, touchDraft]);
 
   const handleShare = useCallback(async () => {
+    if (!convexMutationId) {
+      browserAlert(
+        "El informe PDF estará disponible cuando la inspección esté sincronizada.",
+      );
+      return;
+    }
     if (latestPdf === undefined) {
       setToast("Cargando datos del informe…");
       globalThis.setTimeout(() => setToast(null), 2200);
@@ -139,19 +185,25 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     browserAlert(
       "Aún no hay un PDF archivado en la nube para esta inspección. Un administrador debe generarlo en «Informe PDF»; después podrás compartir el archivo o el enlace del PDF con el cliente (sin necesidad de cuenta en Smartcheck).",
     );
-  }, [latestPdf]);
+  }, [latestPdf, convexMutationId]);
 
   const handleDiscard = useCallback(async () => {
+    if (!convexMutationId) {
+      browserAlert(
+        "No se puede descartar en el servidor hasta que el borrador esté sincronizado.",
+      );
+      return;
+    }
     if (!browserConfirm("¿Descartar esta inspección? Esta acción no se puede deshacer.")) {
       return;
     }
     try {
-      await discardInspection({ inspectionId });
+      await discardInspection({ inspectionId: convexMutationId });
       router.replace("/");
     } catch {
       browserAlert("No se pudo eliminar la inspección.");
     }
-  }, [discardInspection, inspectionId, router]);
+  }, [discardInspection, convexMutationId, router]);
 
   const visibleSections = useMemo(
     () => getInspectionSections(inspection?.transmissionType),
@@ -159,6 +211,13 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
   );
 
   const summariesForList = useMemo(() => {
+    if (convexMutationId === null) {
+      return visibleSections.map((sec) => ({
+        table: sec.table,
+        status: "pendiente" as SectionRowStatus,
+        findings: 0,
+      }));
+    }
     if (sectionData === undefined || sectionData === null) {
       return [] as {
         table: string;
@@ -177,7 +236,7 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
         findings: row?.findings ?? 0,
       };
     });
-  }, [sectionData, visibleSections]);
+  }, [convexMutationId, sectionData, visibleSections]);
 
   const completedCount = summariesForList.filter(
     (s) => s.status === "completado",
@@ -188,7 +247,10 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
       ? Math.round((completedCount / totalSections) * 100)
       : 0;
 
-  if (inspection === undefined || sectionData === undefined) {
+  const sectionBlockers =
+    convexMutationId !== null && sectionData === undefined;
+
+  if (inspection === undefined || sectionBlockers) {
     return <DashboardPageSkeleton variant="detail" />;
   }
 
@@ -203,7 +265,7 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     );
   }
 
-  if (sectionData === null) {
+  if (convexMutationId !== null && sectionData === null) {
     return (
       <div className="p-6">
         <p className="text-muted-foreground">Inicia sesión para ver esta inspección.</p>
@@ -224,6 +286,11 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
     .filter(Boolean)
     .join(" ");
 
+  const orderLabel =
+    convexMutationId !== null
+      ? String(convexMutationId).slice(-6).toUpperCase()
+      : pathSeg.slice(-6).toUpperCase();
+
   return (
     <div className="flex min-h-dvh flex-col bg-[#F8F9FA] pb-28">
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card px-2 py-3">
@@ -237,8 +304,13 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
         <div className="min-w-0 flex-1 text-center">
           <h1 className="text-base font-bold text-primary">Inspección técnica</h1>
           <p className="text-xs text-muted-foreground">
-            Orden #{String(inspectionId).slice(-6).toUpperCase()}
+            Orden #{orderLabel}
           </p>
+          {showLocalDraftBanner ? (
+            <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:bg-amber-950/50 dark:text-amber-100">
+              {INSPECTION_ROUTE_COPY.BADGE_LOCAL_DRAFT}
+            </p>
+          ) : null}
         </div>
         <div className="relative">
           <button
@@ -260,30 +332,32 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
               />
               <div className="absolute right-0 top-11 z-50 min-w-[220px] rounded-xl border border-border bg-card py-1 shadow-lg">
                 <Link
-                  href={`/inspecciones/${inspectionId}/cabecera`}
+                  href={`/inspecciones/${pathSeg}/cabecera`}
                   className="block px-4 py-2.5 text-sm hover:bg-muted"
                   onClick={() => setMenuOpen(false)}
                 >
                   Editar datos del informe
                 </Link>
                 <Link
-                  href={`/inspecciones/${inspectionId}#informe-pdf`}
+                  href={`/inspecciones/${pathSeg}#informe-pdf`}
                   className="block px-4 py-2.5 text-sm hover:bg-muted"
                   onClick={() => setMenuOpen(false)}
                   scroll={false}
                 >
                   Ir al informe PDF
                 </Link>
-                <button
-                  type="button"
-                  className="w-full px-4 py-2.5 text-left text-sm text-destructive hover:bg-muted"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void handleDiscard();
-                  }}
-                >
-                  Descartar inspección
-                </button>
+                {convexMutationId ? (
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2.5 text-left text-sm text-destructive hover:bg-muted"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleDiscard();
+                    }}
+                  >
+                    Descartar inspección
+                  </button>
+                ) : null}
               </div>
             </>
           ) : null}
@@ -291,13 +365,18 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
       </header>
 
       <div className="mx-auto w-full max-w-lg flex-1 space-y-4 px-4 pt-4">
+        {showLocalDraftBanner ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            {INSPECTION_ROUTE_COPY.SECTIONS_OFFLINE_HINT}
+          </p>
+        ) : null}
         <div className="space-y-2">
           <VehicleCard
             plate={plate}
             brandModelYear={brandModelYear || "Vehículo"}
           />
           <Link
-            href={`/inspecciones/${inspectionId}/cabecera`}
+            href={`/inspecciones/${pathSeg}/cabecera`}
             className="block w-full rounded-xl border border-border bg-card px-4 py-3 text-center text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-muted/50"
           >
             Editar datos del informe (cliente, vehículo, fotos)
@@ -308,15 +387,17 @@ export function InspectionSectionsScreen({ inspectionId }: Props) {
           completed={completedCount}
           total={totalSections}
         />
-        {me?.role !== "admin" ? (
-          <InspectionPdfStatus inspectionId={inspectionId} />
+        {me?.role !== "admin" && convexMutationId ? (
+          <InspectionPdfStatus inspectionId={convexMutationId} />
         ) : null}
         <SectionsList
-          inspectionId={inspectionId}
+          pathSegment={pathSeg}
           summaries={summariesForList}
           sections={visibleSections}
         />
-        <InspectionPdfExport inspectionId={inspectionId} />
+        {convexMutationId ? (
+          <InspectionPdfExport inspectionId={convexMutationId} />
+        ) : null}
       </div>
 
       <InspectionFooter
