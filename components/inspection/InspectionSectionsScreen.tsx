@@ -30,9 +30,17 @@ export function InspectionSectionsScreen() {
   const pathSeg = inspectionPathSegment(routeCtx);
   const convexMutationId = routeCtx.convexInspectionId;
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+
+  const queryInspectionId =
+    discarding || !convexMutationId ? null : convexMutationId;
+
   const inspectionFromConvex = useQuery(
     api.inspections.get,
-    convexMutationId ? { id: convexMutationId } : "skip",
+    queryInspectionId ? { id: queryInspectionId } : "skip",
   );
 
   const offline = useOfflineInspection({
@@ -52,22 +60,18 @@ export function InspectionSectionsScreen() {
 
   const sectionData = useQuery(
     api.sections.listSectionSummaries,
-    convexMutationId ? { inspectionId: convexMutationId } : "skip",
+    queryInspectionId ? { inspectionId: queryInspectionId } : "skip",
   );
 
   const me = useQuery(api.users.getMe, {});
   const latestPdf = useQuery(
     api.pdfs.getLatestForInspection,
-    convexMutationId ? { inspectionId: convexMutationId } : "skip",
+    queryInspectionId ? { inspectionId: queryInspectionId } : "skip",
   );
 
   const ensureRows = useMutation(api.sections.ensureSectionRows);
   const touchDraft = useMutation(api.sections.touchDraft);
   const discardInspection = useMutation(api.sections.discardInspection);
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   const showLocalDraftBanner =
     routeCtx.unifiedFlow &&
@@ -194,9 +198,10 @@ export function InspectionSectionsScreen() {
     if (!browserConfirm("¿Descartar esta inspección? Esta acción no se puede deshacer.")) {
       return;
     }
+    setDiscarding(true);
+    router.replace("/");
     try {
       await discardInspection({ inspectionId: convexMutationId });
-      router.replace("/");
     } catch {
       browserAlert("No se pudo eliminar la inspección.");
     }
@@ -246,6 +251,10 @@ export function InspectionSectionsScreen() {
 
   const sectionBlockers =
     convexMutationId !== null && sectionData === undefined;
+
+  if (discarding) {
+    return <DashboardPageSkeleton variant="detail" />;
+  }
 
   if (inspection === undefined || sectionBlockers) {
     return <DashboardPageSkeleton variant="detail" />;

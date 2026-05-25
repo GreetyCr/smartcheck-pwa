@@ -44,3 +44,35 @@ test("createOrUpdateFromDraft: misma clientId la segunda vez patchea, no inserta
   const row = await asUser.query(api.inspections.getByClientId, { clientId });
   expect(row?.clientName).toBe("Segunda");
 });
+
+test("inspections.get: null si el documento no existe (p. ej. tras descartar)", async () => {
+  const t = convexTest(schema, convexModules);
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("users", {
+      clerkId: clerkSubject,
+      email: "get-null@example.com",
+      role: "tecnico",
+      approvalStatus: "approved",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  });
+
+  const asUser = t.withIdentity({ subject: clerkSubject });
+  const clientId = "dddddddd-bbbb-4ccc-bbbb-dddddddddddd";
+
+  const created = await asUser.mutation(api.inspections.createOrUpdateFromDraft, {
+    clientId,
+    payload: { clientName: "Borrar" },
+  });
+
+  await asUser.mutation(api.sections.discardInspection, {
+    inspectionId: created.inspectionId,
+  });
+
+  const gone = await asUser.query(api.inspections.get, {
+    id: created.inspectionId,
+  });
+  expect(gone).toBeNull();
+});

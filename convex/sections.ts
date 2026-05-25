@@ -119,6 +119,9 @@ export const listSectionSummaries = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
+    const inspection = await ctx.db.get(inspectionId);
+    if (!inspection) return null;
+
     const allowed = await canAccessInspection(ctx, inspectionId);
     if (!allowed) throw new Error("No autorizado");
 
