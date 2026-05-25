@@ -320,11 +320,13 @@ export const createOrUpdateFromDraft = mutation({
 export const get = query({
   args: { id: v.id("inspections") },
   handler: async (ctx, { id }) => {
+    const doc = await ctx.db.get(id);
+    if (!doc) return null;
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("No autenticado");
     const allowed = await canAccessInspection(ctx, id);
     if (!allowed) throw new Error("No autorizado");
-    return await ctx.db.get(id);
+    return doc;
   },
 });
 

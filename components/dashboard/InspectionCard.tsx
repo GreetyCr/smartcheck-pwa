@@ -7,7 +7,7 @@ import { useMutation } from "convex/react";
 import { Car, Copy, MoreVertical, Trash2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { browserConfirm } from "@/lib/browser-confirm";
+import { browserAlert, browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import {
   formatInspectionDate,
@@ -89,7 +89,11 @@ export function InspectionCard({
     if (!browserConfirm("¿Eliminar este borrador? No se puede deshacer."))
       return;
     closeMenu();
-    await removeDraft({ id: inspection._id });
+    try {
+      await removeDraft({ id: inspection._id });
+    } catch {
+      browserAlert("No se pudo eliminar el borrador.");
+    }
   };
 
   return (
