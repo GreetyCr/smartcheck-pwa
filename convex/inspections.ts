@@ -11,6 +11,7 @@ import {
   userHasFullAccess,
 } from "./lib/auth";
 import { SECTION_TABLE_ORDER } from "./sections";
+import { validateInspectionDraftPatch } from "./lib/validateInspectionDraft";
 
 /** Fire-and-forget hacia n8n (no bloquea la mutación). Desactivar con N8N_WEBHOOK_DISABLED=true. */
 async function scheduleN8nNotify(
@@ -40,6 +41,53 @@ const countryOfOriginUnion = v.union(
   v.literal("korea"),
   v.literal("otros"),
 );
+
+/**
+ * Keys aceptadas en `patchFields` — mantener alineadas con
+ * `INSPECTION_DRAFT_PATCH_FIELD_KEYS` en `lib/validation/inspectionDraft.ts`.
+ */
+export const INSPECTION_PATCH_FIELD_KEYS = [
+  "clientId",
+  "clientName",
+  "clientPhone",
+  "clientEmail",
+  "location",
+  "sellerType",
+  "sellerNote",
+  "inspectionFee",
+  "outOfGamFee",
+  "captureSource",
+  "vehicleBrand",
+  "vehicleModel",
+  "vehicleYear",
+  "transmissionType",
+  "engineType",
+  "engineSpec",
+  "countryOfOrigin",
+  "identifierType",
+  "identifier",
+  "plateNumber",
+  "vin",
+  "mileage",
+  "mileageUnit",
+  "vehiclePhoto",
+  "vehiclePhotoFront",
+  "vehiclePhotoSideLeft",
+  "vehiclePhotoSideRight",
+  "vehiclePhotoRear",
+  "circulationCard",
+  "photoDekra",
+  "photoPlate",
+  "platePhotoNote",
+  "photoMarchamo",
+  "photoVinSticker",
+  "status",
+  "findingsCount",
+  "lastSyncedAt",
+  "reportDeliveredAt",
+  "biCommission",
+  "biVehicleCondition",
+] as const;
 
 const patchFields = v.object({
   clientId: v.optional(v.string()),
@@ -231,6 +279,8 @@ export const createOrUpdateFromDraft = mutation({
     const trimmed = clientId.trim();
     if (!trimmed) throw new Error("clientId inválido");
 
+    const validatedPayload = validateInspectionDraftPatch(payload);
+
     const user = await requireUser(ctx);
     const existing = await inspectionByClientId(ctx, trimmed);
 
@@ -239,7 +289,7 @@ export const createOrUpdateFromDraft = mutation({
         throw new Error("No autorizado");
       }
       const clean = omitUndefined({
-        ...payload,
+        ...validatedPayload,
         clientId: trimmed,
       }) as Record<string, unknown>;
       await ctx.db.patch(existing._id, clean);
@@ -252,7 +302,7 @@ export const createOrUpdateFromDraft = mutation({
     }
 
     const id = await ctx.db.insert("inspections", {
-      ...omitUndefined(payload),
+      ...omitUndefined(validatedPayload),
       clerkUserId: user.clerkId,
       clientId: trimmed,
       status: "draft",
