@@ -298,6 +298,37 @@ export async function listInspectionRowsForSyncQueue(): Promise<
   return [...pending, ...uploading, ...errored];
 }
 
+/** Inspecciones locales aún no sincronizadas (UI Fase 6). Incluye `syncing`. */
+export async function listUnsyncedInspections(): Promise<PendingInspectionRow[]> {
+  const db = await getDB();
+  const statuses: PendingInspectionRow["syncStatus"][] = [
+    "pending",
+    "uploading",
+    "syncing",
+    "error",
+  ];
+  const rows: PendingInspectionRow[] = [];
+  for (const status of statuses) {
+    const batch = await db.getAllFromIndex(
+      "pendingInspections",
+      "by-status",
+      status,
+    );
+    rows.push(...batch);
+  }
+  return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function countSyncQueueErrors(): Promise<number> {
+  const db = await getDB();
+  const errored = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "error",
+  );
+  return errored.length;
+}
+
 export async function listPendingPhotosForInspection(
   inspectionLocalId: string,
 ): Promise<PendingPhotoRow[]> {

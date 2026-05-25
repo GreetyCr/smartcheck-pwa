@@ -37,10 +37,8 @@ function formatRelativeMinutes(ts: number): string {
 }
 
 /**
- * Cola de sincronización: inspecciones `pending_sync` en Convex + última sync manual (local).
- *
- * Fuente de verdad sync: IDB autoritativa mientras `syncStatus !== "synced"` en la fila local;
- * tras `synced`, Convex manda. Ver `docs/MIGRACION_LOCAL_FIRST_OPERACION.md`.
+ * Cola de sincronización legacy (Convex `pending_sync`).
+ * @deprecated Usar `useSync()` + cola IDB (`processSyncQueue`). Retirar en PR-I.
  */
 export function useSyncQueue() {
   const [isSyncing, setIsSyncing] = useState(false);
