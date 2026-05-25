@@ -15,7 +15,9 @@ import {
 import { VehicleHistory } from "@/components/dashboard/VehicleHistory";
 import { PullToRefresh } from "@/components/dashboard/PullToRefresh";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useSyncQueue } from "@/hooks/useSyncQueue";
+import { useSync } from "@/contexts/SyncContext";
+import { useUnsyncedLocalInspections } from "@/hooks/useUnsyncedLocalInspections";
+import { countSyncQueueErrors } from "@/lib/offline/db";
 
 export default function DashboardPage() {
   const { isLoaded, isSignedIn } = useUser();
@@ -28,7 +30,29 @@ export default function DashboardPage() {
     setHideVehicleHistory(false);
   }, [debounced]);
 
-  const { pendingCount, lastSyncLabel, isSyncing, flush } = useSyncQueue();
+  const { pendingCount, lastSyncAt, isSyncing, syncNow } = useSync();
+  const {
+    localOnlyRows,
+    localSyncStatusForConvex,
+    pendingInSyncQueue,
+  } = useUnsyncedLocalInspections();
+  const [errorCount, setErrorCount] = useState(0);
+
+  useEffect(() => {
+    void countSyncQueueErrors().then(setErrorCount);
+  }, [pendingCount, isSyncing]);
+
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSyncAt) return "Última hace —";
+    const diff = Date.now() - lastSyncAt.getTime();
+    const m = Math.floor(diff / 60_000);
+    if (m < 1) return "Última sync hace un momento";
+    if (m < 60) return `Última sync hace ${m} min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `Última sync hace ${h} h`;
+    const d = Math.floor(h / 24);
+    return `Última sync hace ${d} d`;
+  }, [lastSyncAt]);
 
   const statusArg = filter === "all" ? undefined : filter;
 
@@ -74,7 +98,7 @@ export default function DashboardPage() {
   const onRefresh = async () => {
     setRefresh((n) => n + 1);
     if (pendingCount > 0) {
-      await flush();
+      await syncNow();
     }
   };
 
@@ -103,9 +127,10 @@ export default function DashboardPage() {
 
         <SyncStatusCard
           pendingCount={pendingCount}
+          errorCount={errorCount}
           lastSyncLabel={lastSyncLabel}
           isSyncing={isSyncing}
-          onSync={() => void flush()}
+          onSync={() => void syncNow()}
         />
 
         <NewInspectionCTA />
@@ -123,7 +148,10 @@ export default function DashboardPage() {
         <RecentInspectionsList
           title={searching ? "Resultados" : "Inspecciones recientes"}
           inspections={filtered}
+          localDrafts={searching ? [] : localOnlyRows}
           loading={loading}
+          pendingInSyncQueue={pendingInSyncQueue}
+          idbSyncStatus={localSyncStatusForConvex}
           emptyMessage={
             searching
               ? "No hay coincidencias con tu búsqueda."

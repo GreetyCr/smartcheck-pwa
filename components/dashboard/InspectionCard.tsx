@@ -13,10 +13,13 @@ import {
   formatInspectionDate,
   getInspectionUiStatus,
 } from "@/lib/inspection-ui";
+import type { PendingInspectionRow } from "@/lib/offline/db";
+import { SyncStatusBadge } from "@/components/inspection/SyncStatusBadge";
 
 type InspectionCardProps = {
   inspection: Doc<"inspections">;
   pendingInSyncQueue?: boolean;
+  idbSyncStatus?: PendingInspectionRow["syncStatus"];
 };
 
 function formatPlate(inspection: Doc<"inspections">): string {
@@ -48,6 +51,7 @@ function isDraft(inspection: Doc<"inspections">): boolean {
 export function InspectionCard({
   inspection,
   pendingInSyncQueue,
+  idbSyncStatus,
 }: InspectionCardProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -129,6 +133,9 @@ export function InspectionCard({
           >
             {label}
           </span>
+          {idbSyncStatus && idbSyncStatus !== "synced" ? (
+            <SyncStatusBadge status={idbSyncStatus} className="text-[10px]" />
+          ) : null}
           {findings > 0 ? (
             <span className="text-[10px] font-semibold text-amber-800">
               {findings} hallazgos

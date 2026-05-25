@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
 import { useOfflineInspection } from "@/hooks/useOfflineInspection";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
+import { SyncStatusBadge } from "@/components/inspection/SyncStatusBadge";
 
 export function InspectionSectionsScreen() {
   const router = useRouter();
@@ -297,6 +298,11 @@ export function InspectionSectionsScreen() {
       ? String(convexMutationId).slice(-6).toUpperCase()
       : pathSeg.slice(-6).toUpperCase();
 
+  const idbSyncStatus =
+    routeCtx.unifiedFlow && offline.localRow?.syncStatus !== "synced"
+      ? offline.localRow?.syncStatus
+      : undefined;
+
   return (
     <div className="flex min-h-dvh flex-col bg-[#F8F9FA] pb-28">
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card px-2 py-3">
@@ -316,6 +322,11 @@ export function InspectionSectionsScreen() {
             <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:bg-amber-950/50 dark:text-amber-100">
               {INSPECTION_ROUTE_COPY.BADGE_LOCAL_DRAFT}
             </p>
+          ) : null}
+          {idbSyncStatus ? (
+            <div className="mt-1 flex justify-center">
+              <SyncStatusBadge status={idbSyncStatus} />
+            </div>
           ) : null}
         </div>
         <div className="relative">

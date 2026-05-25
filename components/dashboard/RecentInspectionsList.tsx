@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import type { Doc } from "@/convex/_generated/dataModel";
+import type { PendingInspectionRow } from "@/lib/offline/db";
 import { InspectionCard } from "@/components/dashboard/InspectionCard";
+import { LocalInspectionCard } from "@/components/dashboard/LocalInspectionCard";
 
 function ListSkeleton() {
   return (
@@ -24,25 +26,34 @@ function ListSkeleton() {
 type RecentInspectionsListProps = {
   title?: string;
   inspections: Doc<"inspections">[] | undefined;
+  localDrafts?: PendingInspectionRow[];
   loading: boolean;
   emptyMessage?: string;
   showViewAllHref?: string;
   viewAllLabel?: string;
+  pendingInSyncQueue?: (inspection: Doc<"inspections">) => boolean;
+  idbSyncStatus?: (
+    inspection: Doc<"inspections">,
+  ) => PendingInspectionRow["syncStatus"] | undefined;
 };
 
 export function RecentInspectionsList({
   title = "Inspecciones recientes",
   inspections,
+  localDrafts = [],
   loading,
   emptyMessage = 'No hay inspecciones aún. Crea una con "Nueva inspección".',
   showViewAllHref = "/historial",
   viewAllLabel = "Ver todas",
+  pendingInSyncQueue,
+  idbSyncStatus,
 }: RecentInspectionsListProps) {
   if (loading) {
     return <ListSkeleton />;
   }
 
   const rows = inspections ?? [];
+  const hasRows = rows.length > 0 || localDrafts.length > 0;
 
   return (
     <section className="space-y-3">
@@ -56,15 +67,24 @@ export function RecentInspectionsList({
         </Link>
       </div>
 
-      {rows.length === 0 ? (
+      {!hasRows ? (
         <p className="rounded-2xl border border-dashed border-border bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
           {emptyMessage}
         </p>
       ) : (
         <ul className="space-y-2">
+          {localDrafts.map((row) => (
+            <li key={`local-${row.localId}`}>
+              <LocalInspectionCard row={row} />
+            </li>
+          ))}
           {rows.map((inspection) => (
             <li key={inspection._id}>
-              <InspectionCard inspection={inspection} />
+              <InspectionCard
+                inspection={inspection}
+                pendingInSyncQueue={pendingInSyncQueue?.(inspection)}
+                idbSyncStatus={idbSyncStatus?.(inspection)}
+              />
             </li>
           ))}
         </ul>
