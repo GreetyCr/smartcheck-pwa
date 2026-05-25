@@ -76,14 +76,13 @@ const CAPTURE_ORDER: CaptureSource[] = [
 import { useSync } from "@/contexts/SyncContext";
 import {
   inspectionPathSegment,
-  type InspectionRouteContextValue,
+  useInspectionRoute,
 } from "@/components/inspection/InspectionRouteResolver";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
-type Props = { routeCtx: InspectionRouteContextValue };
-
-export function InspectionCabeceraScreen({ routeCtx }: Props) {
+export function InspectionCabeceraScreen() {
   const router = useRouter();
+  const routeCtx = useInspectionRoute();
   const pathSeg = inspectionPathSegment(routeCtx);
   const convexMutationId = routeCtx.convexInspectionId;
   const { syncNow, isSyncing } = useSync();

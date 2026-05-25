@@ -29,18 +29,18 @@ import {
 
 import {
   inspectionPathSegment,
-  type InspectionRouteContextValue,
+  useInspectionRoute,
 } from "@/components/inspection/InspectionRouteResolver";
 import { useOfflineInspection } from "@/hooks/useOfflineInspection";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
 type SectionFormProps = {
   sectionConfig: SectionConfig;
-  routeCtx: InspectionRouteContextValue;
 };
 
-export function SectionForm({ sectionConfig, routeCtx }: SectionFormProps) {
+export function SectionForm({ sectionConfig }: SectionFormProps) {
   const router = useRouter();
+  const routeCtx = useInspectionRoute();
   const pathSeg = inspectionPathSegment(routeCtx);
   const convexMutationId = routeCtx.convexInspectionId;
 

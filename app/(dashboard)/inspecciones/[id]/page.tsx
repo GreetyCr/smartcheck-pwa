@@ -7,7 +7,7 @@ export default async function InspeccionDetailPage({ params }: Props) {
   const { id } = await params;
   return (
     <InspectionRouteResolver routeRef={id}>
-      {(ctx) => <InspectionSectionsScreen routeCtx={ctx} />}
+      <InspectionSectionsScreen />
     </InspectionRouteResolver>
   );
 }
