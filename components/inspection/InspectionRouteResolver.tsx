@@ -101,7 +101,8 @@ export function InspectionRouteResolver({
   children,
 }: {
   routeRef: string;
-  children: (ctx: InspectionRouteContextValue) => ReactNode;
+  /** ReactNode serializable desde Server Components (no render props). */
+  children: ReactNode;
 }) {
   const unifiedFlow = useUnifiedDraftFlow();
   const inspection = useUnifiedInspection(unifiedFlow ? routeRef : undefined);
@@ -188,7 +189,7 @@ export function InspectionRouteResolver({
   const { ctx } = state;
   return (
     <InspectionRouteContext.Provider value={ctx}>
-      {children(ctx)}
+      {children}
     </InspectionRouteContext.Provider>
   );
 }

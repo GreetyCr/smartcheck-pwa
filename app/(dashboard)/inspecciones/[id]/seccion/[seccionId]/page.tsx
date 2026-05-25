@@ -15,13 +15,7 @@ export default async function InspeccionSeccionPage({ params }: Props) {
 
   return (
     <InspectionRouteResolver routeRef={id}>
-      {(ctx) => (
-        <SectionForm
-          key={`${id}-${config.id}`}
-          sectionConfig={config}
-          routeCtx={ctx}
-        />
-      )}
+      <SectionForm key={`${id}-${config.id}`} sectionConfig={config} />
     </InspectionRouteResolver>
   );
 }

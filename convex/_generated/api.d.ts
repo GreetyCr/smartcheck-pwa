@@ -14,6 +14,7 @@ import type * as inspections from "../inspections.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_externalPhotoUrl from "../lib/externalPhotoUrl.js";
 import type * as lib_sanitizeSectionPatch from "../lib/sanitizeSectionPatch.js";
+import type * as lib_validateInspectionDraft from "../lib/validateInspectionDraft.js";
 import type * as migrations from "../migrations.js";
 import type * as n8nWebhook from "../n8nWebhook.js";
 import type * as pdfs from "../pdfs.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/externalPhotoUrl": typeof lib_externalPhotoUrl;
   "lib/sanitizeSectionPatch": typeof lib_sanitizeSectionPatch;
+  "lib/validateInspectionDraft": typeof lib_validateInspectionDraft;
   migrations: typeof migrations;
   n8nWebhook: typeof n8nWebhook;
   pdfs: typeof pdfs;

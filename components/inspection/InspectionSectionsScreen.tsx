@@ -8,7 +8,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   inspectionPathSegment,
-  type InspectionRouteContextValue,
+  useInspectionRoute,
 } from "@/components/inspection/InspectionRouteResolver";
 import { VehicleCard } from "@/components/inspection/VehicleCard";
 import { ProgressCard } from "@/components/inspection/ProgressCard";
@@ -24,12 +24,9 @@ import { getInspectionSections } from "@/lib/constants/sections";
 import { useOfflineInspection } from "@/hooks/useOfflineInspection";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
-type Props = {
-  routeCtx: InspectionRouteContextValue;
-};
-
-export function InspectionSectionsScreen({ routeCtx }: Props) {
+export function InspectionSectionsScreen() {
   const router = useRouter();
+  const routeCtx = useInspectionRoute();
   const pathSeg = inspectionPathSegment(routeCtx);
   const convexMutationId = routeCtx.convexInspectionId;
 
