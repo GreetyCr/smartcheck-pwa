@@ -42,6 +42,61 @@ const countryOfOriginUnion = v.union(
   v.literal("otros"),
 );
 
+const photoManifestSlot = v.union(
+  v.literal("vehicleFront"),
+  v.literal("vehicleSideLeft"),
+  v.literal("vehicleSideRight"),
+  v.literal("vehicleRear"),
+  v.literal("dekra"),
+  v.literal("plate"),
+  v.literal("marchamo"),
+  v.literal("vinSticker"),
+);
+
+const photoManifestEntry = v.object({
+  clientPhotoId: v.string(),
+  storageId: v.id("_storage"),
+  slot: photoManifestSlot,
+});
+
+const CABECERA_SLOT_TO_PATCH: Record<
+  string,
+  | "vehiclePhotoFront"
+  | "vehiclePhotoSideLeft"
+  | "vehiclePhotoSideRight"
+  | "vehiclePhotoRear"
+  | "photoDekra"
+  | "photoPlate"
+  | "photoMarchamo"
+  | "photoVinSticker"
+> = {
+  vehicleFront: "vehiclePhotoFront",
+  vehicleSideLeft: "vehiclePhotoSideLeft",
+  vehicleSideRight: "vehiclePhotoSideRight",
+  vehicleRear: "vehiclePhotoRear",
+  dekra: "photoDekra",
+  plate: "photoPlate",
+  marchamo: "photoMarchamo",
+  vinSticker: "photoVinSticker",
+};
+
+function applyPhotoManifestToPayload(
+  payload: Record<string, unknown>,
+  manifest: { slot: string; storageId: Id<"_storage"> }[] | undefined,
+): Record<string, unknown> {
+  if (!manifest?.length) return payload;
+  const next = { ...payload };
+  for (const item of manifest) {
+    const field = CABECERA_SLOT_TO_PATCH[item.slot];
+    if (!field) continue;
+    next[field] = item.storageId;
+    if (item.slot === "vehicleFront") {
+      next.vehiclePhoto = item.storageId;
+    }
+  }
+  return next;
+}
+
 /**
  * Keys aceptadas en `patchFields` — mantener alineadas con
  * `INSPECTION_DRAFT_PATCH_FIELD_KEYS` en `lib/validation/inspectionDraft.ts`.
@@ -260,7 +315,7 @@ function omitUndefined<T extends Record<string, unknown>>(obj: T): Record<string
 
 /**
  * Crea o actualiza una inspección por `clientId` (idempotente en una sola mutación).
- * Sin `photoManifest` aún (Fase 5).
+ * `photoManifest` mapea blobs ya subidos a Storage → campos de cabecera por `slot`.
  *
  * Convex no garantiza unicidad declarativa de `clientId`: el patrón es leer por índice
  * `by_client_id` y luego insert o patch en esta misma mutación; reintentos concurrentes
@@ -270,16 +325,21 @@ export const createOrUpdateFromDraft = mutation({
   args: {
     clientId: v.string(),
     payload: patchFields,
+    photoManifest: v.optional(v.array(photoManifestEntry)),
   },
   returns: v.object({
     inspectionId: v.id("inspections"),
     created: v.boolean(),
   }),
-  handler: async (ctx, { clientId, payload }) => {
+  handler: async (ctx, { clientId, payload, photoManifest }) => {
     const trimmed = clientId.trim();
     if (!trimmed) throw new Error("clientId inválido");
 
     const validatedPayload = validateInspectionDraftPatch(payload);
+    const withPhotos = applyPhotoManifestToPayload(
+      validatedPayload as Record<string, unknown>,
+      photoManifest,
+    );
 
     const user = await requireUser(ctx);
     const existing = await inspectionByClientId(ctx, trimmed);
@@ -289,7 +349,7 @@ export const createOrUpdateFromDraft = mutation({
         throw new Error("No autorizado");
       }
       const clean = omitUndefined({
-        ...validatedPayload,
+        ...withPhotos,
         clientId: trimmed,
       }) as Record<string, unknown>;
       await ctx.db.patch(existing._id, clean);
@@ -302,7 +362,7 @@ export const createOrUpdateFromDraft = mutation({
     }
 
     const id = await ctx.db.insert("inspections", {
-      ...omitUndefined(validatedPayload),
+      ...omitUndefined(withPhotos),
       clerkUserId: user.clerkId,
       clientId: trimmed,
       status: "draft",

@@ -14,6 +14,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUnifiedDraftFlow } from "@/lib/featureFlags";
+import { useSync } from "@/contexts/SyncContext";
+import { saveUnifiedWizardDraft } from "@/lib/offline/saveUnifiedWizardDraft";
 import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { PhotoCapture } from "@/components/ui/PhotoCapture";
@@ -72,6 +74,7 @@ async function uploadOne(
 export function VehicleForm({ className }: { className?: string }) {
   const router = useRouter();
   const unifiedDraft = useUnifiedDraftFlow();
+  const { refreshPendingCount, syncNow, isOnline } = useSync();
   const { draft, setDraft } = useInspectionWizard();
   const createDraft = useMutation(api.inspections.createDraft);
   const generateUploadUrl = useMutation(api.inspections.generateUploadUrl);
@@ -197,7 +200,22 @@ export function VehicleForm({ className }: { className?: string }) {
     setSubmitting(true);
 
     try {
-      const newClientId = unifiedDraft ? crypto.randomUUID() : undefined;
+      if (unifiedDraft) {
+        const clientId = crypto.randomUUID();
+        await saveUnifiedWizardDraft({
+          clientId,
+          draft,
+          yearNum,
+          mileageNum,
+        });
+        await refreshPendingCount();
+        if (isOnline) {
+          void syncNow();
+        }
+        router.push(`/inspecciones/${clientId}`);
+        return;
+      }
+
       const inspectionId = (await createDraft()) as Id<"inspections">;
       const source = draft.captureSource as CaptureSource;
       const sellerType = draft.sellerType as SellerTypeKey;
@@ -241,7 +259,6 @@ export function VehicleForm({ className }: { className?: string }) {
       await patchInspection({
         id: inspectionId,
         patch: {
-          ...(newClientId ? { clientId: newClientId } : {}),
           clientName: draft.clientName.trim(),
           clientPhone: draft.clientPhone.trim(),
           clientEmail: draft.clientEmail.trim() || undefined,
@@ -277,10 +294,7 @@ export function VehicleForm({ className }: { className?: string }) {
         },
       });
 
-      const nextPath =
-        newClientId !== undefined
-          ? `/inspecciones/${newClientId}`
-          : `/inspecciones/${String(inspectionId)}`;
+      const nextPath = `/inspecciones/${String(inspectionId)}`;
       router.push(nextPath);
     } catch (err) {
       setSubmitError(

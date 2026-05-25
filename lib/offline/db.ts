@@ -17,12 +17,16 @@ export type WizardDraftBlob = Record<string, unknown>;
 export type PendingPhotoRow = {
   id: string;
   inspectionLocalId: string;
+  /** `"cabecera"` para fotos de cabecera; tabla de sección para ítems. */
   sectionTable: string;
   itemKey: string;
+  /** Solo cabecera: slot de `photoManifest` (Fase 5). */
+  slot?: string;
   blob: Blob;
   createdAt: number;
   status: "pending" | "uploading" | "uploaded" | "error";
   uploadedUrl?: string;
+  storageId?: string;
   syncError?: string;
 };
 
@@ -45,8 +49,10 @@ export type PendingInspectionRow = {
   wizard?: WizardDraftBlob;
   createdAt: number;
   updatedAt: number;
-  syncStatus: "pending" | "syncing" | "synced" | "error";
+  syncStatus: "pending" | "uploading" | "syncing" | "synced" | "error";
   syncError?: string;
+  /** Marca de sync exitosa (retención Fase 7). */
+  syncedAt?: number;
 };
 
 export type PendingInspectionDraftPatch = {
@@ -241,9 +247,25 @@ export function openDb(): ReturnType<typeof getDB> {
 }
 
 export async function countPendingInspections(): Promise<number> {
+  const unified = await listInspectionRowsForSyncQueue();
   const db = await getDB();
-  const all = await db.getAllFromIndex("pendingInspections", "by-status", "pending");
-  return all.length;
+  const pending = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "pending",
+  );
+  const errored = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "error",
+  );
+  const legacyOnly = [...pending, ...errored].filter((row) => !row.clientId);
+  const seen = new Set(unified.map((r) => r.localId));
+  let total = unified.length;
+  for (const row of legacyOnly) {
+    if (!seen.has(row.localId)) total += 1;
+  }
+  return total;
 }
 
 export async function listPendingInspectionsByStatus(
@@ -251,4 +273,34 @@ export async function listPendingInspectionsByStatus(
 ): Promise<PendingInspectionRow[]> {
   const db = await getDB();
   return db.getAllFromIndex("pendingInspections", "by-status", status);
+}
+
+/** Filas con trabajo pendiente para la cola unificada (Fase 5). */
+export async function listInspectionRowsForSyncQueue(): Promise<
+  PendingInspectionRow[]
+> {
+  const db = await getDB();
+  const pending = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "pending",
+  );
+  const uploading = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "uploading",
+  );
+  const errored = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "error",
+  );
+  return [...pending, ...uploading, ...errored];
+}
+
+export async function listPendingPhotosForInspection(
+  inspectionLocalId: string,
+): Promise<PendingPhotoRow[]> {
+  const db = await getDB();
+  return db.getAllFromIndex("pendingPhotos", "by-inspection", inspectionLocalId);
 }
