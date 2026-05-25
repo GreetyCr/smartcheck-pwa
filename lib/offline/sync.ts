@@ -1,3 +1,10 @@
+/**
+ * Fuente de verdad sync (Fase 5+): ver `hooks/useSyncQueue.ts` y
+ * `docs/MIGRACION_LOCAL_FIRST_OPERACION.md`.
+ *
+ * Legacy: `syncPendingToConvex` para filas sin `clientId` (pre-unificado).
+ * Unificado: `processSyncQueue` en `lib/offline/syncQueue.ts`.
+ */
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   getDB,
@@ -5,7 +12,14 @@ import {
   type PendingInspectionRow,
 } from "@/lib/offline/db";
 
-const MAX_SYNC_MS = 28_000; /** RNF-07: &lt; 30 s (margen de red) */
+export { processSyncQueue } from "@/lib/offline/syncQueue";
+export type {
+  CreateOrUpdateFromDraftArgs,
+  SyncQueueAdapters,
+  SyncQueueResult,
+} from "@/lib/offline/syncQueue";
+
+const MAX_SYNC_MS = 28_000;
 
 export type SyncAdapters = {
   createDraft: () => Promise<Id<"inspections">>;
@@ -24,13 +38,12 @@ export type SyncAdapters = {
 export type SyncResult = {
   ok: number;
   errors: number;
-  /** Si se cortó el tiempo límite de sincronización. */
   timedOut: boolean;
 };
 
 /**
- * Sincroniza inspecciones pendientes hacia Convex (RF-19).
- * Asegura filas de sección y sube parches y secciones; marca `markSynced` al final.
+ * Sincroniza inspecciones pendientes hacia Convex (RF-19, flujo legacy).
+ * Omite filas con `clientId` (las procesa `processSyncQueue`).
  */
 export async function syncPendingToConvex(
   adapters: SyncAdapters,
@@ -47,7 +60,7 @@ export async function syncPendingToConvex(
     "by-status",
     "error",
   );
-  const toProcess = [...pending, ...errored];
+  const toProcess = [...pending, ...errored].filter((row) => !row.clientId);
   let ok = 0;
   let errors = 0;
   let timedOut = false;
@@ -83,6 +96,7 @@ export async function syncPendingToConvex(
       await adapters.markSynced({ id: convexId });
       row.syncStatus = "synced";
       row.syncError = undefined;
+      row.syncedAt = Date.now();
       await db.put("pendingInspections", row);
       ok += 1;
     } catch (e) {

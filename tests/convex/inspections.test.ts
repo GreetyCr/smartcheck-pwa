@@ -76,3 +76,42 @@ test("inspections.get: null si el documento no existe (p. ej. tras descartar)", 
   });
   expect(gone).toBeNull();
 });
+
+test("createOrUpdateFromDraft: photoManifest mapea vehicleFront a vehiclePhotoFront", async () => {
+  const t = convexTest(schema, convexModules);
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("users", {
+      clerkId: clerkSubject,
+      email: "photo-manifest@example.com",
+      role: "tecnico",
+      approvalStatus: "approved",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  });
+
+  const asUser = t.withIdentity({ subject: clerkSubject });
+  const clientId = "eeeeeeee-bbbb-4ccc-bbbb-eeeeeeeeeeee";
+
+  let storageId: Id<"_storage"> = "" as Id<"_storage">;
+  await t.run(async (ctx) => {
+    storageId = await ctx.storage.store(new Blob(["x"]));
+  });
+
+  await asUser.mutation(api.inspections.createOrUpdateFromDraft, {
+    clientId,
+    payload: { clientName: "Fotos" },
+    photoManifest: [
+      {
+        clientPhotoId: "local-photo-1",
+        storageId,
+        slot: "vehicleFront",
+      },
+    ],
+  });
+
+  const row = await asUser.query(api.inspections.getByClientId, { clientId });
+  expect(row?.vehiclePhotoFront).toEqual(storageId);
+  expect(row?.vehiclePhoto).toEqual(storageId);
+});
