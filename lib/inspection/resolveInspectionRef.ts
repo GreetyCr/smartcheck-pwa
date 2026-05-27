@@ -49,8 +49,8 @@ export async function resolveInspectionRef(
     const id = normalized as Id<"inspections">;
     const doc = await deps.fetchByConvexId(id);
     if (!doc) return { kind: "not_found" };
-    const clientId = doc.clientId?.trim();
-    if (!clientId) return { kind: "not_found" };
+    // Legacy: inspecciones creadas antes del backfill de clientId siguen enlazadas por `_id`.
+    const clientId = doc.clientId?.trim() || doc._id;
     return { kind: "convex", clientId, convexId: doc._id };
   }
 

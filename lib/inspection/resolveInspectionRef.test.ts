@@ -153,7 +153,7 @@ describe("resolveInspectionRef", () => {
     expect(out).toEqual({ kind: "not_found" });
   });
 
-  it("returns not_found when legacy document has no clientId", async () => {
+  it("resolves legacy Convex id when document has no clientId (pre-backfill)", async () => {
     const doc = minimalInspectionDoc({
       _id: LEGACY_CONVEX as Id<"inspections">,
       clientId: undefined,
@@ -162,7 +162,11 @@ describe("resolveInspectionRef", () => {
       fetchByConvexId: vi.fn().mockResolvedValue(doc),
     });
     const out = await resolveInspectionRef(LEGACY_CONVEX, deps);
-    expect(out).toEqual({ kind: "not_found" });
+    expect(out).toEqual({
+      kind: "convex",
+      clientId: LEGACY_CONVEX,
+      convexId: doc._id,
+    });
   });
 
   it("returns not_found for empty / whitespace-only ref", async () => {

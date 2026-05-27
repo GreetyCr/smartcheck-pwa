@@ -60,7 +60,7 @@ export function VehicleHistory({
           return (
             <li key={row._id}>
               <Link
-                href={`/inspecciones/${row._id}`}
+                href={`/inspecciones/${row.clientId?.trim() || row._id}`}
                 className="flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-muted/30 px-3 py-2 text-sm transition-colors active:bg-muted/60"
               >
                 <span className="font-semibold text-foreground">

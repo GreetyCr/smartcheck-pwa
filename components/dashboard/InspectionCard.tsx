@@ -103,7 +103,7 @@ export function InspectionCard({
   return (
     <div className="relative flex items-stretch gap-1">
       <Link
-        href={`/inspecciones/${inspection._id}`}
+        href={`/inspecciones/${inspection.clientId?.trim() || inspection._id}`}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm transition-colors active:bg-muted/50",
           draft && "touch-manipulation select-none",
