@@ -90,7 +90,7 @@ Convenciones cerradas:
 | `hooks/usePendingInspectionDraft.ts` | 2 | Debounce + `pagehide` / `beforeunload`. |
 | `hooks/useUnifiedInspection.ts` | **PR-E1** | § Fase 3 — PR-E; consume resolver; UI bajo flag en PR-E2. |
 | `lib/offline/syncQueue.ts` | 5 | Cola; adapters tipados con `FunctionArgs<typeof api.inspections.createOrUpdateFromDraft>`. |
-| `lib/offline/retention.ts` | 7 | Purga 7d / retención metadatos 30d; ver `MIGRACION_LOCAL_FIRST_OPERACION.md`. |
+| `lib/offline/retention.ts` | **7 (hecho)** | `runRetentionSweep` en boot (`SyncProvider`); purga 7d / fila 30d; tests `retention.test.ts`. |
 | `docs/MIGRACION_LOCAL_FIRST_OPERACION.md` | **7 (creado)** | Retención, fuente de verdad sync, n8n, criterio doc HTML. |
 
 ~~`lib/images/photoMeta.ts`~~ — no hace falta para Fase 1 si el draft sigue usando `File` comprimido.
