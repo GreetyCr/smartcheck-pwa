@@ -241,7 +241,9 @@ export const backfillInspectionClientIdsInternal = internalMutation({
 /** Placas conocidas → monto total cobrado (colones enteros, sin separadores). */
 const KNOWN_PLATE_TOTALS: Record<string, number> = {
   RTL007: 69_000,
+  RLT007: 69_000,
   ABG888: 64_000,
+  ABG884: 64_000,
   KN561373: 69_000,
   MJM205: 85_000,
   MMF412: 64_000,
