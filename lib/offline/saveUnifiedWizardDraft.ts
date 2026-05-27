@@ -7,6 +7,7 @@ import {
   type PendingPhotoRow,
 } from "@/lib/offline/db";
 import type { CabeceraPhotoSlot } from "@/lib/offline/photoSlots";
+import { parseDigitsToAmount } from "@/lib/amount-input";
 import {
   draftEngineToConvex,
   resolvePrimaryVehicleId,
@@ -51,7 +52,11 @@ function buildInspectionPayload(
     sellerType,
     sellerNote: draft.sellerNote.trim() || undefined,
     captureSource: source,
-    outOfGamFee: draft.isInGAM ? 0 : draft.outOfGamFee,
+    inGam: draft.inGam === "si" || draft.inGam === "no" ? draft.inGam : undefined,
+    outOfGamFee:
+      draft.inGam === "no"
+        ? parseDigitsToAmount(draft.outOfGamFeeInput)
+        : undefined,
     vehicleBrand: draft.brand.trim(),
     vehicleModel: draft.model.trim(),
     vehicleYear: yearNum,

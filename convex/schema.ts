@@ -123,7 +123,14 @@ export default defineSchema({
     /** Nota libre para BI (opcional). */
     sellerNote: v.optional(v.string()),
     inspectionFee: v.optional(v.number()),
+    /** Fuera del GAM: monto adicional cobrado (solo BD; no PDF). Null si `inGam === "si"`. */
     outOfGamFee: v.optional(v.number()),
+    /** ¿Inspección en la GAM? (solo BD; no PDF). */
+    inGam: v.optional(v.union(v.literal("si"), v.literal("no"))),
+    /** ID Manychat (integración webhook); se asigna al cerrar/entregar informe. */
+    manychatId: v.optional(v.string()),
+    /** Monto total cobrado al cliente (solo BD / ingresos; no PDF). */
+    totalAmountCharged: v.optional(v.number()),
     captureSource: v.optional(captureSource),
 
     vehicleBrand: v.optional(v.string()),

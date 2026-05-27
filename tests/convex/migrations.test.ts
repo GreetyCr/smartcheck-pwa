@@ -174,6 +174,49 @@ test("countInspectionsMissingClientIdInternal: sin sesión Clerk (solo internal)
   expect(n).toBe(1);
 });
 
+test("migrateLegacyBillingFields: montos por placa y 1000 para pruebas", async () => {
+  const t = convexTest(schema, convexModules);
+  const now = Date.now();
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("users", {
+      clerkId: adminSubject,
+      email: "admin-billing@example.com",
+      role: "admin",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+      identifierType: "placa",
+      identifier: "RTL007",
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+      identifierType: "placa",
+      identifier: "PRUEBA-XYZ",
+    });
+  });
+
+  const asAdmin = t.withIdentity({ subject: adminSubject });
+  const result = await asAdmin.mutation(
+    api.migrations.migrateLegacyBillingFields,
+    {},
+  );
+  expect(result.scanned).toBeGreaterThanOrEqual(2);
+  expect(result.updated).toBe(result.scanned);
+
+  const rows = await t.run(async (ctx) => ctx.db.query("inspections").collect());
+  const rtl = rows.find((r) => r.identifier === "RTL007");
+  const prueba = rows.find((r) => r.identifier === "PRUEBA-XYZ");
+  expect(rtl?.inGam).toBe("si");
+  expect(rtl?.totalAmountCharged).toBe(69_000);
+  expect(prueba?.totalAmountCharged).toBe(1_000);
+});
+
 test("backfillInspectionClientIds: técnico no admin no puede ejecutar", async () => {
   const t = convexTest(schema, convexModules);
   const now = Date.now();

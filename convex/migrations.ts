@@ -237,3 +237,96 @@ export const backfillInspectionClientIdsInternal = internalMutation({
     return await backfillInspectionClientIdsImpl(ctx, args);
   },
 });
+
+/** Placas conocidas → monto total cobrado (colones enteros, sin separadores). */
+const KNOWN_PLATE_TOTALS: Record<string, number> = {
+  RTL007: 69_000,
+  ABG888: 64_000,
+  KN561373: 69_000,
+  MJM205: 85_000,
+  MMF412: 64_000,
+};
+
+const TEST_INSPECTION_TOTAL = 1_000;
+
+function normalizePlateKey(raw: string | undefined): string {
+  if (!raw) return "";
+  return raw.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function plateKeysForInspection(doc: {
+  identifier?: string;
+  plateNumber?: string;
+}): string[] {
+  const keys = new Set<string>();
+  const id = normalizePlateKey(doc.identifier);
+  const plate = normalizePlateKey(doc.plateNumber);
+  if (id) keys.add(id);
+  if (plate) keys.add(plate);
+  return [...keys];
+}
+
+function resolveTotalAmountCharged(doc: {
+  identifier?: string;
+  plateNumber?: string;
+}): number {
+  const keys = plateKeysForInspection(doc);
+  for (const [plate, amount] of Object.entries(KNOWN_PLATE_TOTALS)) {
+    if (keys.includes(plate)) return amount;
+  }
+  return TEST_INSPECTION_TOTAL;
+}
+
+const billingMigrationReturns = v.object({
+  scanned: v.number(),
+  updated: v.number(),
+  byPlate: v.record(v.string(), v.number()),
+});
+
+async function migrateLegacyBillingFieldsImpl(ctx: MutationCtx): Promise<{
+  scanned: number;
+  updated: number;
+  byPlate: Record<string, number>;
+}> {
+  const rows = await ctx.db.query("inspections").collect();
+  const byPlate: Record<string, number> = {};
+  let updated = 0;
+
+  for (const doc of rows) {
+    const total = resolveTotalAmountCharged(doc);
+    const keys = plateKeysForInspection(doc);
+    const label = keys.find((k) => k in KNOWN_PLATE_TOTALS) ?? keys[0] ?? "otros";
+    byPlate[label] = (byPlate[label] ?? 0) + 1;
+
+    await ctx.db.patch(doc._id, {
+      inGam: "si",
+      totalAmountCharged: total,
+    });
+    updated++;
+  }
+
+  return { scanned: rows.length, updated, byPlate };
+}
+
+/**
+ * Backfill `inGam`, `totalAmountCharged` y limpia `outOfGamFee` en inspecciones legacy.
+ * Todas las revisiones existentes se marcan en GAM; montos por placa según lista acordada;
+ * el resto recibe 1000 (marcador de prueba).
+ */
+export const migrateLegacyBillingFields = mutation({
+  args: {},
+  returns: billingMigrationReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await migrateLegacyBillingFieldsImpl(ctx);
+  },
+});
+
+/** Igual que `migrateLegacyBillingFields` sin sesión Clerk (CLI / Dashboard). */
+export const migrateLegacyBillingFieldsInternal = internalMutation({
+  args: {},
+  returns: billingMigrationReturns,
+  handler: async (ctx) => {
+    return await migrateLegacyBillingFieldsImpl(ctx);
+  },
+});

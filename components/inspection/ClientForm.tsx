@@ -11,12 +11,13 @@ import {
   normalizePhoneDigitsCr,
 } from "@/lib/phone-cr";
 import type { CaptureSource, SellerTypeKey } from "@/types/inspection-draft";
-import {
-  formControlChecked,
-  formControlValue,
-} from "@/lib/browser-confirm";
+import { formControlValue } from "@/lib/browser-confirm";
 import { isValidOptionalEmail } from "@/lib/vehicle-form";
 import { cn } from "@/lib/utils";
+import {
+  digitsOnlyAmountInput,
+  parseDigitsToAmount,
+} from "@/lib/amount-input";
 
 const CAPTURE_LABELS: Record<CaptureSource, string> = {
   publicidad: "Publicidad",
@@ -42,6 +43,8 @@ export function ClientForm({ className }: { className?: string }) {
   const { draft, setDraft } = useInspectionWizard();
 
   const phoneDigits = normalizePhoneDigitsCr(draft.clientPhone);
+  const showOutOfGamFee = draft.inGam === "no";
+  const outOfGamAmount = parseDigitsToAmount(draft.outOfGamFeeInput);
 
   const isValid = useMemo(() => {
     const nameOk = draft.clientName.trim().length >= 3;
@@ -49,12 +52,18 @@ export function ClientForm({ className }: { className?: string }) {
     const sellerOk = draft.sellerType !== "";
     const sourceOk = draft.captureSource !== "";
     const emailOk = isValidOptionalEmail(draft.clientEmail);
-    return nameOk && phoneOk && sellerOk && sourceOk && emailOk;
+    const gamOk = draft.inGam === "si" || draft.inGam === "no";
+    const feeOk =
+      draft.inGam === "si" ||
+      (draft.inGam === "no" && outOfGamAmount !== undefined && outOfGamAmount > 0);
+    return nameOk && phoneOk && sellerOk && sourceOk && emailOk && gamOk && feeOk;
   }, [
     draft.clientName,
     draft.captureSource,
     draft.clientEmail,
     draft.sellerType,
+    draft.inGam,
+    outOfGamAmount,
     phoneDigits,
   ]);
 
@@ -64,7 +73,6 @@ export function ClientForm({ className }: { className?: string }) {
 
     setDraft({
       clientPhone: phoneDigits,
-      outOfGamFee: draft.isInGAM ? 0 : undefined,
     });
 
     router.push("/inspecciones/nueva/vehiculo");
@@ -193,22 +201,52 @@ export function ClientForm({ className }: { className?: string }) {
         />
       </div>
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-        <input
-          type="checkbox"
-          checked={draft.isInGAM}
-          onChange={(e) =>
-            setDraft({ isInGAM: formControlChecked(e) })
-          }
-          className="mt-1 size-4 shrink-0 rounded border-border text-primary"
-        />
-        <span className="text-sm leading-snug">
-          <span className="font-medium text-foreground">¿Se encuentra en el GAM?</span>
-          <span className="mt-0.5 block text-muted-foreground">
-            Gran Área Metropolitana
-          </span>
+      <div className="space-y-2 rounded-2xl border border-border bg-card px-4 py-3">
+        <span id="in-gam-label" className="text-sm font-medium text-foreground">
+          ¿Se encuentra en el GAM?
         </span>
-      </label>
+        <p className="text-xs text-muted-foreground">Gran Área Metropolitana</p>
+        <ToggleButtonGroup
+          labelId="in-gam-label"
+          variant="outline"
+          value={draft.inGam}
+          onChange={(inGam) =>
+            setDraft({
+              inGam: inGam as "si" | "no" | "",
+              ...(inGam === "si" ? { outOfGamFeeInput: "" } : {}),
+            })
+          }
+          options={[
+            { value: "si" as const, label: "Sí" },
+            { value: "no" as const, label: "No" },
+          ]}
+        />
+        {showOutOfGamFee ? (
+          <div className="space-y-1.5 pt-1">
+            <label
+              htmlFor="out-of-gam-fee"
+              className="text-sm font-medium text-foreground"
+            >
+              Adicional a cobrar
+            </label>
+            <input
+              id="out-of-gam-fee"
+              name="outOfGamFee"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Adicional a cobrar"
+              value={draft.outOfGamFeeInput}
+              onChange={(e) =>
+                setDraft({
+                  outOfGamFeeInput: digitsOnlyAmountInput(formControlValue(e)),
+                })
+              }
+              className={fieldClass}
+            />
+          </div>
+        ) : null}
+      </div>
 
       <div className="space-y-1.5">
         <label htmlFor="capture-source" className="text-sm font-medium text-foreground">

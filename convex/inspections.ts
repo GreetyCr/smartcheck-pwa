@@ -111,6 +111,9 @@ export const INSPECTION_PATCH_FIELD_KEYS = [
   "sellerNote",
   "inspectionFee",
   "outOfGamFee",
+  "inGam",
+  "manychatId",
+  "totalAmountCharged",
   "captureSource",
   "vehicleBrand",
   "vehicleModel",
@@ -156,6 +159,9 @@ const patchFields = v.object({
   sellerNote: v.optional(v.string()),
   inspectionFee: v.optional(v.number()),
   outOfGamFee: v.optional(v.number()),
+  inGam: v.optional(v.union(v.literal("si"), v.literal("no"))),
+  manychatId: v.optional(v.string()),
+  totalAmountCharged: v.optional(v.number()),
   captureSource: v.optional(
     v.union(
       v.literal("publicidad"),
@@ -270,6 +276,7 @@ export const createDraft = mutation({
       clerkUserId: user.clerkId,
       status: "draft",
       findingsCount: 0,
+      totalAmountCharged: 0,
     });
     await scheduleN8nNotify(ctx, {
       event: "inspection_created",
@@ -367,6 +374,7 @@ export const createOrUpdateFromDraft = mutation({
       clientId: trimmed,
       status: "draft",
       findingsCount: 0,
+      totalAmountCharged: 0,
     });
     await scheduleN8nNotify(ctx, {
       event: "inspection_created",
@@ -551,14 +559,19 @@ export const getVehicleHistory = query({
 
 /** Admin: marca el informe PDF como entregado al cliente. */
 export const markReportDelivered = mutation({
-  args: { inspectionId: v.id("inspections") },
-  handler: async (ctx, { inspectionId }) => {
+  args: {
+    inspectionId: v.id("inspections"),
+    manychatId: v.optional(v.string()),
+  },
+  handler: async (ctx, { inspectionId, manychatId }) => {
     await requireAdmin(ctx);
     const doc = await ctx.db.get(inspectionId);
     if (!doc) throw new Error("Inspección no encontrada");
+    const trimmedManychat = manychatId?.trim();
     await ctx.db.patch(inspectionId, {
       status: "report_delivered",
       reportDeliveredAt: Date.now(),
+      ...(trimmedManychat ? { manychatId: trimmedManychat } : {}),
     });
     await scheduleN8nNotify(ctx, {
       event: "report_delivered",
@@ -633,7 +646,9 @@ export const duplicateInspection = mutation({
       sellerNote: src.sellerNote,
       inspectionFee: src.inspectionFee,
       outOfGamFee: src.outOfGamFee,
+      inGam: src.inGam,
       captureSource: src.captureSource,
+      totalAmountCharged: 0,
       vehicleBrand: src.vehicleBrand,
       vehicleModel: src.vehicleModel,
       vehicleYear: src.vehicleYear,

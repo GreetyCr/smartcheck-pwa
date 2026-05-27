@@ -15,6 +15,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUnifiedDraftFlow } from "@/lib/featureFlags";
 import { useSync } from "@/contexts/SyncContext";
+import { parseDigitsToAmount } from "@/lib/amount-input";
 import { saveUnifiedWizardDraft } from "@/lib/offline/saveUnifiedWizardDraft";
 import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
@@ -265,7 +266,11 @@ export function VehicleForm({ className }: { className?: string }) {
           sellerType,
           sellerNote: draft.sellerNote.trim() || undefined,
           captureSource: source,
-          outOfGamFee: draft.isInGAM ? 0 : draft.outOfGamFee,
+          inGam: draft.inGam === "si" || draft.inGam === "no" ? draft.inGam : undefined,
+          outOfGamFee:
+            draft.inGam === "no"
+              ? parseDigitsToAmount(draft.outOfGamFeeInput)
+              : undefined,
           vehicleBrand: draft.brand.trim(),
           vehicleModel: draft.model.trim(),
           vehicleYear: yearNum,

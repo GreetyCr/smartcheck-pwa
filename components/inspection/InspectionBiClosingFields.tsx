@@ -3,6 +3,11 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  digitsOnlyAmountInput,
+  formatAmountDigits,
+  parseDigitsToAmount,
+} from "@/lib/amount-input";
 import { cn } from "@/lib/utils";
 
 type Props = { inspectionId: Id<"inspections"> };
@@ -17,6 +22,7 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
 
   const commission = doc.biCommission ?? null;
   const condition = doc.biVehicleCondition ?? null;
+  const totalDisplay = formatAmountDigits(doc.totalAmountCharged);
 
   const pill = (active: boolean) =>
     cn(
@@ -25,6 +31,9 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
         ? "bg-primary text-primary-foreground shadow-sm"
         : "bg-muted text-muted-foreground hover:bg-muted/80",
     );
+
+  const fieldClass =
+    "w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30";
 
   const setCommissionAndSave = (v: "si" | "no") => {
     void patchInspection({
@@ -40,6 +49,15 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
     });
   };
 
+  const saveTotalAmount = (raw: string) => {
+    const digits = digitsOnlyAmountInput(raw);
+    const amount = parseDigitsToAmount(digits);
+    void patchInspection({
+      id: inspectionId,
+      patch: { totalAmountCharged: amount ?? 0 },
+    });
+  };
+
   return (
     <div className="mt-6 space-y-4 rounded-xl border border-border bg-muted/20 p-4">
       <div>
@@ -47,8 +65,8 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
           Datos internos (no salen en el PDF)
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Comisión y estado del vehículo para análisis; solo se guardan en la base de
-          datos.
+          Comisión, estado del vehículo y montos para control de ingresos; solo se
+          guardan en la base de datos.
         </p>
       </div>
 
@@ -91,6 +109,29 @@ export function InspectionBiClosingFields({ inspectionId }: Props) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="total-amount-charged"
+          className="text-sm font-medium text-foreground"
+        >
+          Monto total cobrado
+        </label>
+        <input
+          id="total-amount-charged"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="Monto total cobrado"
+          defaultValue={totalDisplay}
+          key={`total-${inspectionId}-${totalDisplay}`}
+          onBlur={(e) => saveTotalAmount(e.target.value)}
+          className={fieldClass}
+        />
+        <p className="text-xs text-muted-foreground">
+          Solo dígitos, sin signos. Se guarda al salir del campo.
+        </p>
       </div>
     </div>
   );

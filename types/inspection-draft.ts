@@ -32,11 +32,12 @@ export interface InspectionDraft {
   clientEmail: string;
   /** Número de revisiones (solo borrador local; aún no en Convex). */
   inspectionCount: 1 | 2 | 3;
-  isInGAM: boolean;
+  /** Vacío hasta elegir en paso cliente. */
+  inGam: "si" | "no" | "";
+  /** Monto adicional (solo si `inGam === "no"`). Dígitos en UI vía `outOfGamFeeInput`. */
+  outOfGamFeeInput: string;
   /** Vacío hasta que el usuario elija (validación paso 1). */
   captureSource: CaptureSource | "";
-  /** Si está en GAM → 0 al avanzar; si no, se definirá en una iteración posterior. */
-  outOfGamFee?: number;
   /** Paso 1 — contexto comercial / BI. */
   sellerType: SellerTypeKey | "";
   sellerNote: string;
@@ -73,7 +74,8 @@ export function createEmptyInspectionDraft(): InspectionDraft {
     clientPhone: "",
     clientEmail: "",
     inspectionCount: 1,
-    isInGAM: false,
+    inGam: "",
+    outOfGamFeeInput: "",
     captureSource: "",
     sellerType: "",
     sellerNote: "",
