@@ -2,7 +2,7 @@
 
 ## Constantes de retención (editables)
 
-Definidas en `lib/offline/retention.ts` (Fase 7) y reexportadas aquí como referencia:
+Definidas en `lib/offline/retention.ts` (Fase 7 — implementado) y reexportadas aquí como referencia:
 
 | Constante | Valor propuesto | Efecto |
 |-----------|-----------------|--------|

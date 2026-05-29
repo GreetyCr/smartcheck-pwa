@@ -192,6 +192,20 @@
       <div class="note">
         <strong>Webhook n8n:</strong> al crear el borrador y al aplicar <code>patch</code>, el backend puede programar notificaciones (eventos <code>inspection_created</code> / <code>inspection_patched</code>) según la configuración del proyecto.
       </div>
+
+      <h3>1.6 Modelo local-first (borrador en dispositivo)</h3>
+      <p class="muted">
+        Cuando el flujo unificado está activo en el entorno, la inspección puede crearse y avanzar
+        <strong>sin red</strong>: el borrador vive en IndexedDB del navegador con un
+        <code>clientId</code> estable (UUID) que también aparece en la URL
+        (<span class="path">/inspecciones/[clientId]</span>). Al recuperar conexión, una
+        <strong>cola de sincronización</strong> sube cabecera, secciones y fotos a Convex en segundo plano,
+        sin pasos extra para el técnico.
+      </p>
+      <ul>
+        <li>Estado de sync en el dispositivo: pendiente, subiendo fotos, sincronizando, sincronizado o error (visible en el tablero y en <span class="path">/sincronizar</span>).</li>
+        <li>Tras <code>synced</code>, Convex es la fuente de verdad del informe; el dispositivo puede conservar solo metadatos ligeros un tiempo y luego purgarlos (política de retención en <span class="path">lib/offline/retention.ts</span>: 7 días sin blobs pesados, 30 días sin fila local).</li>
+      </ul>
     </section>
 
     <section id="posterior">

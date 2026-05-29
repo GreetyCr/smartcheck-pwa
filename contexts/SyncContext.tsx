@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { countPendingInspections } from "@/lib/offline/db";
+import { runRetentionSweep } from "@/lib/offline/retention";
 import { syncPendingToConvex } from "@/lib/offline/sync";
 import { processSyncQueue } from "@/lib/offline/syncQueue";
 
@@ -48,6 +49,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       void refreshPendingCount();
     }, POLL_MS);
     return () => clearInterval(t);
+  }, [refreshPendingCount]);
+
+  useEffect(() => {
+    void runRetentionSweep()
+      .then((result) => {
+        if (result.rowsDeleted > 0 || result.rowsTrimmed > 0) {
+          void refreshPendingCount();
+        }
+      })
+      .catch((e) => {
+        console.error("[smartcheck retention]", e);
+      });
   }, [refreshPendingCount]);
 
   useEffect(() => {
