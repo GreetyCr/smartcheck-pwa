@@ -11,6 +11,7 @@ import {
   type SectionData,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
+import { loadPendingInspectionRowByRef } from "@/lib/inspection/resolveInspectionRef";
 import { looksLikeConvexInspectionId } from "@/lib/inspection/idValidation";
 
 type Options = {
@@ -152,29 +153,43 @@ export function useOfflineInspection({
 
   const saveSection = useCallback(
     async (sectionTable: string, sectionData: SectionData) => {
-      if (isOnline) {
-        const iid =
-          (localRow?.convexId as Id<"inspections"> | undefined) ||
-          (inspectionId as Id<"inspections"> | undefined);
-        if (!iid) return;
-        await upsertSectionM({ inspectionId: iid, sectionTable, data: sectionData });
-      } else {
-        if (!inspectionId) return;
-        const db = await getDB();
-        const row = await db.get("pendingInspections", inspectionId);
-        if (!row) return;
-        const next: PendingInspectionRow = {
-          ...row,
-          sections: { ...row.sections, [sectionTable]: sectionData },
-          updatedAt: Date.now(),
-          syncStatus: "pending",
-        };
-        await db.put("pendingInspections", next);
-        setLocalRow(next);
-        void refreshPendingCount();
+      if (!inspectionId) return;
+      const row = await loadPendingInspectionRowByRef(inspectionId);
+      if (!row) return;
+
+      const convexTarget =
+        convexInspectionIdForOnline !== null && convexInspectionIdForOnline !== undefined
+          ? convexInspectionIdForOnline
+          : row.convexId
+            ? (row.convexId as Id<"inspections">)
+            : undefined;
+
+      if (isOnline && convexTarget && convexInspectionIdForOnline !== null) {
+        await upsertSectionM({
+          inspectionId: convexTarget,
+          sectionTable,
+          data: sectionData,
+        });
       }
+
+      const next: PendingInspectionRow = {
+        ...row,
+        sections: { ...row.sections, [sectionTable]: sectionData },
+        updatedAt: Date.now(),
+        syncStatus: row.syncStatus === "synced" ? "synced" : "pending",
+      };
+      const db = await getDB();
+      await db.put("pendingInspections", next);
+      setLocalRow(next);
+      void refreshPendingCount();
     },
-    [isOnline, inspectionId, localRow, upsertSectionM, refreshPendingCount],
+    [
+      isOnline,
+      inspectionId,
+      convexInspectionIdForOnline,
+      upsertSectionM,
+      refreshPendingCount,
+    ],
   );
 
   return {

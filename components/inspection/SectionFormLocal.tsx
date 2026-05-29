@@ -3,98 +3,57 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { SectionConfig, ReadonlyUserContext } from "@/lib/constants/sectionItems";
 import { SectionFormShell } from "@/components/inspection/SectionFormShell";
 import { SectionFooter } from "@/components/inspection/SectionFooter";
 import { SectionFormField } from "@/components/inspection/SectionFormField";
-import { InspectionBiClosingFields } from "@/components/inspection/InspectionBiClosingFields";
 import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
-import { UploadProgress } from "@/components/inspection/UploadProgress";
 import type { PhotoEntry } from "@/components/inspection/items/ItemPhotos";
-import { usePhotoUpload } from "@/hooks/usePhotoUpload";
-import type { SectionConfig, ReadonlyUserContext } from "@/lib/constants/sectionItems";
+import { useLocalSectionPhotos } from "@/hooks/useLocalSectionPhotos";
+import { useOfflineInspection } from "@/hooks/useOfflineInspection";
+import {
+  inspectionPathSegment,
+  useInspectionRoute,
+} from "@/components/inspection/InspectionRouteResolver";
 import { browserAlert } from "@/lib/browser-confirm";
 import { getInspectionSections } from "@/lib/constants/sections";
 import { derivePhotoUi } from "@/lib/section-form-ui";
 import {
   countSectionProgress,
-  docToFormState,
-  formStateToPatch,
   validateSectionFormDetailed,
   type SectionFormState,
 } from "@/lib/section-form-utils";
-
 import {
-  inspectionPathSegment,
-  useInspectionRoute,
-} from "@/components/inspection/InspectionRouteResolver";
-import { useOfflineInspection } from "@/hooks/useOfflineInspection";
-import { SectionFormLocal } from "@/components/inspection/SectionFormLocal";
+  localSectionDoc,
+  seedSectionFormState,
+  toUpsertPayload,
+} from "@/lib/offline/sectionLocal";
+import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 
-type SectionFormProps = {
-  sectionConfig: SectionConfig;
-};
+type Props = { sectionConfig: SectionConfig };
 
-export function SectionForm({ sectionConfig }: SectionFormProps) {
-  const routeCtx = useInspectionRoute();
-  if (routeCtx.unifiedFlow && routeCtx.convexInspectionId === null) {
-    return <SectionFormLocal sectionConfig={sectionConfig} />;
-  }
-
-  return <SectionFormOnline sectionConfig={sectionConfig} />;
-}
-
-function SectionFormOnline({ sectionConfig }: SectionFormProps) {
+/** Formulario de sección solo IDB (sin `convexId`); sync vía `processSyncQueue`. */
+export function SectionFormLocal({ sectionConfig }: Props) {
   const router = useRouter();
   const routeCtx = useInspectionRoute();
   const pathSeg = inspectionPathSegment(routeCtx);
-  const convexMutationId = routeCtx.convexInspectionId;
-
   const { user } = useUser();
-
-  const inspectionFromConvex = useQuery(
-    api.inspections.get,
-    convexMutationId ? { id: convexMutationId } : "skip",
-  );
 
   const offline = useOfflineInspection({
     inspectionId: routeCtx.routeRef,
-    convexInspectionIdForOnline: routeCtx.unifiedFlow
-      ? convexMutationId
-      : undefined,
+    convexInspectionIdForOnline: null,
   });
 
-  const inspection = useMemo(() => {
-    if (convexMutationId) {
-      if (inspectionFromConvex === undefined) return undefined;
-      return inspectionFromConvex ?? offline.inspection;
-    }
-    return offline.inspection;
-  }, [convexMutationId, inspectionFromConvex, offline.inspection]);
-
-  const doc = useQuery(
-    api.sections.getSection,
-    convexMutationId
-      ? { inspectionId: convexMutationId, sectionTable: sectionConfig.table }
-      : "skip",
-  );
-  const photoEntries = useQuery(
-    api.sections.getSectionItemPhotoEntries,
-    convexMutationId
-      ? { inspectionId: convexMutationId, sectionTable: sectionConfig.table }
-      : "skip",
-  );
-
-  const upsertSection = useMutation(api.sections.upsertSection);
+  const inspection = offline.inspection;
+  const localId = offline.localRow?.localId ?? routeCtx.routeRef;
 
   const [state, setState] = useState<SectionFormState>({});
   const seeded = useRef(false);
   const userEdited = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
+
   const getSavedPhotoCount = useCallback(
     (itemKey: string) => {
       const photos =
@@ -104,7 +63,7 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     [state.itemPhotos],
   );
 
-  const onPhotoUrl = useCallback((itemKey: string, url: string) => {
+  const onPhotoRef = useCallback((itemKey: string, ref: string) => {
     userEdited.current = true;
     setDirty(true);
     setState((prev) => {
@@ -115,22 +74,18 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
         ...prev,
         itemPhotos: {
           ...photos,
-          [itemKey]: [...list, url],
+          [itemKey]: [...list, ref],
         },
       };
     });
   }, []);
 
-  const photoUploadKey =
-    convexMutationId ?? (routeCtx.routeRef as Id<"inspections">);
-
-  const photoUpload = usePhotoUpload({
-    inspectionId: photoUploadKey,
+  const localPhotos = useLocalSectionPhotos({
+    inspectionLocalId: localId,
     sectionTable: sectionConfig.table,
     getSavedPhotoCount,
-    onPhotoUrl,
+    onPhotoRef,
   });
-  const { awaitUploadsIdle, stats: uploadStats } = photoUpload;
 
   const readonlyContext: ReadonlyUserContext = useMemo(
     () => ({
@@ -145,39 +100,26 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     [inspection?.transmissionType],
   );
 
+  const sectionDoc = useMemo(
+    () => localSectionDoc(offline.localRow?.sections, sectionConfig.table),
+    [offline.localRow?.sections, sectionConfig.table],
+  );
+
   useEffect(() => {
-    if (doc === undefined) return;
-    if (seeded.current) return;
-    if (userEdited.current) return;
-
-    let next = docToFormState(
-      doc as unknown as Record<string, unknown>,
-      sectionConfig,
-    );
-
-    if (sectionConfig.id === "finalizacion") {
-      const name =
-        (doc as { nombre_inspector?: string }).nombre_inspector ??
-        user?.fullName ??
-        user?.firstName ??
-        "";
-      const ts =
-        (doc as { fecha_hora?: number }).fecha_hora ?? Date.now();
-      next = {
-        ...next,
-        nombre_inspector: name,
-        fecha_hora: ts,
-        comentario_final:
-          typeof next.comentario_final === "string"
-            ? next.comentario_final
-            : (doc as { comentario_final?: { texto?: string } })
-                  .comentario_final?.texto ?? "",
-      };
-    }
-
+    if (offline.isLoading || seeded.current || userEdited.current) return;
+    const next = seedSectionFormState(sectionDoc, sectionConfig, {
+      nombre_inspector: user?.fullName ?? user?.firstName ?? "",
+      fecha_hora: Date.now(),
+    });
     setState(next);
     seeded.current = true;
-  }, [doc, sectionConfig, user?.firstName, user?.fullName]);
+  }, [
+    offline.isLoading,
+    sectionDoc,
+    sectionConfig,
+    user?.firstName,
+    user?.fullName,
+  ]);
 
   const progress = useMemo(
     () => countSectionProgress(sectionConfig.items, state),
@@ -185,28 +127,16 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
   );
 
   const persist = useCallback(async () => {
-    if (!convexMutationId) {
-      browserAlert(
-        "Sincroniza el borrador para guardar esta sección en el servidor.",
-      );
-      return;
-    }
-    const patch = formStateToPatch(state, sectionConfig);
-    if (Object.keys(patch).length === 0) {
-      return;
-    }
+    const patch = toUpsertPayload(state, sectionConfig);
+    if (Object.keys(patch).length === 0) return;
     try {
-      await upsertSection({
-        inspectionId: convexMutationId,
-        sectionTable: sectionConfig.table,
-        data: patch,
-      });
+      await offline.saveSection(sectionConfig.table, patch);
     } catch (e) {
       browserAlert(
         e instanceof Error ? e.message : "No se pudo guardar la sección.",
       );
     }
-  }, [convexMutationId, sectionConfig, state, upsertSection]);
+  }, [offline, sectionConfig, state]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -215,15 +145,6 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     }, 800);
     return () => globalThis.clearTimeout(t);
   }, [state, dirty, persist]);
-
-  const uploadsWereActive = useRef(false);
-  useEffect(() => {
-    const active = uploadStats.active > 0;
-    if (uploadsWereActive.current && !active && dirty) {
-      void persist();
-    }
-    uploadsWereActive.current = active;
-  }, [uploadStats.active, dirty, persist]);
 
   const updateField = useCallback((key: string, value: unknown) => {
     userEdited.current = true;
@@ -237,26 +158,16 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     setState((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const addPhotosForItem = useCallback(
-    async (itemKey: string, files: File[]) => {
-      await photoUpload.addPhotosForItem(itemKey, files);
-    },
-    [photoUpload],
-  );
-
   const removePhotoForItem = useCallback(
     async (itemKey: string, ref: string) => {
-      const pend = photoUpload.pendingForItem(itemKey);
-      if (pend.some((p) => p.id === ref)) {
-        await photoUpload.removePendingPhoto(itemKey, ref);
-        return;
+      if (localPhotos.pendingForItem(itemKey).some((p) => p.id === ref)) {
+        await localPhotos.removePendingPhoto(itemKey, ref);
       }
       userEdited.current = true;
       setDirty(true);
       setState((prev) => {
         const photos =
-          (prev.itemPhotos as Record<string, (Id<"_storage"> | string)[]> | undefined) ??
-          {};
+          (prev.itemPhotos as Record<string, string[]> | undefined) ?? {};
         const list = photos[itemKey] ?? [];
         return {
           ...prev,
@@ -267,42 +178,19 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
         };
       });
     },
-    [photoUpload],
+    [localPhotos],
   );
 
   const mergedPhotoEntries = useMemo(() => {
     const out: Record<string, PhotoEntry[]> = {};
     for (const item of sectionConfig.items) {
       if (!derivePhotoUi(item).allowPhotos) continue;
-      const server = photoEntries?.[item.key] ?? [];
-      const pend = photoUpload.pendingForItem(item.key).map(
-        (p): PhotoEntry => ({
-          ref: p.id,
-          url: p.previewUrl,
-          status: p.status,
-          errorMessage: p.errorMessage,
-        }),
-      );
-      const saved: PhotoEntry[] = server.map((e) => ({
-        ref: e.ref,
-        url: e.url,
-        status: "done",
-      }));
-      out[item.key] = [...pend, ...saved];
+      out[item.key] = localPhotos.photoEntriesForItem(item.key);
     }
     return out;
-  }, [photoEntries, photoUpload, sectionConfig.items]);
+  }, [localPhotos, sectionConfig.items]);
 
   const onContinue = useCallback(async () => {
-    try {
-      await awaitUploadsIdle();
-    } catch (e) {
-      browserAlert(
-        e instanceof Error ? e.message : "Esperando la subida de fotos…",
-      );
-      return;
-    }
-
     const v = validateSectionFormDetailed(sectionConfig, state);
     if (!v.ok) {
       const keys = new Set(v.errors.map((e) => e.key));
@@ -329,19 +217,10 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     } else {
       router.push(`/inspecciones/${pathSeg}`);
     }
-  }, [
-    awaitUploadsIdle,
-    pathSeg,
-    persist,
-    router,
-    routeSections,
-    sectionConfig,
-    state,
-  ]);
+  }, [pathSeg, persist, router, routeSections, sectionConfig, state]);
 
   useEffect(() => {
-    if (inspection === undefined) return;
-    if (inspection === null) return;
+    if (inspection === undefined || inspection === null) return;
     const allowed = routeSections.some((s) => s.id === sectionConfig.id);
     if (!allowed) {
       router.replace(`/inspecciones/${pathSeg}`);
@@ -350,28 +229,17 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
 
   const total = sectionConfig.items.length;
 
-  const docLoading = convexMutationId !== null && doc === undefined;
-  const photoLoading = convexMutationId !== null && photoEntries === undefined;
-
-  if (inspection === undefined || docLoading || photoLoading) {
+  if (offline.isLoading) {
     return <DashboardPageSkeleton variant="form" />;
   }
 
-  if (inspection === null) {
+  if (!inspection || !offline.localRow) {
     return (
       <div className="p-6">
         <p className="text-destructive">Inspección no encontrada o sin permiso.</p>
         <Link href="/" className="mt-2 inline-block text-primary underline">
           Volver al inicio
         </Link>
-      </div>
-    );
-  }
-
-  if (doc === null) {
-    return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Inicia sesión para ver esta sección.</p>
       </div>
     );
   }
@@ -384,6 +252,9 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
         progressCurrent={progress}
         progressTotal={total}
       >
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          {INSPECTION_ROUTE_COPY.SECTIONS_OFFLINE_HINT}
+        </p>
         {sectionConfig.id === "finalizacion" ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
             Esta inspección es un documento técnico orientativo. El taller o comprador
@@ -400,24 +271,15 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
             fieldInvalid={invalidKeys.has(item.key)}
             readonlyContext={readonlyContext}
             onChange={updateField}
-            onPickPhotos={addPhotosForItem}
+            onPickPhotos={localPhotos.addPhotosForItem}
             onRemovePhoto={removePhotoForItem}
           />
         ))}
-        {sectionConfig.id === "finalizacion" && convexMutationId ? (
-          <InspectionBiClosingFields inspectionId={convexMutationId} />
-        ) : null}
       </SectionFormShell>
-      <UploadProgress
-        pending={uploadStats.pending}
-        uploading={uploadStats.uploading}
-      />
       <SectionFooter
         onClick={() => void onContinue()}
-        disabled={uploadStats.active > 0}
-        label={
-          uploadStats.active > 0 ? "Subiendo fotos…" : "Guardar y continuar"
-        }
+        disabled={false}
+        label="Guardar y continuar"
       />
     </>
   );
