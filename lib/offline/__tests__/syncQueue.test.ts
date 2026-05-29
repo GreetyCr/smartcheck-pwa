@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   createEmptyPendingInspectionRow,
   getDB,
+  putPendingInspectionRow,
   resetOfflineDbForTests,
   type PendingPhotoRow,
 } from "@/lib/offline/db";
@@ -127,6 +128,30 @@ describe("processSyncQueue", () => {
     expect(adapters.createOrUpdateFromDraft).not.toHaveBeenCalled();
     const saved = await db.get("pendingInspections", CLIENT_ID);
     expect(saved?.syncStatus).toBe("error");
+  });
+
+  test("putPendingInspectionRow no embebe blobs en pendingInspections", async () => {
+    const db = await getDB();
+    const row = createEmptyPendingInspectionRow(CLIENT_ID);
+    row.photos = [
+      {
+        id: "photo-front-1",
+        inspectionLocalId: CLIENT_ID,
+        sectionTable: "cabecera",
+        itemKey: "vehicleFront",
+        slot: "vehicleFront",
+        blob: new Blob([new Uint8Array([1])], { type: "image/jpeg" }),
+        createdAt: Date.now(),
+        status: "pending",
+      },
+    ];
+    await db.put("pendingPhotos", row.photos[0]!);
+    await putPendingInspectionRow(row);
+
+    const saved = await db.get("pendingInspections", CLIENT_ID);
+    expect(saved?.photos).toEqual([]);
+    const photo = await db.get("pendingPhotos", "photo-front-1");
+    expect(photo?.blob).toBeInstanceOf(Blob);
   });
 
   test("sube foto de cabecera y envía photoManifest", async () => {

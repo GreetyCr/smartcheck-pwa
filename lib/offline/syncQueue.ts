@@ -6,6 +6,8 @@ import {
   getDB,
   listInspectionRowsForSyncQueue,
   listPendingPhotosForInspection,
+  patchPendingPhoto,
+  putPendingInspectionRow,
   type PendingInspectionRow,
   type PendingPhotoRow,
   type SectionData,
@@ -95,21 +97,12 @@ function resolveClientId(row: PendingInspectionRow): string {
 }
 
 function collectCabeceraPhotos(
-  row: PendingInspectionRow,
   storePhotos: PendingPhotoRow[],
 ): PendingPhotoRow[] {
-  const embedded = row.photos.filter(
-    (p) =>
-      p.status !== "uploaded" &&
-      (p.slot != null || p.sectionTable === "cabecera"),
-  );
-  const fromStore = storePhotos.filter(
-    (p) =>
-      p.status !== "uploaded" &&
-      (p.slot != null || p.sectionTable === "cabecera"),
-  );
   const byId = new Map<string, PendingPhotoRow>();
-  for (const p of [...embedded, ...fromStore]) {
+  for (const p of storePhotos) {
+    if (p.status === "uploaded") continue;
+    if (!(p.slot != null || p.sectionTable === "cabecera")) continue;
     byId.set(p.id, p);
   }
   return [...byId.values()];
@@ -162,7 +155,6 @@ async function uploadCabeceraPhotos(
   generateUploadUrl: () => Promise<string>,
 ): Promise<PhotoManifestEntry[]> {
   const manifest: PhotoManifestEntry[] = [];
-  const db = await getDB();
 
   await mapPool(photos, SYNC_PHOTO_CONCURRENCY, async (photo) => {
     const slotRaw = photo.slot ?? photo.itemKey;
@@ -172,12 +164,21 @@ async function uploadCabeceraPhotos(
     const slot = slotRaw as CabeceraPhotoSlot;
 
     if (photo.id) {
-      await db.put("pendingPhotos", { ...photo, status: "uploading" });
+      await patchPendingPhoto(photo.id, { status: "uploading" });
     }
 
     try {
+      const db = await getDB();
+      const stored = photo.id
+        ? await db.get("pendingPhotos", photo.id)
+        : undefined;
+      const blob = stored?.blob ?? photo.blob;
+      if (!blob || blob.size === 0) {
+        throw new Error(`Foto de cabecera ${slot} sin datos (${photo.id})`);
+      }
+
       const postUrl = await generateUploadUrl();
-      const file = blobToUploadFile(photo.blob, photo.id);
+      const file = blobToUploadFile(blob, photo.id);
       const storageId = await uploadFileToConvexStorage(postUrl, file);
       manifest.push({
         clientPhotoId: photo.id,
@@ -185,8 +186,7 @@ async function uploadCabeceraPhotos(
         slot,
       });
       if (photo.id) {
-        await db.put("pendingPhotos", {
-          ...photo,
+        await patchPendingPhoto(photo.id, {
           status: "uploaded",
           storageId,
         });
@@ -194,8 +194,7 @@ async function uploadCabeceraPhotos(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (photo.id) {
-        await db.put("pendingPhotos", {
-          ...photo,
+        await patchPendingPhoto(photo.id, {
           status: "error",
           syncError: msg,
         });
@@ -213,7 +212,6 @@ async function uploadSectionPhotos(
   adapters: Pick<SyncQueueAdapters, "generateUploadUrl" | "upsertSection">,
 ): Promise<void> {
   if (photos.length === 0) return;
-  const db = await getDB();
   const bySection = new Map<string, PendingPhotoRow[]>();
   for (const p of photos) {
     const list = bySection.get(p.sectionTable) ?? [];
@@ -224,24 +222,27 @@ async function uploadSectionPhotos(
   for (const [sectionTable, sectionPhotos] of bySection) {
     const itemPhotos: Record<string, (Id<"_storage"> | string)[]> = {};
     for (const photo of sectionPhotos) {
-      const uploading: PendingPhotoRow = { ...photo, status: "uploading" };
-      await db.put("pendingPhotos", uploading);
+      await patchPendingPhoto(photo.id, { status: "uploading" });
       try {
+        const db = await getDB();
+        const stored = await db.get("pendingPhotos", photo.id);
+        const blob = stored?.blob ?? photo.blob;
+        if (!blob || blob.size === 0) {
+          throw new Error(`Foto de sección sin datos (${photo.id})`);
+        }
         const postUrl = await adapters.generateUploadUrl();
-        const file = blobToUploadFile(photo.blob, photo.id);
+        const file = blobToUploadFile(blob, photo.id);
         const storageId = await uploadFileToConvexStorage(postUrl, file);
         const list = itemPhotos[photo.itemKey] ?? [];
         list.push(storageId);
         itemPhotos[photo.itemKey] = list;
-        await db.put("pendingPhotos", {
-          ...photo,
+        await patchPendingPhoto(photo.id, {
           status: "uploaded",
           storageId,
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        await db.put("pendingPhotos", {
-          ...photo,
+        await patchPendingPhoto(photo.id, {
           status: "error",
           syncError: msg,
         });
@@ -274,7 +275,7 @@ async function syncOneRow(
   }
 
   const storePhotos = await listPendingPhotosForInspection(row.localId);
-  const cabeceraPhotos = collectCabeceraPhotos(row, storePhotos);
+  const cabeceraPhotos = collectCabeceraPhotos(storePhotos);
   const existingManifest = collectUploadedCabeceraManifest(storePhotos);
 
   let working: PendingInspectionRow = {
@@ -282,7 +283,7 @@ async function syncOneRow(
     syncStatus: "uploading",
     syncError: undefined,
   };
-  await db.put("pendingInspections", working);
+  await putPendingInspectionRow(working);
 
   const newManifest = await uploadCabeceraPhotos(
     cabeceraPhotos,
@@ -291,7 +292,7 @@ async function syncOneRow(
   const photoManifest = mergePhotoManifests(existingManifest, newManifest);
 
   working = { ...working, syncStatus: "syncing" };
-  await db.put("pendingInspections", working);
+  await putPendingInspectionRow(working);
 
   const parsed = safeParseInspectionDraftPatch(working.data);
   if (!parsed.success) {
@@ -307,7 +308,7 @@ async function syncOneRow(
   });
 
   working = { ...working, convexId: inspectionId };
-  await db.put("pendingInspections", working);
+  await putPendingInspectionRow(working);
 
   await adapters.ensureSectionRows({ inspectionId });
 
@@ -326,21 +327,14 @@ async function syncOneRow(
 
   await adapters.markSynced({ id: inspectionId });
 
-  const uploadedIds = new Set(photoManifest.map((m) => m.clientPhotoId));
-  const updatedPhotos = working.photos.map((p) =>
-    uploadedIds.has(p.id)
-      ? { ...p, status: "uploaded" as const }
-      : p,
-  );
-
   const done: PendingInspectionRow = {
     ...working,
-    photos: updatedPhotos,
+    photos: [],
     syncStatus: "synced",
     syncError: undefined,
     syncedAt: Date.now(),
   };
-  await db.put("pendingInspections", done);
+  await putPendingInspectionRow(done);
 }
 
 /**
@@ -364,7 +358,7 @@ export async function recoverStuckSyncRows(): Promise<number> {
       status,
     );
     for (const row of batch) {
-      await db.put("pendingInspections", {
+      await putPendingInspectionRow({
         ...row,
         syncStatus: "pending",
         syncError: undefined,
@@ -402,7 +396,7 @@ export async function processSyncQueue(
       const msg = e instanceof Error ? e.message : String(e);
       const db = await getDB();
       const failedRow = await db.get("pendingInspections", row.localId);
-      await db.put("pendingInspections", {
+      await putPendingInspectionRow({
         ...(failedRow ?? row),
         syncStatus: "error",
         syncError: msg,

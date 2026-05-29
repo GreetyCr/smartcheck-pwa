@@ -8,6 +8,7 @@
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   getDB,
+  putPendingInspectionRow,
   type InspectionData,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
@@ -73,14 +74,14 @@ export async function syncPendingToConvex(
     const row: PendingInspectionRow = { ...inspection };
     row.syncStatus = "syncing";
     row.syncError = undefined;
-    await db.put("pendingInspections", row);
+    await putPendingInspectionRow(row);
 
     try {
       let convexId = row.convexId as Id<"inspections"> | undefined;
       if (!convexId) {
         convexId = await adapters.createDraft();
         row.convexId = convexId;
-        await db.put("pendingInspections", row);
+        await putPendingInspectionRow(row);
       }
       if (row.data && Object.keys(row.data).length > 0) {
         await adapters.patch({ id: convexId, patch: row.data as InspectionData });
@@ -97,13 +98,13 @@ export async function syncPendingToConvex(
       row.syncStatus = "synced";
       row.syncError = undefined;
       row.syncedAt = Date.now();
-      await db.put("pendingInspections", row);
+      await putPendingInspectionRow(row);
       ok += 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       row.syncStatus = "error";
       row.syncError = msg;
-      await db.put("pendingInspections", row);
+      await putPendingInspectionRow(row);
       errors += 1;
     }
   }

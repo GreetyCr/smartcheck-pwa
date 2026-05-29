@@ -116,6 +116,47 @@ export function createEmptyPendingInspectionRow(localId: string): PendingInspect
 }
 
 /**
+ * Filas de inspección en IDB: metadatos only. Los blobs viven en `pendingPhotos`.
+ * Re-escribir blobs embebidos en `photos[]` falla en algunos motores IDB al sync.
+ */
+export function inspectionRowForStore(
+  row: PendingInspectionRow,
+): PendingInspectionRow {
+  return { ...row, photos: [] };
+}
+
+export async function putPendingInspectionRow(
+  row: PendingInspectionRow,
+): Promise<void> {
+  const db = await getDB();
+  await db.put("pendingInspections", inspectionRowForStore(row));
+}
+
+/** Actualiza una foto en IDB leyendo el blob existente (evita clones inválidos). */
+export async function patchPendingPhoto(
+  id: string,
+  patch: Partial<Omit<PendingPhotoRow, "id">>,
+): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get("pendingPhotos", id);
+  if (!existing) return;
+  await db.put("pendingPhotos", { ...existing, ...patch });
+}
+
+/** Quita blobs embebidos legacy en `photos[]` de filas ya existentes. */
+export async function normalizeEmbeddedInspectionPhotos(): Promise<number> {
+  const db = await getDB();
+  const all = await db.getAll("pendingInspections");
+  let fixed = 0;
+  for (const row of all) {
+    if (row.photos.length === 0) continue;
+    await putPendingInspectionRow(row);
+    fixed += 1;
+  }
+  return fixed;
+}
+
+/**
  * Garantiza la invariante `localId === clientId` sin pisar un `clientId` ya migrado.
  */
 export function ensureClientIdOnRow(row: PendingInspectionRow): PendingInspectionRow {
@@ -168,7 +209,7 @@ export async function migratePendingInspectionsClientIds(
     for (const row of all) {
       try {
         if (!row.clientId) {
-          await tx.store.put(ensureClientIdOnRow(row));
+          await tx.store.put(ensureClientIdOnRow(inspectionRowForStore(row)));
         }
       } catch (rowErr) {
         console.error("[smartcheck IDB v2 migration] fila", row.localId, rowErr);

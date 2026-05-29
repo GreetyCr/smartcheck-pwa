@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useSync } from "@/contexts/SyncContext";
 import {
   getDB,
+  putPendingInspectionRow,
   type InspectionData,
   type SectionData,
   type PendingInspectionRow,
@@ -112,7 +113,7 @@ export function useOfflineInspection({
           if (localRow) {
             const next = { ...localRow, data, updatedAt: Date.now() };
             const db = await getDB();
-            await db.put("pendingInspections", next);
+            await putPendingInspectionRow(next);
             setLocalRow(next);
           }
         } else {
@@ -138,7 +139,7 @@ export function useOfflineInspection({
           updatedAt: now,
           syncStatus: "pending",
         };
-        await db.put("pendingInspections", next);
+        await putPendingInspectionRow(next);
         setLocalRow(next);
         void refreshPendingCount();
         return localId;
@@ -183,7 +184,7 @@ export function useOfflineInspection({
         syncStatus: row.syncStatus === "synced" ? "synced" : "pending",
       };
       const db = await getDB();
-      await db.put("pendingInspections", next);
+      await putPendingInspectionRow(next);
       setLocalRow(next);
       void refreshPendingCount();
     },

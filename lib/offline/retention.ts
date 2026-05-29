@@ -1,6 +1,7 @@
 import {
   getDB,
   listPendingPhotosForInspection,
+  putPendingInspectionRow,
   type InspectionData,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
@@ -136,7 +137,7 @@ export async function runRetentionSweep(
     blobsPurged += removedPhotos;
 
     const trimmed = trimRowToLightMetadata(row);
-    await db.put("pendingInspections", trimmed);
+    await putPendingInspectionRow(trimmed);
     rowsTrimmed += 1;
   }
 

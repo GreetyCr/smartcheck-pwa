@@ -11,7 +11,7 @@ import {
 } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { countAutoSyncPendingInspections, countPendingInspections } from "@/lib/offline/db";
+import { countAutoSyncPendingInspections, countPendingInspections, normalizeEmbeddedInspectionPhotos } from "@/lib/offline/db";
 import { runRetentionSweep } from "@/lib/offline/retention";
 import { syncPendingToConvex } from "@/lib/offline/sync";
 import { processSyncQueue, recoverStuckSyncRows } from "@/lib/offline/syncQueue";
@@ -63,11 +63,19 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void recoverStuckSyncRows()
-      .then((n) => (n > 0 ? refreshPendingCount() : undefined))
-      .catch((e) => {
+    void (async () => {
+      try {
+        const [recovered, normalized] = await Promise.all([
+          recoverStuckSyncRows(),
+          normalizeEmbeddedInspectionPhotos(),
+        ]);
+        if (recovered > 0 || normalized > 0) {
+          await refreshPendingCount();
+        }
+      } catch (e) {
         console.error("[smartcheck sync recover]", e);
-      });
+      }
+    })();
   }, [refreshPendingCount]);
 
   useEffect(() => {
