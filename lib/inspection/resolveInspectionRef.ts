@@ -10,6 +10,17 @@ export type ResolvedInspection =
   | { kind: "not_found" };
 
 /**
+ * Id Convex usable en UI/mutaciones solo cuando la fila IDB terminó de sincronizar.
+ * Durante `uploading`/`syncing`/`error` el borrador sigue siendo local-first.
+ */
+export function convexIdIfSyncedLocalRow(
+  row: PendingInspectionRow,
+): Id<"inspections"> | null {
+  if (row.syncStatus !== "synced" || !row.convexId) return null;
+  return row.convexId as Id<"inspections">;
+}
+
+/**
  * Dependencias inyectables (tests) — solo se invocan dentro de `resolveInspectionRef`,
  * nunca al importar el módulo.
  */

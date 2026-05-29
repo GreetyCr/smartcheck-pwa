@@ -14,7 +14,10 @@ import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton
 import { useUnifiedInspection } from "@/hooks/useUnifiedInspection";
 import { useUnifiedDraftFlow } from "@/lib/featureFlags";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
-import type { ResolvedInspection } from "@/lib/inspection/resolveInspectionRef";
+import {
+  convexIdIfSyncedLocalRow,
+  type ResolvedInspection,
+} from "@/lib/inspection/resolveInspectionRef";
 
 export type InspectionRouteContextValue = {
   /** Segmento actual bajo `/inspecciones/` (UUID o id legacy Convex). */
@@ -77,9 +80,7 @@ function buildUnifiedContext(
     };
   }
   const cid = String(resolution.row.clientId ?? resolution.row.localId);
-  const cnv = resolution.row.convexId
-    ? (resolution.row.convexId as Id<"inspections">)
-    : null;
+  const cnv = convexIdIfSyncedLocalRow(resolution.row);
   return {
     routeRef: trimmed,
     unifiedFlow: true,

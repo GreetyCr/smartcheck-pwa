@@ -4,14 +4,15 @@ import { useMutation } from "convex/react";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { countPendingInspections } from "@/lib/offline/db";
+import { countAutoSyncPendingInspections, countPendingInspections } from "@/lib/offline/db";
 import { runRetentionSweep } from "@/lib/offline/retention";
 import { syncPendingToConvex } from "@/lib/offline/sync";
-import { processSyncQueue } from "@/lib/offline/syncQueue";
+import { processSyncQueue, recoverStuckSyncRows } from "@/lib/offline/syncQueue";
 
 type SyncContextValue = {
   isOnline: boolean;
   pendingCount: number;
+  autoSyncCount: number;
   isSyncing: boolean;
   lastSyncAt: Date | null;
   syncNow: () => Promise<void>;
@@ -25,6 +26,7 @@ const POLL_MS = 5000;
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [autoSyncCount, setAutoSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
 
@@ -39,9 +41,21 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshPendingCount = useCallback(async () => {
-    const n = await countPendingInspections();
+    const [n, auto] = await Promise.all([
+      countPendingInspections(),
+      countAutoSyncPendingInspections(),
+    ]);
     setPendingCount(n);
+    setAutoSyncCount(auto);
   }, []);
+
+  useEffect(() => {
+    void recoverStuckSyncRows()
+      .then((n) => (n > 0 ? refreshPendingCount() : undefined))
+      .catch((e) => {
+        console.error("[smartcheck sync recover]", e);
+      });
+  }, [refreshPendingCount]);
 
   useEffect(() => {
     void refreshPendingCount();
@@ -134,26 +148,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   useEffect(() => {
-    if (isOnline && pendingCount > 0 && !isSyncing) {
+    if (isOnline && autoSyncCount > 0 && !isSyncing) {
       void syncNow();
     }
-  }, [isOnline, pendingCount, isSyncing, syncNow]);
+  }, [isOnline, autoSyncCount, isSyncing, syncNow]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible" && isOnline && pendingCount > 0) {
+      if (document.visibilityState === "visible" && isOnline && autoSyncCount > 0) {
         void syncNow();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [isOnline, pendingCount, syncNow]);
+  }, [isOnline, autoSyncCount, syncNow]);
 
   return (
     <SyncContext.Provider
       value={{
         isOnline,
         pendingCount,
+        autoSyncCount,
         isSyncing,
         lastSyncAt,
         syncNow,

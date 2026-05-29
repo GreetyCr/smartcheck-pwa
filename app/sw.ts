@@ -29,6 +29,13 @@ const serwist = new Serwist({
           if (request.mode !== "navigate") return false;
           const nextRsc = request.headers.get("Next-Router-Prefetch");
           if (nextRsc === "1") return false;
+          if (request.headers.get("RSC") === "1") return false;
+          try {
+            const path = new URL(request.url).pathname;
+            if (path.startsWith("/inspecciones/")) return false;
+          } catch {
+            /* ignore */
+          }
           return true;
         },
       },

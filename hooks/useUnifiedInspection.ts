@@ -5,6 +5,7 @@ import { startTransition, useEffect, useMemo, useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PendingInspectionRow } from "@/lib/offline/db";
 import {
+  convexIdIfSyncedLocalRow,
   createConvexResolveDeps,
   resolveInspectionRef,
   type ResolvedInspection,
@@ -85,8 +86,8 @@ export function useUnifiedInspection(ref: string | undefined): {
   const convexId =
     resolution?.kind === "convex"
       ? resolution.convexId
-      : resolution?.kind === "local_only" && resolution.row.convexId
-        ? (resolution.row.convexId as Id<"inspections">)
+      : resolution?.kind === "local_only"
+        ? (convexIdIfSyncedLocalRow(resolution.row) ?? undefined)
         : undefined;
 
   return { state, resolution, syncStatus, clientId, convexId };

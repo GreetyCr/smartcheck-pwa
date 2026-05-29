@@ -308,6 +308,25 @@ async function syncOneRow(
  * Cola local-first: inspección (Zod + photoManifest) → secciones → fotos de ítems.
  * Idempotente por `clientId` en Convex (PR-B).
  */
+export async function recoverStuckSyncRows(): Promise<number> {
+  const db = await getDB();
+  const stuck = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "syncing",
+  );
+  let recovered = 0;
+  for (const row of stuck) {
+    await db.put("pendingInspections", {
+      ...row,
+      syncStatus: "pending",
+      syncError: undefined,
+    });
+    recovered += 1;
+  }
+  return recovered;
+}
+
 export async function processSyncQueue(
   adapters: SyncQueueAdapters,
 ): Promise<SyncQueueResult> {
@@ -329,8 +348,9 @@ export async function processSyncQueue(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const db = await getDB();
+      const failedRow = await db.get("pendingInspections", row.localId);
       await db.put("pendingInspections", {
-        ...row,
+        ...(failedRow ?? row),
         syncStatus: "error",
         syncError: msg,
       });

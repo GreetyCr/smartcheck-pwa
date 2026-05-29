@@ -2,6 +2,7 @@
 
 import { SectionItem, type SectionRowStatus } from "@/components/inspection/SectionItem";
 import type { SectionDefinition } from "@/lib/constants/sections";
+import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 
 type Summary = {
   table: string;
@@ -36,7 +37,7 @@ export function SectionsList({
           return (
             <li key={sec.id}>
               <SectionItem
-                href={`/inspecciones/${pathSegment}/seccion/${sec.id}`}
+                href={inspectionSectionHref(pathSegment, sec.id)}
                 name={sec.name}
                 subtitle={sec.subtitle}
                 icon={sec.icon}

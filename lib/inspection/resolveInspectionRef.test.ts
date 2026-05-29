@@ -3,6 +3,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import type { PendingInspectionRow } from "@/lib/offline/db";
 import { ClientId as toClientId } from "@/lib/types/clientId";
 import {
+  convexIdIfSyncedLocalRow,
   resolveInspectionRef,
   type ResolveInspectionRefDeps,
 } from "./resolveInspectionRef";
@@ -57,6 +58,24 @@ function minimalLocalRow(
  * 5) String sin forma UUID ni legacy → not_found
  * 6) Whitespace → trim antes de IDB/Convex
  */
+describe("convexIdIfSyncedLocalRow", () => {
+  it("returns null while row is not fully synced", () => {
+    const row = minimalLocalRow({
+      convexId: LEGACY_CONVEX,
+      syncStatus: "syncing",
+    });
+    expect(convexIdIfSyncedLocalRow(row)).toBeNull();
+  });
+
+  it("returns convex id only when syncStatus is synced", () => {
+    const row = minimalLocalRow({
+      convexId: LEGACY_CONVEX,
+      syncStatus: "synced",
+    });
+    expect(convexIdIfSyncedLocalRow(row)).toBe(LEGACY_CONVEX);
+  });
+});
+
 describe("resolveInspectionRef", () => {
   it("falls through to Convex when UUID v4 not in local IDB", async () => {
     const doc = minimalInspectionDoc({

@@ -30,6 +30,7 @@ import {
   toUpsertPayload,
 } from "@/lib/offline/sectionLocal";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
+import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 
 type Props = { sectionConfig: SectionConfig };
 
@@ -213,7 +214,7 @@ export function SectionFormLocal({ sectionConfig }: Props) {
     const idx = routeSections.findIndex((s) => s.id === sectionConfig.id);
     const next = idx >= 0 ? routeSections[idx + 1] : undefined;
     if (next) {
-      router.push(`/inspecciones/${pathSeg}/seccion/${next.id}`);
+      router.push(inspectionSectionHref(pathSeg, next.id));
     } else {
       router.push(`/inspecciones/${pathSeg}`);
     }

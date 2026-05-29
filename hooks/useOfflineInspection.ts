@@ -71,11 +71,15 @@ export function useOfflineInspection({
 
   const queryId = useMemo((): Id<"inspections"> | null => {
     if (convexInspectionIdForOnline !== undefined) {
+      if (convexInspectionIdForOnline === null) return null;
+      if (localRow && localRow.syncStatus !== "synced") return null;
       return convexInspectionIdForOnline;
     }
     if (!isOnline) return null;
     if (localRow) {
-      if (localRow.convexId) return localRow.convexId as Id<"inspections">;
+      if (localRow.convexId && localRow.syncStatus === "synced") {
+        return localRow.convexId as Id<"inspections">;
+      }
       return null;
     }
     if (inspectionId && looksLikeConvexInspectionId(inspectionId)) {

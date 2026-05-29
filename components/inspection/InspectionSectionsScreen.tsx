@@ -21,6 +21,7 @@ import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton
 import { browserAlert, browserConfirm } from "@/lib/browser-confirm";
 import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
+import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 import { useOfflineInspection } from "@/hooks/useOfflineInspection";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 import { SyncStatusBadge } from "@/components/inspection/SyncStatusBadge";
@@ -53,7 +54,9 @@ export function InspectionSectionsScreen() {
 
   const inspection = useMemo(() => {
     if (convexMutationId) {
-      if (inspectionFromConvex === undefined) return undefined;
+      if (inspectionFromConvex === undefined) {
+        return offline.inspection ?? undefined;
+      }
       return inspectionFromConvex ?? offline.inspection;
     }
     return offline.inspection;
@@ -97,6 +100,15 @@ export function InspectionSectionsScreen() {
     }, 100);
     return () => globalThis.clearTimeout(t);
   }, [inspection, pathSeg]);
+
+  useEffect(() => {
+    if (!pathSeg || !inspection) return;
+    const sections = getInspectionSections(inspection.transmissionType);
+    const target = sections.find((s) => s.id !== "finalizacion") ?? sections[0];
+    if (target) {
+      router.prefetch(inspectionSectionHref(pathSeg, target.id));
+    }
+  }, [pathSeg, inspection, router]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!convexMutationId) {
@@ -254,6 +266,10 @@ export function InspectionSectionsScreen() {
     convexMutationId !== null && sectionData === undefined;
 
   if (discarding) {
+    return <DashboardPageSkeleton variant="detail" />;
+  }
+
+  if (offline.isLoading) {
     return <DashboardPageSkeleton variant="detail" />;
   }
 

@@ -26,6 +26,7 @@ import {
   validateSectionFormDetailed,
   type SectionFormState,
 } from "@/lib/section-form-utils";
+import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 
 import {
   inspectionPathSegment,
@@ -69,7 +70,9 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
 
   const inspection = useMemo(() => {
     if (convexMutationId) {
-      if (inspectionFromConvex === undefined) return undefined;
+      if (inspectionFromConvex === undefined) {
+        return offline.inspection ?? undefined;
+      }
       return inspectionFromConvex ?? offline.inspection;
     }
     return offline.inspection;
@@ -325,7 +328,7 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     const idx = routeSections.findIndex((s) => s.id === sectionConfig.id);
     const next = idx >= 0 ? routeSections[idx + 1] : undefined;
     if (next) {
-      router.push(`/inspecciones/${pathSeg}/seccion/${next.id}`);
+      router.push(inspectionSectionHref(pathSeg, next.id));
     } else {
       router.push(`/inspecciones/${pathSeg}`);
     }

@@ -268,6 +268,33 @@ export async function countPendingInspections(): Promise<number> {
   return total;
 }
 
+/** Filas que deben disparar auto-sync (excluye `error` para evitar loops). */
+export async function countAutoSyncPendingInspections(): Promise<number> {
+  const db = await getDB();
+  const statuses: Array<"pending" | "uploading" | "syncing"> = [
+    "pending",
+    "uploading",
+    "syncing",
+  ];
+  let total = 0;
+  for (const status of statuses) {
+    const batch = await db.getAllFromIndex(
+      "pendingInspections",
+      "by-status",
+      status,
+    );
+    total += batch.filter((row) => row.clientId).length;
+  }
+  const pending = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "pending",
+  );
+  const legacyOnly = pending.filter((row) => !row.clientId);
+  total += legacyOnly.length;
+  return total;
+}
+
 export async function listPendingInspectionsByStatus(
   status: PendingInspectionRow["syncStatus"],
 ): Promise<PendingInspectionRow[]> {
@@ -290,12 +317,17 @@ export async function listInspectionRowsForSyncQueue(): Promise<
     "by-status",
     "uploading",
   );
+  const syncing = await db.getAllFromIndex(
+    "pendingInspections",
+    "by-status",
+    "syncing",
+  );
   const errored = await db.getAllFromIndex(
     "pendingInspections",
     "by-status",
     "error",
   );
-  return [...pending, ...uploading, ...errored];
+  return [...pending, ...uploading, ...syncing, ...errored];
 }
 
 /** Inspecciones locales aún no sincronizadas (UI Fase 6). Incluye `syncing`. */
