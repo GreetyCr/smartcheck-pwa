@@ -1,10 +1,14 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { InspectionCabeceraScreen } from "@/components/inspection/InspectionCabeceraScreen";
 import { InspectionRouteResolver } from "@/components/inspection/InspectionRouteResolver";
 
-type Props = { params: Promise<{ id: string }> };
+export default function InspeccionCabeceraPage() {
+  const params = useParams();
+  const id = typeof params.id === "string" ? params.id : "";
+  if (!id) return null;
 
-export default async function InspeccionCabeceraPage({ params }: Props) {
-  const { id } = await params;
   return (
     <InspectionRouteResolver routeRef={id}>
       <InspectionCabeceraScreen />

@@ -25,7 +25,11 @@ const serwist = new Serwist({
       {
         url: "/~offline",
         matcher({ request }) {
-          return request.destination === "document";
+          if (request.destination !== "document") return false;
+          if (request.mode !== "navigate") return false;
+          const nextRsc = request.headers.get("Next-Router-Prefetch");
+          if (nextRsc === "1") return false;
+          return true;
         },
       },
     ],

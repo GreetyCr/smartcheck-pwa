@@ -11,6 +11,12 @@ export default function OfflinePage() {
       <p className="text-muted-foreground">
         No hay conexión a internet. Revisá tu red e intentá de nuevo.
       </p>
+      <a
+        href="/"
+        className="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+      >
+        Volver al inicio
+      </a>
     </div>
   );
 }
