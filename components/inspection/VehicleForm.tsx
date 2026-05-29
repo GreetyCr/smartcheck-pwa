@@ -201,6 +201,13 @@ export function VehicleForm({ className }: { className?: string }) {
     setSubmitting(true);
 
     try {
+      if (!unifiedDraft && !isOnline) {
+        setSubmitError(
+          "Sin conexión. Reconectá para crear la inspección o usá el flujo local-first (flag unificado).",
+        );
+        return;
+      }
+
       if (unifiedDraft) {
         const clientId = crypto.randomUUID();
         await saveUnifiedWizardDraft({
@@ -678,6 +685,13 @@ export function VehicleForm({ className }: { className?: string }) {
       {submitError ? (
         <p className="text-sm text-destructive" role="alert">
           {submitError}
+        </p>
+      ) : null}
+
+      {unifiedDraft && !isOnline ? (
+        <p className="text-xs text-muted-foreground">
+          Sin red: la inspección se guardará en este dispositivo y se sincronizará al
+          reconectar.
         </p>
       ) : null}
 
