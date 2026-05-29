@@ -1,7 +1,14 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { countAutoSyncPendingInspections, countPendingInspections } from "@/lib/offline/db";
@@ -22,6 +29,8 @@ type SyncContextValue = {
 const SyncContext = createContext<SyncContextValue | null>(null);
 
 const POLL_MS = 5000;
+/** Mínimo entre intentos automáticos (evita loop rápido si la fila no avanza). */
+const AUTO_SYNC_COOLDOWN_MS = 12_000;
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState(true);
@@ -29,6 +38,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [autoSyncCount, setAutoSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+
+  const isSyncingRef = useRef(false);
+  const lastAutoSyncAtRef = useRef(0);
+  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createDraft = useMutation(api.inspections.createDraft);
   const patch = useMutation(api.inspections.patch);
@@ -89,79 +102,121 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const syncNow = useCallback(async () => {
-    if (typeof navigator !== "undefined" && !navigator.onLine) return;
-    if (isSyncing) return;
-    setIsSyncing(true);
-    try {
-      const queueResult = await processSyncQueue({
-        generateUploadUrl: () => generateUploadUrl(),
-        createOrUpdateFromDraft: (args) => createOrUpdateFromDraft(args),
-        ensureSectionRows: async (a) => {
-          await ensureSectionRows(a);
-        },
-        upsertSection: async (a) => {
-          await upsertSection(a);
-        },
-        markSynced: async (a) => {
-          await markSynced(a);
-        },
-      });
+  const runSync = useCallback(
+    async (options: { includeErrors: boolean }) => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      if (isSyncingRef.current) return;
 
-      const legacyResult = await syncPendingToConvex({
-        createDraft: () => createDraft(),
-        patch: async (args) => {
-          await patch({ id: args.id, patch: args.patch });
-        },
-        ensureSectionRows: async (a) => {
-          await ensureSectionRows(a);
-        },
-        upsertSection: async (a) => {
-          await upsertSection(a);
-        },
-        markSynced: async (a) => {
-          await markSynced(a);
-        },
-      });
+      isSyncingRef.current = true;
+      setIsSyncing(true);
+      try {
+        const queueResult = await processSyncQueue(
+          {
+            generateUploadUrl: () => generateUploadUrl(),
+            createOrUpdateFromDraft: (args) => createOrUpdateFromDraft(args),
+            ensureSectionRows: async (a) => {
+              await ensureSectionRows(a);
+            },
+            upsertSection: async (a) => {
+              await upsertSection(a);
+            },
+            markSynced: async (a) => {
+              await markSynced(a);
+            },
+          },
+          { includeErrors: options.includeErrors },
+        );
 
-      const anyOk =
-        queueResult.processed > 0 ||
-        legacyResult.ok > 0 ||
-        (!queueResult.timedOut && !legacyResult.timedOut);
-      if (anyOk) {
-        setLastSyncAt(new Date());
+        const legacyResult = await syncPendingToConvex({
+          createDraft: () => createDraft(),
+          patch: async (args) => {
+            await patch({ id: args.id, patch: args.patch });
+          },
+          ensureSectionRows: async (a) => {
+            await ensureSectionRows(a);
+          },
+          upsertSection: async (a) => {
+            await upsertSection(a);
+          },
+          markSynced: async (a) => {
+            await markSynced(a);
+          },
+        });
+
+        const anyOk =
+          queueResult.processed > 0 ||
+          legacyResult.ok > 0 ||
+          (!queueResult.timedOut && !legacyResult.timedOut);
+        if (anyOk) {
+          setLastSyncAt(new Date());
+        }
+        await refreshPendingCount();
+      } finally {
+        isSyncingRef.current = false;
+        setIsSyncing(false);
       }
-      await refreshPendingCount();
-    } finally {
-      setIsSyncing(false);
+    },
+    [
+      createDraft,
+      patch,
+      ensureSectionRows,
+      upsertSection,
+      markSynced,
+      generateUploadUrl,
+      createOrUpdateFromDraft,
+      refreshPendingCount,
+    ],
+  );
+
+  const syncNow = useCallback(async () => {
+    await runSync({ includeErrors: true });
+  }, [runSync]);
+
+  const scheduleAutoSync = useCallback(() => {
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+      autoSyncTimerRef.current = null;
     }
-  }, [
-    createDraft,
-    patch,
-    ensureSectionRows,
-    upsertSection,
-    markSynced,
-    generateUploadUrl,
-    createOrUpdateFromDraft,
-    isSyncing,
-    refreshPendingCount,
-  ]);
+
+    const elapsed = Date.now() - lastAutoSyncAtRef.current;
+    const delay =
+      elapsed >= AUTO_SYNC_COOLDOWN_MS
+        ? 0
+        : AUTO_SYNC_COOLDOWN_MS - elapsed;
+
+    autoSyncTimerRef.current = setTimeout(() => {
+      autoSyncTimerRef.current = null;
+      if (isSyncingRef.current) return;
+      lastAutoSyncAtRef.current = Date.now();
+      void runSync({ includeErrors: false });
+    }, delay);
+  }, [runSync]);
 
   useEffect(() => {
-    if (isOnline && autoSyncCount > 0 && !isSyncing) {
-      void syncNow();
-    }
-  }, [isOnline, autoSyncCount, isSyncing, syncNow]);
+    if (!isOnline || autoSyncCount <= 0 || isSyncingRef.current) return;
+    scheduleAutoSync();
+    return () => {
+      if (autoSyncTimerRef.current) {
+        clearTimeout(autoSyncTimerRef.current);
+        autoSyncTimerRef.current = null;
+      }
+    };
+  }, [isOnline, autoSyncCount, scheduleAutoSync]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible" && isOnline && autoSyncCount > 0) {
-        void syncNow();
+      if (
+        document.visibilityState === "visible" &&
+        isOnline &&
+        autoSyncCount > 0 &&
+        !isSyncingRef.current
+      ) {
+        scheduleAutoSync();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [isOnline, autoSyncCount, syncNow]);
+  }, [isOnline, autoSyncCount, scheduleAutoSync]);
 
   return (
     <SyncContext.Provider

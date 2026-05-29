@@ -43,6 +43,11 @@ export type SyncQueueResult = {
   timedOut: boolean;
 };
 
+export type ProcessSyncQueueOptions = {
+  /** Reintentar filas en `error` (manual). Auto-sync debe usar `false`. */
+  includeErrors?: boolean;
+};
+
 export const SYNC_QUEUE_MAX_MS = 28_000;
 export const SYNC_PHOTO_CONCURRENCY = 4;
 const BACKOFF_BASE_MS = 800;
@@ -118,6 +123,38 @@ function collectSectionPhotos(storePhotos: PendingPhotoRow[]): PendingPhotoRow[]
       !p.slot &&
       p.sectionTable.length > 0,
   );
+}
+
+/** Fotos de cabecera ya subidas en intentos previos (reanudar sync parcial). */
+function collectUploadedCabeceraManifest(
+  storePhotos: PendingPhotoRow[],
+): PhotoManifestEntry[] {
+  const manifest: PhotoManifestEntry[] = [];
+  for (const photo of storePhotos) {
+    if (photo.status !== "uploaded" || !photo.storageId) continue;
+    const slotRaw = photo.slot ?? photo.itemKey;
+    if (!isCabeceraPhotoSlot(slotRaw)) continue;
+    manifest.push({
+      clientPhotoId: photo.id,
+      storageId: photo.storageId as Id<"_storage">,
+      slot: slotRaw,
+    });
+  }
+  return manifest;
+}
+
+function mergePhotoManifests(
+  existing: PhotoManifestEntry[],
+  uploaded: PhotoManifestEntry[],
+): PhotoManifestEntry[] {
+  const bySlot = new Map<CabeceraPhotoSlot, PhotoManifestEntry>();
+  for (const entry of existing) {
+    bySlot.set(entry.slot, entry);
+  }
+  for (const entry of uploaded) {
+    bySlot.set(entry.slot, entry);
+  }
+  return [...bySlot.values()];
 }
 
 async function uploadCabeceraPhotos(
@@ -238,6 +275,7 @@ async function syncOneRow(
 
   const storePhotos = await listPendingPhotosForInspection(row.localId);
   const cabeceraPhotos = collectCabeceraPhotos(row, storePhotos);
+  const existingManifest = collectUploadedCabeceraManifest(storePhotos);
 
   let working: PendingInspectionRow = {
     ...row,
@@ -246,10 +284,11 @@ async function syncOneRow(
   };
   await db.put("pendingInspections", working);
 
-  const photoManifest = await uploadCabeceraPhotos(
+  const newManifest = await uploadCabeceraPhotos(
     cabeceraPhotos,
     adapters.generateUploadUrl,
   );
+  const photoManifest = mergePhotoManifests(existingManifest, newManifest);
 
   working = { ...working, syncStatus: "syncing" };
   await db.put("pendingInspections", working);
@@ -308,35 +347,49 @@ async function syncOneRow(
  * Cola local-first: inspección (Zod + photoManifest) → secciones → fotos de ítems.
  * Idempotente por `clientId` en Convex (PR-B).
  */
+/**
+ * Devuelve filas `uploading`/`syncing` a `pending` (p. ej. tras timeout o cierre abrupto).
+ */
 export async function recoverStuckSyncRows(): Promise<number> {
   const db = await getDB();
-  const stuck = await db.getAllFromIndex(
-    "pendingInspections",
-    "by-status",
+  const stuckStatuses: Array<PendingInspectionRow["syncStatus"]> = [
+    "uploading",
     "syncing",
-  );
+  ];
   let recovered = 0;
-  for (const row of stuck) {
-    await db.put("pendingInspections", {
-      ...row,
-      syncStatus: "pending",
-      syncError: undefined,
-    });
-    recovered += 1;
+  for (const status of stuckStatuses) {
+    const batch = await db.getAllFromIndex(
+      "pendingInspections",
+      "by-status",
+      status,
+    );
+    for (const row of batch) {
+      await db.put("pendingInspections", {
+        ...row,
+        syncStatus: "pending",
+        syncError: undefined,
+      });
+      recovered += 1;
+    }
   }
   return recovered;
 }
 
 export async function processSyncQueue(
   adapters: SyncQueueAdapters,
+  options: ProcessSyncQueueOptions = {},
 ): Promise<SyncQueueResult> {
+  const includeErrors = options.includeErrors ?? true;
   const start = performance.now();
   const rows = await listInspectionRowsForSyncQueue();
+  const queue = includeErrors
+    ? rows
+    : rows.filter((row) => row.syncStatus !== "error");
   let processed = 0;
   let errors = 0;
   let timedOut = false;
 
-  for (const row of rows) {
+  for (const row of queue) {
     if (performance.now() - start > SYNC_QUEUE_MAX_MS) {
       timedOut = true;
       break;
@@ -356,6 +409,10 @@ export async function processSyncQueue(
       });
       errors += 1;
     }
+  }
+
+  if (timedOut) {
+    await recoverStuckSyncRows();
   }
 
   return { processed, errors, timedOut };

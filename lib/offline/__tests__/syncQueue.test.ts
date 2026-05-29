@@ -112,6 +112,23 @@ describe("processSyncQueue", () => {
     expect(adapters.createOrUpdateFromDraft).not.toHaveBeenCalled();
   });
 
+  test("auto-sync omite filas en error cuando includeErrors es false", async () => {
+    const db = await getDB();
+    const row = createEmptyPendingInspectionRow(CLIENT_ID);
+    row.syncStatus = "error";
+    row.syncError = "fallo previo";
+    row.data = { clientName: "Error previo" };
+    await db.put("pendingInspections", row);
+
+    const adapters = makeAdapters();
+    const result = await processSyncQueue(adapters, { includeErrors: false });
+
+    expect(result.processed).toBe(0);
+    expect(adapters.createOrUpdateFromDraft).not.toHaveBeenCalled();
+    const saved = await db.get("pendingInspections", CLIENT_ID);
+    expect(saved?.syncStatus).toBe("error");
+  });
+
   test("sube foto de cabecera y envía photoManifest", async () => {
     const db = await getDB();
     const row = createEmptyPendingInspectionRow(CLIENT_ID);
