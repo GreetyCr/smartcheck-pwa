@@ -2,6 +2,7 @@ import type { FunctionArgs } from "convex/server";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { uploadFileToConvexStorage } from "@/lib/convex-storage";
+import { preparePhotoBlobForUpload } from "@/lib/offline/preparePhotoBlobForUpload";
 import {
   getDB,
   listInspectionRowsForSyncQueue,
@@ -54,11 +55,8 @@ export const SYNC_QUEUE_MAX_MS = 28_000;
 export const SYNC_PHOTO_CONCURRENCY = 4;
 const BACKOFF_BASE_MS = 800;
 
-function blobToUploadFile(blob: Blob, id: string): File {
-  const ext = blob.type === "image/png" ? "png" : "jpg";
-  return new File([blob], `${id}.${ext}`, {
-    type: blob.type || "image/jpeg",
-  });
+function blobToUploadFile(blob: Blob, id: string): Promise<File> {
+  return preparePhotoBlobForUpload(blob, id);
 }
 
 function jitteredBackoffMs(attempt: number): number {
@@ -178,7 +176,7 @@ async function uploadCabeceraPhotos(
       }
 
       const postUrl = await generateUploadUrl();
-      const file = blobToUploadFile(blob, photo.id);
+      const file = await blobToUploadFile(blob, photo.id);
       const storageId = await uploadFileToConvexStorage(postUrl, file);
       manifest.push({
         clientPhotoId: photo.id,
@@ -231,7 +229,7 @@ async function uploadSectionPhotos(
           throw new Error(`Foto de sección sin datos (${photo.id})`);
         }
         const postUrl = await adapters.generateUploadUrl();
-        const file = blobToUploadFile(blob, photo.id);
+        const file = await blobToUploadFile(blob, photo.id);
         const storageId = await uploadFileToConvexStorage(postUrl, file);
         const list = itemPhotos[photo.itemKey] ?? [];
         list.push(storageId);

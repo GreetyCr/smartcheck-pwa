@@ -50,7 +50,8 @@ describe("processSyncQueue", () => {
       "fetch",
       vi.fn(async () => ({
         ok: true,
-        json: async () => ({ storageId: "storage_photo_1" }),
+        status: 200,
+        text: async () => JSON.stringify({ storageId: "storage_photo_1" }),
       })) as unknown as typeof fetch,
     );
   });

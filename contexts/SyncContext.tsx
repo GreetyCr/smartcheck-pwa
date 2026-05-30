@@ -11,7 +11,7 @@ import {
 } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { countAutoSyncPendingInspections, countPendingInspections, normalizeEmbeddedInspectionPhotos } from "@/lib/offline/db";
+import { countAutoSyncPendingInspections, countPendingInspections, listUnsyncedInspections, normalizeEmbeddedInspectionPhotos } from "@/lib/offline/db";
 import { runRetentionSweep } from "@/lib/offline/retention";
 import { syncPendingToConvex } from "@/lib/offline/sync";
 import { processSyncQueue, recoverStuckSyncRows } from "@/lib/offline/syncQueue";
@@ -22,6 +22,7 @@ type SyncContextValue = {
   autoSyncCount: number;
   isSyncing: boolean;
   lastSyncAt: Date | null;
+  lastSyncError: string | null;
   syncNow: () => Promise<void>;
   refreshPendingCount: () => Promise<void>;
 };
@@ -38,6 +39,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [autoSyncCount, setAutoSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
 
   const isSyncingRef = useRef(false);
   const lastAutoSyncAtRef = useRef(0);
@@ -158,6 +160,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (anyOk) {
           setLastSyncAt(new Date());
         }
+
+        const unsynced = await listUnsyncedInspections();
+        const rowError = unsynced.find(
+          (r) => r.syncStatus === "error" && r.syncError,
+        )?.syncError;
+        if (queueResult.errors > 0 || legacyResult.errors > 0 || rowError) {
+          setLastSyncError(
+            rowError ??
+              (queueResult.errors > 0 || legacyResult.errors > 0
+                ? "Error al sincronizar. Revisá el detalle abajo."
+                : null),
+          );
+        } else if (queueResult.processed > 0 || legacyResult.ok > 0) {
+          setLastSyncError(null);
+        }
+
         await refreshPendingCount();
       } finally {
         isSyncingRef.current = false;
@@ -234,6 +252,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         autoSyncCount,
         isSyncing,
         lastSyncAt,
+        lastSyncError,
         syncNow,
         refreshPendingCount,
       }}

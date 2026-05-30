@@ -8,6 +8,11 @@ import {
   type PendingPhotoRow,
 } from "@/lib/offline/db";
 import type { CabeceraPhotoSlot } from "@/lib/offline/photoSlots";
+import {
+  compressImageOrFallback,
+  isImageLikeFile,
+  withImageMimeForUpload,
+} from "@/lib/images";
 import { parseDigitsToAmount } from "@/lib/amount-input";
 import {
   draftEngineToConvex,
@@ -98,6 +103,16 @@ export async function saveUnifiedWizardDraft(args: {
   for (const { fileKey, slot } of WIZARD_PHOTO_SLOTS) {
     const file = draft[fileKey];
     if (!file) continue;
+    let blob: Blob = file;
+    if (isImageLikeFile(file)) {
+      blob = withImageMimeForUpload(
+        await compressImageOrFallback(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.82,
+        }),
+      );
+    }
     const id = `${clientId}-${slot}`;
     pendingPhotos.push({
       id,
@@ -105,7 +120,7 @@ export async function saveUnifiedWizardDraft(args: {
       sectionTable: "cabecera",
       itemKey: slot,
       slot,
-      blob: file,
+      blob,
       createdAt: now,
       status: "pending",
     });
