@@ -8,6 +8,7 @@ import {
   getDB,
   getOfflineDbMigrationDegraded,
   mergePendingInspectionDraftPatch,
+  putPendingInspectionRow,
   type PendingInspectionDraftPatch,
   type PendingInspectionRow,
 } from "@/lib/offline/db";
@@ -69,19 +70,16 @@ export function usePendingInspectionDraft(
   }, []);
 
   const putSnapshotFireAndForget = useCallback((snapshot: PendingInspectionRow) => {
-    void getDB()
-      .then((db) => db.put("pendingInspections", snapshot))
-      .catch((err) => {
-        console.error("[usePendingInspectionDraft] put (lifecycle)", err);
-      });
+    void putPendingInspectionRow(snapshot).catch((err) => {
+      console.error("[usePendingInspectionDraft] put (lifecycle)", err);
+    });
   }, []);
 
   const flushImmediate = useCallback(async () => {
     clearTimer();
     if (readOnlyRef.current || !dirtyRef.current || !draftRef.current) return;
     const snapshot = draftRef.current;
-    const db = await getDB();
-    await db.put("pendingInspections", snapshot);
+    await putPendingInspectionRow(snapshot);
     dirtyRef.current = false;
     setRow(snapshot);
   }, [clearTimer]);
@@ -139,7 +137,7 @@ export function usePendingInspectionDraft(
         if (!loaded) {
           loaded = createEmptyPendingInspectionRow(localKey);
           if (!readOnlyRef.current) {
-            await db.put("pendingInspections", loaded);
+            await putPendingInspectionRow(loaded);
           }
         } else {
           loaded = ensureClientIdOnRow(loaded);

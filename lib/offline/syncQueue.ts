@@ -161,10 +161,6 @@ async function uploadCabeceraPhotos(
     }
     const slot = slotRaw as CabeceraPhotoSlot;
 
-    if (photo.id) {
-      await patchPendingPhoto(photo.id, { status: "uploading" });
-    }
-
     try {
       const db = await getDB();
       const stored = photo.id
@@ -220,7 +216,6 @@ async function uploadSectionPhotos(
   for (const [sectionTable, sectionPhotos] of bySection) {
     const itemPhotos: Record<string, (Id<"_storage"> | string)[]> = {};
     for (const photo of sectionPhotos) {
-      await patchPendingPhoto(photo.id, { status: "uploading" });
       try {
         const db = await getDB();
         const stored = await db.get("pendingPhotos", photo.id);
@@ -394,11 +389,18 @@ export async function processSyncQueue(
       const msg = e instanceof Error ? e.message : String(e);
       const db = await getDB();
       const failedRow = await db.get("pendingInspections", row.localId);
-      await putPendingInspectionRow({
-        ...(failedRow ?? row),
-        syncStatus: "error",
-        syncError: msg,
-      });
+      const friendly = /preparing Blob\/File/i.test(msg)
+        ? "No se pudieron leer las fotos guardadas en el dispositivo. Actualizá la app, abrí Sincronizar y reintentá; si persiste, creá el reporte de nuevo."
+        : msg;
+      try {
+        await putPendingInspectionRow({
+          ...(failedRow ?? row),
+          syncStatus: "error",
+          syncError: friendly,
+        });
+      } catch {
+        /* IDB irrecuperable */
+      }
       errors += 1;
     }
   }

@@ -115,6 +115,25 @@ export function createEmptyPendingInspectionRow(localId: string): PendingInspect
   };
 }
 
+function stripNonJsonable(value: unknown): unknown {
+  if (typeof Blob !== "undefined" && value instanceof Blob) return undefined;
+  if (typeof File !== "undefined" && value instanceof File) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => stripNonJsonable(v))
+      .filter((v) => v !== undefined);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const s = stripNonJsonable(v);
+      if (s !== undefined) out[k] = s;
+    }
+    return out;
+  }
+  return value;
+}
+
 /**
  * Filas de inspección en IDB: metadatos only. Los blobs viven en `pendingPhotos`.
  * Re-escribir blobs embebidos en `photos[]` falla en algunos motores IDB al sync.
@@ -122,7 +141,16 @@ export function createEmptyPendingInspectionRow(localId: string): PendingInspect
 export function inspectionRowForStore(
   row: PendingInspectionRow,
 ): PendingInspectionRow {
-  return { ...row, photos: [] };
+  return {
+    ...row,
+    photos: [],
+    data: stripNonJsonable(row.data) as InspectionData,
+    sections: stripNonJsonable(row.sections) as Record<string, SectionData>,
+    wizard:
+      row.wizard === undefined
+        ? undefined
+        : (stripNonJsonable(row.wizard) as WizardDraftBlob),
+  };
 }
 
 export async function putPendingInspectionRow(
@@ -132,16 +160,12 @@ export async function putPendingInspectionRow(
   await db.put("pendingInspections", inspectionRowForStore(row));
 }
 
-/** Actualiza una foto en IDB leyendo el blob existente (evita clones inválidos). */
-export async function patchPendingPhoto(
-  id: string,
-  patch: Partial<Omit<PendingPhotoRow, "id">>,
-): Promise<void> {
-  const db = await getDB();
-  const existing = await db.get("pendingPhotos", id);
-  if (!existing) return;
-  await db.put("pendingPhotos", { ...existing, ...patch });
-}
+export {
+  deletePendingPhoto,
+  patchPendingPhoto,
+  putPendingPhotoRow,
+  rehydratePhotoBlob,
+} from "@/lib/offline/idbPhotos";
 
 /** Quita blobs embebidos legacy en `photos[]` de filas ya existentes. */
 export async function normalizeEmbeddedInspectionPhotos(): Promise<number> {
@@ -309,6 +333,43 @@ export async function countPendingInspections(): Promise<number> {
   return total;
 }
 
+/** Fotos locales que aún requieren subida a Convex. */
+export async function countOutstandingPhotosForInspection(
+  inspectionLocalId: string,
+): Promise<number> {
+  const photos = await listPendingPhotosForInspection(inspectionLocalId);
+  return photos.filter(
+    (p) =>
+      p.status === "pending" ||
+      p.status === "uploading" ||
+      (p.status === "error" && !p.storageId),
+  ).length;
+}
+
+/**
+ * Inspección ya vive en Convex y no hay fotos/secciones locales pendientes:
+ * deja de contar para auto-sync (evita sync fantasma en flujo online).
+ */
+export async function reconcileConvexBackedLocalRow(
+  row: PendingInspectionRow,
+): Promise<boolean> {
+  if (!row.convexId) return false;
+  const outstanding = await countOutstandingPhotosForInspection(row.localId);
+  const hasLocalSections = Object.keys(row.sections).length > 0;
+  if (outstanding > 0 || hasLocalSections) return false;
+  if (row.syncStatus === "synced") return false;
+
+  await putPendingInspectionRow({
+    ...row,
+    syncStatus: "synced",
+    syncError: undefined,
+    syncedAt: row.syncedAt ?? Date.now(),
+    sections: {},
+    wizard: undefined,
+  });
+  return true;
+}
+
 /** Filas que deben disparar auto-sync (excluye `error` para evitar loops). */
 export async function countAutoSyncPendingInspections(): Promise<number> {
   const db = await getDB();
@@ -324,7 +385,11 @@ export async function countAutoSyncPendingInspections(): Promise<number> {
       "by-status",
       status,
     );
-    total += batch.filter((row) => row.clientId).length;
+    for (const row of batch) {
+      if (!row.clientId) continue;
+      if (await reconcileConvexBackedLocalRow(row)) continue;
+      total += 1;
+    }
   }
   const pending = await db.getAllFromIndex(
     "pendingInspections",

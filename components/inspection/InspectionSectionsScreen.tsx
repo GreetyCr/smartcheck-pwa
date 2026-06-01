@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { getInspectionSections } from "@/lib/constants/sections";
 import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 import { useOfflineInspection } from "@/hooks/useOfflineInspection";
+import { reconcileConvexBackedLocalRow } from "@/lib/offline/db";
+import { useSync } from "@/contexts/SyncContext";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 import { SyncStatusBadge } from "@/components/inspection/SyncStatusBadge";
 
@@ -51,6 +53,19 @@ export function InspectionSectionsScreen() {
       ? convexMutationId
       : undefined,
   });
+  const { refreshPendingCount } = useSync();
+
+  useEffect(() => {
+    if (!routeCtx.unifiedFlow || !convexMutationId || !offline.localRow) return;
+    void reconcileConvexBackedLocalRow(offline.localRow).then((reconciled) => {
+      if (reconciled) void refreshPendingCount();
+    });
+  }, [
+    routeCtx.unifiedFlow,
+    convexMutationId,
+    offline.localRow,
+    refreshPendingCount,
+  ]);
 
   const inspection = useMemo(() => {
     if (convexMutationId) {

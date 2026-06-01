@@ -4,6 +4,7 @@ import {
   createEmptyPendingInspectionRow,
   getDB,
   inspectionRowForStore,
+  putPendingPhotoRow,
   type InspectionData,
   type PendingPhotoRow,
 } from "@/lib/offline/db";
@@ -131,7 +132,7 @@ export async function saveUnifiedWizardDraft(args: {
   const tx = db.transaction(["pendingInspections", "pendingPhotos"], "readwrite");
   await tx.objectStore("pendingInspections").put(inspectionRowForStore(row));
   for (const photo of pendingPhotos) {
-    await tx.objectStore("pendingPhotos").put(photo);
+    await putPendingPhotoRow(photo);
   }
   await tx.done;
 }

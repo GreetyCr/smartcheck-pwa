@@ -1,4 +1,4 @@
-import { getDB, type PendingPhotoRow } from "@/lib/offline/db";
+import { getDB, putPendingPhotoRow, type PendingPhotoRow } from "@/lib/offline/db";
 
 export type PhotoQueueRow = {
   id: string;
@@ -12,7 +12,6 @@ export type PhotoQueueRow = {
 const STORE = "pendingPhotos" as const;
 
 export async function enqueuePhotoQueue(row: PhotoQueueRow): Promise<void> {
-  const db = await getDB();
   const full: PendingPhotoRow = {
     id: row.id,
     inspectionLocalId: row.inspectionId,
@@ -22,7 +21,7 @@ export async function enqueuePhotoQueue(row: PhotoQueueRow): Promise<void> {
     createdAt: row.createdAt,
     status: "pending",
   };
-  await db.put(STORE, full);
+  await putPendingPhotoRow(full);
 }
 
 export async function removePhotoQueue(id: string): Promise<void> {
