@@ -4,8 +4,9 @@ import { useConvex } from "convex/react";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PendingInspectionRow } from "@/lib/offline/db";
+import { useSync } from "@/contexts/SyncContext";
 import {
-  convexIdIfSyncedLocalRow,
+  convexIdForUnifiedRoute,
   createConvexResolveDeps,
   resolveInspectionRef,
   type ResolvedInspection,
@@ -40,6 +41,7 @@ export function useUnifiedInspection(ref: string | undefined): {
   convexId: Id<"inspections"> | undefined;
 } {
   const convex = useConvex();
+  const { isOnline } = useSync();
   const deps = useMemo(() => createConvexResolveDeps(convex), [convex]);
   const trimmed = useMemo(() => (ref ?? "").trim(), [ref]);
 
@@ -87,7 +89,7 @@ export function useUnifiedInspection(ref: string | undefined): {
     resolution?.kind === "convex"
       ? resolution.convexId
       : resolution?.kind === "local_only"
-        ? (convexIdIfSyncedLocalRow(resolution.row) ?? undefined)
+        ? (convexIdForUnifiedRoute(resolution.row, isOnline) ?? undefined)
         : undefined;
 
   return { state, resolution, syncStatus, clientId, convexId };

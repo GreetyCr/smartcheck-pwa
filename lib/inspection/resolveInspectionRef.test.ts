@@ -3,6 +3,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import type { PendingInspectionRow } from "@/lib/offline/db";
 import { ClientId as toClientId } from "@/lib/types/clientId";
 import {
+  convexIdForUnifiedRoute,
   convexIdIfSyncedLocalRow,
   resolveInspectionRef,
   type ResolveInspectionRefDeps,
@@ -58,6 +59,25 @@ function minimalLocalRow(
  * 5) String sin forma UUID ni legacy → not_found
  * 6) Whitespace → trim antes de IDB/Convex
  */
+describe("convexIdForUnifiedRoute", () => {
+  it("exposes convex id while online even before synced", () => {
+    const row = minimalLocalRow({
+      convexId: LEGACY_CONVEX,
+      syncStatus: "syncing",
+    });
+    expect(convexIdForUnifiedRoute(row, true)).toBe(LEGACY_CONVEX);
+    expect(convexIdForUnifiedRoute(row, false)).toBeNull();
+  });
+
+  it("offline only after synced", () => {
+    const row = minimalLocalRow({
+      convexId: LEGACY_CONVEX,
+      syncStatus: "synced",
+    });
+    expect(convexIdForUnifiedRoute(row, false)).toBe(LEGACY_CONVEX);
+  });
+});
+
 describe("convexIdIfSyncedLocalRow", () => {
   it("returns null while row is not fully synced", () => {
     const row = minimalLocalRow({

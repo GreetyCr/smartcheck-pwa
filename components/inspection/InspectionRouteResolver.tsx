@@ -13,9 +13,10 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { useUnifiedInspection } from "@/hooks/useUnifiedInspection";
 import { useUnifiedDraftFlow } from "@/lib/featureFlags";
+import { useSync } from "@/contexts/SyncContext";
 import { INSPECTION_ROUTE_COPY } from "@/lib/inspection/inspectionRouteCopy";
 import {
-  convexIdIfSyncedLocalRow,
+  convexIdForUnifiedRoute,
   type ResolvedInspection,
 } from "@/lib/inspection/resolveInspectionRef";
 
@@ -69,6 +70,7 @@ function buildLegacyContext(trimmed: string): InspectionRouteContextValue {
 function buildUnifiedContext(
   trimmed: string,
   resolution: Exclude<ResolvedInspection, { kind: "not_found" }>,
+  isOnline: boolean,
 ): InspectionRouteContextValue {
   if (resolution.kind === "convex") {
     return {
@@ -80,7 +82,7 @@ function buildUnifiedContext(
     };
   }
   const cid = String(resolution.row.clientId ?? resolution.row.localId);
-  const cnv = convexIdIfSyncedLocalRow(resolution.row);
+  const cnv = convexIdForUnifiedRoute(resolution.row, isOnline);
   return {
     routeRef: trimmed,
     unifiedFlow: true,
@@ -106,6 +108,7 @@ export function InspectionRouteResolver({
   children: ReactNode;
 }) {
   const unifiedFlow = useUnifiedDraftFlow();
+  const { isOnline } = useSync();
   const inspection = useUnifiedInspection(unifiedFlow ? routeRef : undefined);
   const pathname = usePathname();
   const router = useRouter();
@@ -150,11 +153,11 @@ export function InspectionRouteResolver({
       if (canon.toLowerCase() !== trimmed.toLowerCase()) {
         return { kind: "loading" };
       }
-      return { kind: "ready", ctx: buildUnifiedContext(trimmed, res) };
+      return { kind: "ready", ctx: buildUnifiedContext(trimmed, res, isOnline) };
     }
 
-    return { kind: "ready", ctx: buildUnifiedContext(trimmed, res) };
-  }, [trimmed, unifiedFlow, inspection.state]);
+    return { kind: "ready", ctx: buildUnifiedContext(trimmed, res, isOnline) };
+  }, [trimmed, unifiedFlow, inspection.state, isOnline]);
 
   if (state.kind === "loading") {
     return <DashboardPageSkeleton variant="detail" />;

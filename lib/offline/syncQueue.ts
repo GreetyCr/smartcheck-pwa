@@ -287,6 +287,14 @@ async function syncOneRow(
   working = { ...working, syncStatus: "syncing" };
   await putPendingInspectionRow(working);
 
+  const freshRow =
+    (await db.get("pendingInspections", row.localId)) ?? working;
+  working = {
+    ...working,
+    data: freshRow.data,
+    sections: freshRow.sections,
+  };
+
   const parsed = safeParseInspectionDraftPatch(working.data);
   if (!parsed.success) {
     throw new Error(

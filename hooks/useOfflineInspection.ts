@@ -32,7 +32,7 @@ export function useOfflineInspection({
   inspectionId,
   convexInspectionIdForOnline,
 }: Options) {
-  const { isOnline, refreshPendingCount } = useSync();
+  const { isOnline, refreshPendingCount, pendingCount } = useSync();
   const [localRow, setLocalRow] = useState<PendingInspectionRow | null>(null);
   const [loadingLocal, setLoadingLocal] = useState(false);
 
@@ -68,19 +68,19 @@ export function useOfflineInspection({
         setLoadingLocal(false);
       }
     })();
-  }, [inspectionId, isOnline]);
+  }, [inspectionId, isOnline, pendingCount]);
 
   const queryId = useMemo((): Id<"inspections"> | null => {
     if (convexInspectionIdForOnline !== undefined) {
       if (convexInspectionIdForOnline === null) return null;
-      if (localRow && localRow.syncStatus !== "synced") return null;
+      if (localRow && localRow.syncStatus !== "synced" && !isOnline) {
+        return null;
+      }
       return convexInspectionIdForOnline;
     }
     if (!isOnline) return null;
     if (localRow) {
-      if (localRow.convexId && localRow.syncStatus === "synced") {
-        return localRow.convexId as Id<"inspections">;
-      }
+      if (localRow.convexId) return localRow.convexId as Id<"inspections">;
       return null;
     }
     if (inspectionId && looksLikeConvexInspectionId(inspectionId)) {
@@ -169,7 +169,7 @@ export function useOfflineInspection({
             ? (row.convexId as Id<"inspections">)
             : undefined;
 
-      if (isOnline && convexTarget && convexInspectionIdForOnline !== null) {
+      if (isOnline && convexTarget) {
         await upsertSectionM({
           inspectionId: convexTarget,
           sectionTable,

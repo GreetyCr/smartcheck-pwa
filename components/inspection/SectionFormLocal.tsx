@@ -43,7 +43,7 @@ export function SectionFormLocal({ sectionConfig }: Props) {
 
   const offline = useOfflineInspection({
     inspectionId: routeCtx.routeRef,
-    convexInspectionIdForOnline: null,
+    convexInspectionIdForOnline: routeCtx.convexInspectionId,
   });
 
   const inspection = offline.inspection;

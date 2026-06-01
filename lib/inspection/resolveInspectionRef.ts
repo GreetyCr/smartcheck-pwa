@@ -10,14 +10,27 @@ export type ResolvedInspection =
   | { kind: "not_found" };
 
 /**
- * Id Convex usable en UI/mutaciones solo cuando la fila IDB terminó de sincronizar.
- * Durante `uploading`/`syncing`/`error` el borrador sigue siendo local-first.
+ * Id Convex usable offline solo cuando la fila IDB terminó de sincronizar.
  */
 export function convexIdIfSyncedLocalRow(
   row: PendingInspectionRow,
 ): Id<"inspections"> | null {
   if (row.syncStatus !== "synced" || !row.convexId) return null;
   return row.convexId as Id<"inspections">;
+}
+
+/**
+ * Id Convex para rutas/mutaciones en flujo unificado.
+ * Online: expone `convexId` en cuanto existe (secciones van directo a Convex).
+ * Offline: solo cuando `syncStatus === synced` (evita spinner infinito sin red).
+ */
+export function convexIdForUnifiedRoute(
+  row: PendingInspectionRow,
+  isOnline: boolean,
+): Id<"inspections"> | null {
+  if (!row.convexId) return null;
+  if (isOnline) return row.convexId as Id<"inspections">;
+  return convexIdIfSyncedLocalRow(row);
 }
 
 /**
