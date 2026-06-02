@@ -31,3 +31,25 @@ describe("traccion section visibility", () => {
     expect(stats).toEqual({ filled: 1, total: 1 });
   });
 });
+
+describe("finalizacion section completion", () => {
+  const config = getSectionConfig("finalizacion")!;
+
+  it("is complete with inspector name and timestamp only", () => {
+    const state = {
+      nombre_inspector: "Inspector Test",
+      fecha_hora: 1_700_000_000_000,
+    };
+    expect(getSectionCompletionStats(config, state)).toEqual({
+      filled: 2,
+      total: 2,
+    });
+  });
+
+  it("is incomplete without persisted readonly fields", () => {
+    expect(getSectionCompletionStats(config, {})).toEqual({
+      filled: 0,
+      total: 2,
+    });
+  });
+});

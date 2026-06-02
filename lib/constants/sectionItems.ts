@@ -37,8 +37,9 @@ export interface SectionItem {
   placeholder?: string;
   /** Solo `readonly`: ver `ReadonlySource`. */
   readonlySource?: ReadonlySource;
+  /** Si true, no cuenta para completar la sección (p. ej. comentario final). */
+  optional?: boolean;
   /**
-   * Sí/No con pregunta explícita de presencia de defecto (ej. «¿Presencia de herrumbre?»).
    * **Sí** = hallazgo, **No** = sin defecto (OK). Misma regla que el default tras el fix de hallazgos.
    */
   positiveWhenNo?: boolean;
@@ -796,6 +797,7 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         key: "comentario_final",
         label: "Información importante (opcional)",
         type: "textarea",
+        optional: true,
         placeholder:
           "Datos relevantes para el cliente o la operación (opcional)...",
       },

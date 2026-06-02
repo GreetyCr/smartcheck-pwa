@@ -30,7 +30,7 @@ export function countSectionProgress(
     const v = state[item.key];
     switch (item.type) {
       case "readonly":
-        n++;
+        if (hasValue(v)) n++;
         break;
       case "textarea":
       case "text":
@@ -59,9 +59,10 @@ export function getSectionCompletionStats(
   state: SectionFormState,
 ): { filled: number; total: number } {
   const visible = getVisibleSectionItems(config, state);
+  const required = visible.filter((item) => !item.optional);
   return {
-    filled: countSectionProgress(visible, state),
-    total: visible.length,
+    filled: countSectionProgress(required, state),
+    total: required.length,
   };
 }
 
