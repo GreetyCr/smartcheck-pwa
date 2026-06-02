@@ -53,6 +53,18 @@ export function countSectionProgress(
   return n;
 }
 
+/** Progreso y total esperado respetando ítems condicionales (`visibleWhen`). */
+export function getSectionCompletionStats(
+  config: SectionConfig,
+  state: SectionFormState,
+): { filled: number; total: number } {
+  const visible = getVisibleSectionItems(config, state);
+  return {
+    filled: countSectionProgress(visible, state),
+    total: visible.length,
+  };
+}
+
 function obsOk(
   rule: "optional" | "when_reparacion" | "when_si",
   raw: unknown,

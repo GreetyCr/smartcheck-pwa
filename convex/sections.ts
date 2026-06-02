@@ -6,6 +6,10 @@ import { canAccessInspection, requireUser } from "./lib/auth";
 import { normalizeStoredPhotoUrl } from "./lib/externalPhotoUrl";
 import { sanitizeSectionPatch } from "./lib/sanitizeSectionPatch";
 import { countFindingsForSectionDoc } from "@/lib/inspection-findings";
+import {
+  docToFormState,
+  getSectionCompletionStats,
+} from "@/lib/section-form-utils";
 
 /** Orden del flujo (catálogo Módulo 2.2) — índice `by_inspection` en cada tabla. */
 export const SECTION_TABLE_ORDER = [
@@ -31,59 +35,14 @@ export const SECTION_TABLE_ORDER = [
 
 export type SectionTable = (typeof SECTION_TABLE_ORDER)[number];
 
-/** Ítems del catálogo por tabla — una sola fuente de verdad con `SECTIONS_CONFIG`. */
-const SECTION_ITEM_TOTALS: Record<SectionTable, number> = Object.fromEntries(
-  SECTION_TABLE_ORDER.map((table) => {
-    const cfg = SECTIONS_CONFIG.find((s) => s.table === table);
-    return [table, cfg?.items.length ?? 0];
-  }),
-) as Record<SectionTable, number>;
-
-function isItemFieldKey(key: string): boolean {
-  return (
-    key !== "photos" &&
-    key !== "itemPhotos" &&
-    key !== "inspectionId" &&
-    key !== "_id" &&
-    key !== "_creationTime"
-  );
-}
-
-function countFilledItemFields(doc: Record<string, unknown>): number {
-  let n = 0;
-  for (const key of Object.keys(doc)) {
-    if (!isItemFieldKey(key)) continue;
-    const val = doc[key];
-    if (val === undefined || val === null) continue;
-    if (typeof val === "object" && val !== null && !Array.isArray(val)) {
-      const o = val as Record<string, unknown>;
-      if ("value" in o && o.value !== undefined && o.value !== null) {
-        n++;
-        continue;
-      }
-      if ("texto" in o && typeof o.texto === "string" && o.texto.trim() !== "") {
-        n++;
-        continue;
-      }
-      if (key === "comentario_final" && o.texto !== undefined) {
-        n++;
-        continue;
-      }
-      if (key === "fabricacion" && typeof o === "string" && String(o).trim() !== "") {
-        n++;
-        continue;
-      }
-      if (key === "desgaste" && o.value !== undefined) {
-        n++;
-        continue;
-      }
-    } else if (typeof val === "string" && val.trim() !== "") {
-      n++;
-    } else if (typeof val === "number") {
-      n++;
-    }
-  }
-  return n;
+function sectionCompletionFromDoc(
+  table: SectionTable,
+  plain: Record<string, unknown>,
+): { filled: number; total: number } {
+  const cfg = SECTIONS_CONFIG.find((s) => s.table === table);
+  if (!cfg) return { filled: 0, total: 0 };
+  const state = docToFormState(plain, cfg);
+  return getSectionCompletionStats(cfg, state);
 }
 
 export async function getSectionDoc(
@@ -135,13 +94,20 @@ export const listSectionSummaries = query({
 
     for (const table of SECTION_TABLE_ORDER) {
       const doc = await getSectionDoc(ctx, table, inspectionId);
-      const total = SECTION_ITEM_TOTALS[table];
+      const cfg = SECTIONS_CONFIG.find((s) => s.table === table);
       if (!doc) {
-        rows.push({ table, filled: 0, total, findings: 0, complete: false });
+        const total = cfg ? getSectionCompletionStats(cfg, {}).total : 0;
+        rows.push({
+          table,
+          filled: 0,
+          total,
+          findings: 0,
+          complete: false,
+        });
         continue;
       }
       const plain = doc as unknown as Record<string, unknown>;
-      const filled = countFilledItemFields(plain);
+      const { filled, total } = sectionCompletionFromDoc(table, plain);
       const findings = countFindingsForSectionDoc(table, plain);
       const complete = total > 0 && filled >= total;
       rows.push({ table, filled, total, findings, complete });
