@@ -32,6 +32,9 @@ const LABELS: Record<string, string> = {
   normal: "Normal",
   irregular: "Irregular",
   excesivo: "Excesivo",
+  "2wd": "2WD",
+  "4wd": "4WD",
+  "4x4": "4x4",
 };
 
 export function ItemSelect({

@@ -68,13 +68,13 @@ function toDefinition(config: SectionConfig): SectionDefinition {
   };
 }
 
-/** Orden completo del catálogo (incluye tracción; filtra en UI con `getInspectionSections`). */
+/** Orden completo del catálogo (19 secciones). */
 export const INSPECTION_SECTIONS: SectionDefinition[] =
   SECTIONS_CONFIG.map(toDefinition);
 
 export const SECTION_TOTAL = INSPECTION_SECTIONS.length;
 
-/** Secciones visibles para el vehículo (oculta tracción si no es 4WD). */
+/** Secciones visibles del reporte (19 secciones; tracción siempre incluida). */
 export function getInspectionSections(
   transmissionType?: string | null,
 ): SectionDefinition[] {

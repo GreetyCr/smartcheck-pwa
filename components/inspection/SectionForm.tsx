@@ -26,6 +26,7 @@ import {
   validateSectionFormDetailed,
   type SectionFormState,
 } from "@/lib/section-form-utils";
+import { getVisibleSectionItems } from "@/lib/section-item-visibility";
 import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 
 import {
@@ -185,6 +186,11 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
   const progress = useMemo(
     () => countSectionProgress(sectionConfig.items, state),
     [sectionConfig.items, state],
+  );
+
+  const visibleItems = useMemo(
+    () => getVisibleSectionItems(sectionConfig, state),
+    [sectionConfig, state],
   );
 
   const persist = useCallback(async () => {
@@ -351,7 +357,7 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     }
   }, [inspection, pathSeg, router, routeSections, sectionConfig.id]);
 
-  const total = sectionConfig.items.length;
+  const total = visibleItems.length;
 
   const docLoading = convexMutationId !== null && doc === undefined;
   const photoLoading = convexMutationId !== null && photoEntries === undefined;
@@ -393,7 +399,7 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
             asume la responsabilidad de verificar el estado real del vehículo.
           </p>
         ) : null}
-        {sectionConfig.items.map((item, i) => (
+        {visibleItems.map((item, i) => (
           <SectionFormField
             key={item.key}
             index={i + 1}

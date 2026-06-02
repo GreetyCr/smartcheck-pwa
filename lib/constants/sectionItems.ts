@@ -47,6 +47,14 @@ export interface SectionItem {
    * temperatura no normal, líneas no congruentes). **Sí** = OK.
    */
   findingWhenNo?: boolean;
+  /**
+   * Visible solo si otro campo del mismo formulario tiene uno de estos valores
+   * (p. ej. ítems de Tracción cuando tipo = 4WD o 4x4).
+   */
+  visibleWhen?: {
+    field: string;
+    values: string[];
+  };
 }
 
 export interface SectionConfig {
@@ -730,34 +738,39 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
   },
   {
     id: "traccion",
-    name: "Tracción total / doble",
+    name: "Tracción",
     table: "section_traccion",
     icon: "Gauge",
-    conditionalOn: {
-      field: "transmissionType",
-      values: ["automatico_4wd", "manual_4wd"],
-    },
     items: [
       {
-        key: "funcionamiento",
-        label: "Funcionamiento",
-        type: "bien_reparacion_na",
+        key: "tipo_traccion",
+        label: "Tracción",
+        type: "select",
+        options: ["2wd", "4wd", "4x4"],
       },
       {
-        key: "accionamiento_2h_4h_4l",
-        label: "Accionamiento 2H / 4H / 4L",
+        key: "duplicacion",
+        label: "Duplicación",
         type: "bien_reparacion_na",
+        visibleWhen: { field: "tipo_traccion", values: ["4wd", "4x4"] },
       },
       {
         key: "ruidos_anormales",
         label: "Ruidos anormales",
         type: "si_no_na",
-        showObservation: true,
+        visibleWhen: { field: "tipo_traccion", values: ["4wd", "4x4"] },
       },
       {
         key: "indicadores_tablero",
         label: "Indicadores del tablero",
         type: "bien_reparacion_na",
+        visibleWhen: { field: "tipo_traccion", values: ["4wd", "4x4"] },
+      },
+      {
+        key: "bloqueo_diferencial",
+        label: "Bloqueo diferencial",
+        type: "bien_reparacion_na",
+        visibleWhen: { field: "tipo_traccion", values: ["4wd", "4x4"] },
       },
     ],
   },
@@ -794,7 +807,7 @@ export function getSectionConfig(sectionId: string): SectionConfig | undefined {
   return SECTIONS_CONFIG.find((s) => s.id === sectionId);
 }
 
-/** Secciones visibles según datos del vehículo (p. ej. tracción 4WD). */
+/** Secciones visibles según datos del vehículo (p. ej. secciones con `conditionalOn`). */
 export function getVisibleSections(
   transmissionType: string | null | undefined,
 ): SectionConfig[] {

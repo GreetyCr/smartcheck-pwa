@@ -332,3 +332,81 @@ export const migrateLegacyBillingFieldsInternal = internalMutation({
     return await migrateLegacyBillingFieldsImpl(ctx);
   },
 });
+
+const traccionBackfillReturns = v.object({
+  inspections: v.number(),
+  inserted: v.number(),
+  patched: v.number(),
+  skipped: v.number(),
+});
+
+const DEFAULT_TIPO_TRACCION = { value: "2wd" as const };
+
+/**
+ * Crea fila `section_traccion` faltante y asigna `tipo_traccion: 2wd` en legacy
+ * (reportes sin sección o con campos antiguos).
+ */
+async function backfillTraccionSectionImpl(ctx: MutationCtx) {
+  let inserted = 0;
+  let patched = 0;
+  let skipped = 0;
+
+  const inspections = await ctx.db.query("inspections").collect();
+
+  for (const ins of inspections) {
+    const existing = await ctx.db
+      .query("section_traccion")
+      .withIndex("by_inspection", (q) => q.eq("inspectionId", ins._id))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert("section_traccion", {
+        inspectionId: ins._id,
+        tipo_traccion: DEFAULT_TIPO_TRACCION,
+      });
+      inserted += 1;
+      continue;
+    }
+
+    const row = existing as Record<string, unknown>;
+    const tipo = row.tipo_traccion;
+    const needsDefault =
+      tipo === undefined ||
+      tipo === null ||
+      row.funcionamiento !== undefined ||
+      row.accionamiento_2h_4h_4l !== undefined;
+
+    if (needsDefault) {
+      await ctx.db.patch(existing._id, {
+        tipo_traccion: DEFAULT_TIPO_TRACCION,
+      });
+      patched += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  return {
+    inspections: inspections.length,
+    inserted,
+    patched,
+    skipped,
+  };
+}
+
+export const backfillTraccionSection = mutation({
+  args: {},
+  returns: traccionBackfillReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await backfillTraccionSectionImpl(ctx);
+  },
+});
+
+export const backfillTraccionSectionInternal = internalMutation({
+  args: {},
+  returns: traccionBackfillReturns,
+  handler: async (ctx) => {
+    return await backfillTraccionSectionImpl(ctx);
+  },
+});

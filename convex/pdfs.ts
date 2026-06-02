@@ -9,16 +9,9 @@ import {
   type SectionTable,
 } from "./sections";
 
-function visibleSectionTables(
-  transmissionType: string | undefined,
-): SectionTable[] {
-  const tt = transmissionType ?? "";
-  const is4wd = tt === "automatico_4wd" || tt === "manual_4wd";
-  const all = [...SECTION_TABLE_ORDER];
-  if (!is4wd) {
-    return all.filter((t) => t !== "section_traccion");
-  }
-  return all;
+/** Todas las tablas de sección del reporte (incluye Tracción). */
+function visibleSectionTables(_transmissionType: string | undefined): SectionTable[] {
+  return [...SECTION_TABLE_ORDER];
 }
 
 /** Datos serializables para generar el PDF en el cliente (solo admin). */

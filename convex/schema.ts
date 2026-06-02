@@ -428,15 +428,24 @@ export default defineSchema({
     codigos_error_post_prueba: v.optional(itemSnNa),
   }).index("by_inspection", ["inspectionId"]),
 
-  /** Solo aplica si el vehículo es 4WD/AWD */
   section_traccion: defineTable({
     inspectionId: v.id("inspections"),
     photos: sectionPhotos,
     itemPhotos: sectionItemPhotos,
-    funcionamiento: v.optional(itemBrNa),
-    accionamiento_2h_4h_4l: v.optional(itemBrNa),
+    tipo_traccion: v.optional(
+      v.object({
+        value: v.union(
+          v.literal("2wd"),
+          v.literal("4wd"),
+          v.literal("4x4"),
+        ),
+        observation: v.optional(v.string()),
+      }),
+    ),
+    duplicacion: v.optional(itemBrNa),
     ruidos_anormales: v.optional(itemSnNa),
     indicadores_tablero: v.optional(itemBrNa),
+    bloqueo_diferencial: v.optional(itemBrNa),
   }).index("by_inspection", ["inspectionId"]),
 
   section_finalizacion: defineTable({

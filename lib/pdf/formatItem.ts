@@ -22,6 +22,15 @@ const SI_NO_NA: Record<string, string> = {
   na: "N/A",
 };
 
+const SELECT_LABELS: Record<string, string> = {
+  normal: "Normal",
+  irregular: "Irregular",
+  excesivo: "Excesivo",
+  "2wd": "2WD",
+  "4wd": "4WD",
+  "4x4": "4x4",
+};
+
 function str(v: unknown): string {
   if (v === undefined || v === null) return "—";
   if (typeof v === "string") return v.trim() || "—";
@@ -76,9 +85,10 @@ export function formatItemForPdf(
     }
     case "select": {
       const o = raw as { value?: string; observation?: string };
+      const v = o.value ?? "";
       return {
         label: item.label,
-        value: str(o.value),
+        value: SELECT_LABELS[v] ?? str(o.value),
         observation: o.observation?.trim() || undefined,
       };
     }

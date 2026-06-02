@@ -1,4 +1,5 @@
 import type { SectionConfig, SectionItem } from "@/lib/constants/sectionItems";
+import { getVisibleSectionItems, isSectionItemVisible } from "@/lib/section-item-visibility";
 import { observationRuleFor } from "@/lib/section-form-ui";
 
 export type SectionFormState = Record<string, unknown>;
@@ -25,6 +26,7 @@ export function countSectionProgress(
 ): number {
   let n = 0;
   for (const item of items) {
+    if (!isSectionItemVisible(item, state)) continue;
     const v = state[item.key];
     switch (item.type) {
       case "readonly":
@@ -78,6 +80,7 @@ export function validateSectionFormDetailed(
 ): { ok: boolean; errors: SectionValidationError[] } {
   const errors: SectionValidationError[] = [];
   for (const item of config.items) {
+    if (!isSectionItemVisible(item, state)) continue;
     const v = state[item.key];
     switch (item.type) {
       case "readonly":
@@ -191,6 +194,7 @@ export function formStateToPatch(
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   for (const item of config.items) {
+    if (!isSectionItemVisible(item, state)) continue;
     const v = state[item.key];
     if (v === undefined) continue;
     if (item.key === "comentario_final" && typeof v === "string") {

@@ -24,6 +24,7 @@ import {
   validateSectionFormDetailed,
   type SectionFormState,
 } from "@/lib/section-form-utils";
+import { getVisibleSectionItems } from "@/lib/section-item-visibility";
 import {
   localSectionDoc,
   seedSectionFormState,
@@ -127,6 +128,11 @@ export function SectionFormLocal({ sectionConfig }: Props) {
     [sectionConfig.items, state],
   );
 
+  const visibleItems = useMemo(
+    () => getVisibleSectionItems(sectionConfig, state),
+    [sectionConfig, state],
+  );
+
   const persist = useCallback(async () => {
     const patch = toUpsertPayload(state, sectionConfig);
     if (Object.keys(patch).length === 0) return;
@@ -228,7 +234,7 @@ export function SectionFormLocal({ sectionConfig }: Props) {
     }
   }, [inspection, pathSeg, router, routeSections, sectionConfig.id]);
 
-  const total = sectionConfig.items.length;
+  const total = visibleItems.length;
 
   if (offline.isLoading) {
     return <DashboardPageSkeleton variant="form" />;
@@ -262,7 +268,7 @@ export function SectionFormLocal({ sectionConfig }: Props) {
             asume la responsabilidad de verificar el estado real del vehículo.
           </p>
         ) : null}
-        {sectionConfig.items.map((item, i) => (
+        {visibleItems.map((item, i) => (
           <SectionFormField
             key={item.key}
             index={i + 1}
