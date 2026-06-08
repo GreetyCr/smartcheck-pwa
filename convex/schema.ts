@@ -186,6 +186,8 @@ export default defineSchema({
     /** Informe PDF entregado al cliente (solo tras generación del PDF). */
     reportDeliveredAt: v.optional(v.number()),
     /** Solo base de datos / BI — no va en el cuerpo del PDF. */
+    /** Solo BI: costo fijo de comisión (₡5,000) cuando `biCommission === "si"`. */
+    commissionFeeAmount: v.optional(v.number()),
     biCommission: v.optional(v.union(v.literal("si"), v.literal("no"))),
     /** 1 = bueno … 3 = mal estado (solo BI). */
     biVehicleCondition: v.optional(

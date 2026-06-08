@@ -23,10 +23,10 @@ export function normalizePlate(value: string): string {
   return value.trim().toUpperCase();
 }
 
-/** Placa costarricense típica: 6 u 7 caracteres alfanuméricos (sin contar guiones). */
+/** Placa costarricense típica: 6 a 8 caracteres alfanuméricos (sin contar guiones). */
 export function isValidPlateCr(value: string): boolean {
   const core = plateAlphanumericCore(value);
-  return /^[A-Z0-9]{6,7}$/.test(core);
+  return /^[A-Z0-9]{6,8}$/.test(core);
 }
 
 export function normalizeVin(value: string): string {
@@ -114,7 +114,7 @@ export const COUNTRY_OPTIONS: { value: CountryOriginKey; label: string }[] = [
   { value: "otros", label: "Otros" },
 ];
 
-/** Prioridad: VIN válido (17 caracteres); si no, placa 6–7. */
+/** Prioridad: VIN válido (17 caracteres); si no, placa 6–8. */
 export function resolvePrimaryVehicleId(
   plateInput: string,
   vinInput: string,
@@ -127,7 +127,7 @@ export function resolvePrimaryVehicleId(
   const plateCore = plateAlphanumericCore(plateInput);
   const vinNorm = normalizeVin(vinInput);
   const hasVin = new RegExp(`^${VIN_BODY}$`).test(vinNorm);
-  const hasPlate = /^[A-Z0-9]{6,7}$/.test(plateCore);
+  const hasPlate = /^[A-Z0-9]{6,8}$/.test(plateCore);
   if (hasVin) {
     return {
       identifierType: "vin",
@@ -143,7 +143,7 @@ export function resolvePrimaryVehicleId(
     };
   }
   throw new Error(
-    "Se requiere VIN (17 caracteres) o placa (6–7 caracteres alfanuméricos).",
+    "Se requiere VIN (17 caracteres) o placa (6–8 caracteres alfanuméricos).",
   );
 }
 

@@ -11,6 +11,7 @@ import { SectionFormShell } from "@/components/inspection/SectionFormShell";
 import { SectionFooter } from "@/components/inspection/SectionFooter";
 import { SectionFormField } from "@/components/inspection/SectionFormField";
 import { InspectionBiClosingFields } from "@/components/inspection/InspectionBiClosingFields";
+import type { InspectionBiClosingFieldsHandle } from "@/components/inspection/InspectionBiClosingFields";
 import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
 import { UploadProgress } from "@/components/inspection/UploadProgress";
 import type { PhotoEntry } from "@/components/inspection/items/ItemPhotos";
@@ -27,6 +28,7 @@ import {
   type SectionFormState,
 } from "@/lib/section-form-utils";
 import { getVisibleSectionItems } from "@/lib/section-item-visibility";
+import { validateClosingFields } from "@/lib/finalization-closing-validation";
 import { inspectionSectionHref } from "@/lib/inspection/sectionPaths";
 
 import {
@@ -99,6 +101,10 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
   const userEdited = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
+  const [closingInvalidKeys, setClosingInvalidKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const closingFieldsRef = useRef<InspectionBiClosingFieldsHandle>(null);
   const getSavedPhotoCount = useCallback(
     (itemKey: string) => {
       const photos =
@@ -316,6 +322,7 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     if (!v.ok) {
       const keys = new Set(v.errors.map((e) => e.key));
       setInvalidKeys(keys);
+      setClosingInvalidKeys(new Set());
       browserAlert(
         v.errors.length > 1
           ? `${v.errors[0]?.message ?? "Revisa el formulario."} (${v.errors.length} campos pendientes)`
@@ -330,6 +337,28 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
       return;
     }
     setInvalidKeys(new Set());
+
+    if (sectionConfig.id === "finalizacion" && convexMutationId) {
+      const flushed =
+        (await closingFieldsRef.current?.flushTotalAmount()) ??
+        inspection?.totalAmountCharged ??
+        0;
+      const closing = validateClosingFields({ totalAmountCharged: flushed });
+      if (!closing.ok) {
+        const keys = new Set(closing.errors.map((e) => e.key));
+        setClosingInvalidKeys(keys);
+        browserAlert(closing.errors[0]?.message ?? "Revisa los datos internos.");
+        const first = closing.errors[0]?.key;
+        if (first && typeof globalThis.document !== "undefined") {
+          globalThis.document
+            .getElementById(`wizard-field-${first}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+      setClosingInvalidKeys(new Set());
+    }
+
     await persist();
     const idx = routeSections.findIndex((s) => s.id === sectionConfig.id);
     const next = idx >= 0 ? routeSections[idx + 1] : undefined;
@@ -346,6 +375,8 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
     routeSections,
     sectionConfig,
     state,
+    inspection?.totalAmountCharged,
+    convexMutationId,
   ]);
 
   useEffect(() => {
@@ -414,7 +445,11 @@ function SectionFormOnline({ sectionConfig }: SectionFormProps) {
           />
         ))}
         {sectionConfig.id === "finalizacion" && convexMutationId ? (
-          <InspectionBiClosingFields inspectionId={convexMutationId} />
+          <InspectionBiClosingFields
+            ref={closingFieldsRef}
+            inspectionId={convexMutationId}
+            invalidKeys={closingInvalidKeys}
+          />
         ) : null}
       </SectionFormShell>
       <UploadProgress

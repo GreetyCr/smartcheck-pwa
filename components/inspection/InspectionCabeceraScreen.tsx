@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, BatteryCharging, Fuel, Plug, Save } from "lucide-react";
@@ -11,10 +11,9 @@ import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { PhotoCapture } from "@/components/ui/PhotoCapture";
 import { DashboardPageSkeleton } from "@/components/layout/DashboardPageSkeleton";
-import { formControlValue } from "@/lib/browser-confirm";
+import { formControlValue, browserAlert } from "@/lib/browser-confirm";
 import { uploadFileToConvexStorage } from "@/lib/convex-storage";
 import {
-  isValidPhoneCr8Digits,
   normalizePhoneDigitsCr,
 } from "@/lib/phone-cr";
 import type {
@@ -29,14 +28,16 @@ import {
   COUNTRY_OPTIONS,
   convexEngineToDraft,
   draftEngineToConvex,
-  isValidVinOptional17,
   parseMileage,
   parseYear,
-  plateAlphanumericCore,
   resolvePrimaryVehicleId,
-  isValidOptionalEmail,
 } from "@/lib/vehicle-form";
 import { cn } from "@/lib/utils";
+import {
+  scrollToFirstWizardField,
+  WizardFieldWrap,
+} from "@/lib/wizard-form-wrap";
+import { validateCabeceraEditForm } from "@/lib/vehicle-wizard-validation";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -97,6 +98,7 @@ export function InspectionCabeceraScreen() {
   const seeded = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -174,11 +176,6 @@ export function InspectionCabeceraScreen() {
   const phoneDigits = normalizePhoneDigitsCr(clientPhone);
   const yearNum = parseYear(yearInput);
   const mileageNum = parseMileage(mileageInput);
-  const vinNorm = vinInput.trim().toUpperCase();
-  const hasVin17 = /^[A-HJ-NPR-Z0-9]{17}$/.test(vinNorm);
-  const hasPlateOk = /^[A-Z0-9]{6,7}$/.test(plateAlphanumericCore(plate));
-  const vinFormatOk = isValidVinOptional17(vinInput);
-  const idOk = hasVin17 || hasPlateOk;
 
   const photosOk =
     Boolean(payload?.photoUrls.front || vehiclePhotoFrontFile) &&
@@ -186,65 +183,41 @@ export function InspectionCabeceraScreen() {
     Boolean(payload?.photoUrls.sideRight || vehiclePhotoSideRightFile) &&
     Boolean(payload?.photoUrls.rear || vehiclePhotoRearFile);
 
-  const isValid = useMemo(() => {
-    const nameOk = clientName.trim().length >= 3;
-    const phoneOk = isValidPhoneCr8Digits(phoneDigits);
-    const emailOk = isValidOptionalEmail(clientEmail);
-    const sourceOk = captureSource !== "";
-    const sellerOk = sellerType !== "";
-    const yearOk = yearNum !== null;
-    const modelOk = model.trim().length >= 2;
-    const brandOk = brand.trim().length > 0;
-    const countryOk = countryOfOrigin !== "";
-    const mileageOk = mileageNum !== null;
-    const engineOk =
-      engineCategory !== "combustion" ||
-      combustionFuel === "gasolina" ||
-      combustionFuel === "diesel" ||
-      combustionFuel === "gas_lp";
-    return (
-      nameOk &&
-      phoneOk &&
-      emailOk &&
-      sourceOk &&
-      sellerOk &&
-      photosOk &&
-      idOk &&
-      yearOk &&
-      modelOk &&
-      brandOk &&
-      countryOk &&
-      mileageOk &&
-      engineOk &&
-      vinFormatOk
-    );
-  }, [
-    clientName,
-    phoneDigits,
-    clientEmail,
-    captureSource,
-    sellerType,
-    photosOk,
-    idOk,
-    mileageNum,
-    yearNum,
-    model,
-    brand,
-    countryOfOrigin,
-    engineCategory,
-    combustionFuel,
-    vinFormatOk,
-  ]);
-
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (
-        !isValid ||
-        !payload ||
-        !yearNum ||
-        !mileageNum
-      ) {
+      const validation = validateCabeceraEditForm({
+        clientName,
+        clientPhone,
+        clientEmail,
+        captureSource,
+        sellerType,
+        photosOk,
+        plate,
+        vinInput,
+        yearInput,
+        brand,
+        model,
+        mileageInput,
+        countryOfOrigin,
+        engineCategory,
+        combustionFuel,
+      });
+      if (!validation.ok) {
+        const keys = new Set(validation.errors.map((err) => err.key));
+        setInvalidKeys(keys);
+        browserAlert(
+          validation.errors.length > 1
+            ? `${validation.errors[0]?.message ?? "Revisa el formulario."} (${validation.errors.length} campos pendientes)`
+            : (validation.errors[0]?.message ?? "Revisa el formulario."),
+        );
+        const first = validation.errors[0]?.key;
+        if (first) scrollToFirstWizardField(first);
+        return;
+      }
+      setInvalidKeys(new Set());
+
+      if (!payload || !yearNum || !mileageNum) {
         return;
       }
       setSubmitError(null);
@@ -344,10 +317,10 @@ export function InspectionCabeceraScreen() {
       }
     },
     [
-      isValid,
       payload,
       yearNum,
       mileageNum,
+      photosOk,
       generateUploadUrl,
       vehiclePhotoFrontFile,
       vehiclePhotoSideLeftFile,
@@ -552,6 +525,7 @@ export function InspectionCabeceraScreen() {
         <p className="text-xs text-muted-foreground">
           Cuatro ángulos obligatorios. Si no cambias una foto, se mantiene la actual.
         </p>
+        <WizardFieldWrap fieldId="vehiclePhotos" invalid={invalidKeys.has("vehiclePhotos")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <PhotoCapture
             file={vehiclePhotoFrontFile}
@@ -582,8 +556,10 @@ export function InspectionCabeceraScreen() {
             label="Trasera"
           />
         </div>
+        </WizardFieldWrap>
 
         <div className="grid grid-cols-2 gap-3">
+          <WizardFieldWrap fieldId="vehicleId" invalid={invalidKeys.has("vehicleId")}>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground" htmlFor="ec-plate">
               Placa
@@ -592,9 +568,11 @@ export function InspectionCabeceraScreen() {
               id="ec-plate"
               value={plate}
               onChange={(e) => setPlate(formControlValue(e))}
+              placeholder="6–8 caracteres"
               className={fieldClass}
             />
           </div>
+          </WizardFieldWrap>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground" htmlFor="ec-year">
               Año
@@ -610,6 +588,7 @@ export function InspectionCabeceraScreen() {
           </div>
         </div>
 
+        <WizardFieldWrap fieldId="vin" invalid={invalidKeys.has("vin") || invalidKeys.has("vehicleId")}>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground" htmlFor="ec-vin">
             VIN (17 caracteres)
@@ -621,14 +600,11 @@ export function InspectionCabeceraScreen() {
             className={fieldClass}
             maxLength={17}
           />
-          {vinInput.trim().length > 0 && !vinFormatOk ? (
-            <p className="text-xs text-destructive">
-              Si indicas VIN, deben ser 17 caracteres válidos.
-            </p>
-          ) : null}
         </div>
+        </WizardFieldWrap>
 
         <div className="grid grid-cols-2 gap-3">
+          <WizardFieldWrap fieldId="brand" invalid={invalidKeys.has("brand")}>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground" htmlFor="ec-brand">
               Marca
@@ -641,6 +617,7 @@ export function InspectionCabeceraScreen() {
               placeholder="Ej. Toyota"
             />
           </div>
+          </WizardFieldWrap>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground" htmlFor="ec-model">
               Modelo
@@ -654,6 +631,7 @@ export function InspectionCabeceraScreen() {
           </div>
         </div>
 
+        <WizardFieldWrap fieldId="mileage" invalid={invalidKeys.has("mileage")}>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground" htmlFor="ec-mileage">
             Kilometraje / millaje
@@ -681,6 +659,7 @@ export function InspectionCabeceraScreen() {
             ]}
           />
         </div>
+        </WizardFieldWrap>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground" htmlFor="ec-country">
@@ -803,7 +782,7 @@ export function InspectionCabeceraScreen() {
 
         <Button
           type="submit"
-          disabled={!isValid || submitting}
+          disabled={submitting}
           size="lg"
           className="h-12 w-full gap-2 rounded-2xl bg-[#1E3A5F] text-base font-semibold text-white hover:bg-[#1E3A5F]/90"
         >

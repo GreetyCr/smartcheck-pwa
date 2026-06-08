@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as http from "../http.js";
 import type * as inspections from "../inspections.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_commission from "../lib/commission.js";
 import type * as lib_externalPhotoUrl from "../lib/externalPhotoUrl.js";
 import type * as lib_sanitizeSectionPatch from "../lib/sanitizeSectionPatch.js";
 import type * as lib_validateInspectionDraft from "../lib/validateInspectionDraft.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   inspections: typeof inspections;
   "lib/auth": typeof lib_auth;
+  "lib/commission": typeof lib_commission;
   "lib/externalPhotoUrl": typeof lib_externalPhotoUrl;
   "lib/sanitizeSectionPatch": typeof lib_sanitizeSectionPatch;
   "lib/validateInspectionDraft": typeof lib_validateInspectionDraft;

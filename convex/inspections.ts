@@ -12,6 +12,7 @@ import {
 } from "./lib/auth";
 import { SECTION_TABLE_ORDER } from "./sections";
 import { validateInspectionDraftPatch } from "./lib/validateInspectionDraft";
+import { applyCommissionPatchSideEffects } from "./lib/commission";
 
 /** Fire-and-forget hacia n8n (no bloquea la mutación). Desactivar con N8N_WEBHOOK_DISABLED=true. */
 async function scheduleN8nNotify(
@@ -304,11 +305,14 @@ export const patch = mutation({
   handler: async (ctx, { id, patch }) => {
     const allowed = await canAccessInspection(ctx, id);
     if (!allowed) throw new Error("No autorizado");
-    await ctx.db.patch(id, patch);
+    const enriched = applyCommissionPatchSideEffects(
+      patch as Record<string, unknown>,
+    );
+    await ctx.db.patch(id, enriched);
     await scheduleN8nNotify(ctx, {
       event: "inspection_patched",
       inspectionId: id,
-      meta: { patchedKeys: Object.keys(patch) },
+      meta: { patchedKeys: Object.keys(enriched) },
     });
   },
 });
@@ -355,8 +359,9 @@ export const createOrUpdateFromDraft = mutation({
       if (!(await canAccessInspectionByClientId(ctx, trimmed))) {
         throw new Error("No autorizado");
       }
+      const withCommission = applyCommissionPatchSideEffects(withPhotos);
       const clean = omitUndefined({
-        ...withPhotos,
+        ...withCommission,
         clientId: trimmed,
       }) as Record<string, unknown>;
       await ctx.db.patch(existing._id, clean);
@@ -368,8 +373,11 @@ export const createOrUpdateFromDraft = mutation({
       return { inspectionId: existing._id, created: false };
     }
 
+    const insertPayload = applyCommissionPatchSideEffects(
+      omitUndefined(withPhotos) as Record<string, unknown>,
+    );
     const id = await ctx.db.insert("inspections", {
-      ...omitUndefined(withPhotos),
+      ...insertPayload,
       clerkUserId: user.clerkId,
       clientId: trimmed,
       status: "draft",

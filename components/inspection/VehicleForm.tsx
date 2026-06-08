@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BatteryCharging,
@@ -21,16 +21,14 @@ import { Button } from "@/components/ui/button";
 import { ToggleButtonGroup } from "@/components/ui/toggle-button-group";
 import { PhotoCapture } from "@/components/ui/PhotoCapture";
 import { useInspectionWizard } from "@/components/inspection/InspectionWizard";
-import { formControlValue } from "@/lib/browser-confirm";
+import { formControlValue, browserAlert } from "@/lib/browser-confirm";
 import { uploadFileToConvexStorage } from "@/lib/convex-storage";
 import {
   BRAND_OPTIONS,
   COUNTRY_OPTIONS,
   draftEngineToConvex,
-  isValidVinOptional17,
   parseMileage,
   parseYear,
-  plateAlphanumericCore,
   resolvePrimaryVehicleId,
 } from "@/lib/vehicle-form";
 import type {
@@ -48,6 +46,11 @@ import {
   CompressVehiclePhotoError,
 } from "@/lib/images/compressVehiclePhoto";
 import type { InspectionDraft } from "@/types/inspection-draft";
+import {
+  scrollToFirstWizardField,
+  WizardFieldWrap,
+} from "@/lib/wizard-form-wrap";
+import { validateVehicleWizardForm } from "@/lib/vehicle-wizard-validation";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -84,6 +87,7 @@ export function VehicleForm({ className }: { className?: string }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [photoPickError, setPhotoPickError] = useState<string | null>(null);
+  const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
   /** Por slot: solo el último pick gana si el usuario cambia foto antes de que termine la compresión. */
   const photoPickGen = useRef<Partial<Record<VehicleWizardPhotoKey, number>>>({});
 
@@ -134,59 +138,26 @@ export function VehicleForm({ className }: { className?: string }) {
 
   const yearNum = parseYear(draft.yearInput);
   const mileageNum = parseMileage(draft.mileageInput);
-  const vinNorm = draft.vinInput.trim().toUpperCase();
-  const plateCore = plateAlphanumericCore(draft.plate);
-  const hasVin17 = /^[A-HJ-NPR-Z0-9]{17}$/.test(vinNorm);
-  const hasPlateOk = /^[A-Z0-9]{6,7}$/.test(plateCore);
-  const vinFormatOk = isValidVinOptional17(draft.vinInput);
-  const idOk = hasVin17 || hasPlateOk;
-
-  const photosOk =
-    draft.vehiclePhotoFrontFile !== null &&
-    draft.vehiclePhotoSideLeftFile !== null &&
-    draft.vehiclePhotoSideRightFile !== null &&
-    draft.vehiclePhotoRearFile !== null;
-
-  const isValid = useMemo(() => {
-    const yearOk = yearNum !== null;
-    const modelOk = draft.model.trim().length >= 2;
-    const brandOk = draft.brand.trim().length > 0;
-    const countryOk = draft.countryOfOrigin !== "";
-    const mileageOk = mileageNum !== null;
-    const engineOk =
-      draft.engineCategory !== "combustion" ||
-      draft.combustionFuel === "gasolina" ||
-      draft.combustionFuel === "diesel" ||
-      draft.combustionFuel === "gas_lp";
-    return (
-      photosOk &&
-      idOk &&
-      yearOk &&
-      modelOk &&
-      brandOk &&
-      countryOk &&
-      mileageOk &&
-      engineOk &&
-      vinFormatOk
-    );
-  }, [
-    draft.brand,
-    draft.model,
-    draft.countryOfOrigin,
-    draft.engineCategory,
-    draft.combustionFuel,
-    draft.vinInput,
-    mileageNum,
-    yearNum,
-    photosOk,
-    idOk,
-    vinFormatOk,
-  ]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const validation = validateVehicleWizardForm({ draft });
+    if (!validation.ok) {
+      const keys = new Set(validation.errors.map((err) => err.key));
+      setInvalidKeys(keys);
+      browserAlert(
+        validation.errors.length > 1
+          ? `${validation.errors[0]?.message ?? "Revisa el formulario."} (${validation.errors.length} campos pendientes)`
+          : (validation.errors[0]?.message ?? "Revisa el formulario."),
+      );
+      const first = validation.errors[0]?.key;
+      if (first) scrollToFirstWizardField(first);
+      return;
+    }
+    setInvalidKeys(new Set());
+
     if (
-      !isValid ||
       !yearNum ||
       !mileageNum ||
       !draft.vehiclePhotoFrontFile ||
@@ -343,6 +314,7 @@ export function VehicleForm({ className }: { className?: string }) {
       onSubmit={(e) => void handleSubmit(e)}
       className={cn("mx-auto max-w-lg space-y-5 px-4 py-4", className)}
     >
+      <WizardFieldWrap fieldId="vehiclePhotos" invalid={invalidKeys.has("vehiclePhotos")}>
       <div className="space-y-3">
         <p className="text-sm font-medium text-foreground">
           Fotos del vehículo <span className="text-destructive">*</span>
@@ -386,8 +358,10 @@ export function VehicleForm({ className }: { className?: string }) {
           />
         </div>
       </div>
+      </WizardFieldWrap>
 
       <div className="grid grid-cols-2 gap-3">
+        <WizardFieldWrap fieldId="vehicleId" invalid={invalidKeys.has("vehicleId")}>
         <div className="space-y-1.5">
           <label htmlFor="plate" className="text-sm font-medium text-foreground">
             Placa
@@ -397,7 +371,7 @@ export function VehicleForm({ className }: { className?: string }) {
             name="plate"
             type="text"
             autoCapitalize="characters"
-            placeholder="6–7 caracteres"
+            placeholder="6–8 caracteres"
             value={draft.plate}
             onChange={(e) => setDraft({ plate: formControlValue(e) })}
             className={fieldClass}
@@ -406,6 +380,8 @@ export function VehicleForm({ className }: { className?: string }) {
             Opcional si ya tienes VIN (17 caracteres). Sin guiones o con guiones.
           </p>
         </div>
+        </WizardFieldWrap>
+        <WizardFieldWrap fieldId="year" invalid={invalidKeys.has("year")}>
         <div className="space-y-1.5">
           <label htmlFor="year" className="text-sm font-medium text-foreground">
             Año
@@ -421,8 +397,10 @@ export function VehicleForm({ className }: { className?: string }) {
             className={fieldClass}
           />
         </div>
+        </WizardFieldWrap>
       </div>
 
+      <WizardFieldWrap fieldId="vin" invalid={invalidKeys.has("vin") || invalidKeys.has("vehicleId")}>
       <div className="space-y-1.5">
         <label htmlFor="vin" className="text-sm font-medium text-foreground">
           VIN (17 caracteres)
@@ -444,19 +422,11 @@ export function VehicleForm({ className }: { className?: string }) {
           Código único del fabricante (sin I, O ni Q). En Costa Rica los ensamblados
           locales suelen usar prefijos WMI como 3V–37…
         </p>
-        {draft.vinInput.trim().length > 0 && !vinFormatOk ? (
-          <p className="text-xs text-destructive">
-            Si indicas VIN, deben ser 17 caracteres válidos (estándar internacional).
-          </p>
-        ) : null}
-        {!idOk && vinFormatOk ? (
-          <p className="text-xs text-destructive">
-            Indica un VIN válido (17 caracteres) o una placa de 6–7 caracteres.
-          </p>
-        ) : null}
       </div>
+      </WizardFieldWrap>
 
       <div className="grid grid-cols-2 gap-3">
+        <WizardFieldWrap fieldId="brand" invalid={invalidKeys.has("brand")}>
         <div className="space-y-1.5">
           <label htmlFor="brand" className="text-sm font-medium text-foreground">
             Marca
@@ -486,6 +456,8 @@ export function VehicleForm({ className }: { className?: string }) {
             />
           </div>
         </div>
+        </WizardFieldWrap>
+        <WizardFieldWrap fieldId="model" invalid={invalidKeys.has("model")}>
         <div className="space-y-1.5">
           <label htmlFor="model" className="text-sm font-medium text-foreground">
             Modelo
@@ -500,8 +472,10 @@ export function VehicleForm({ className }: { className?: string }) {
             className={fieldClass}
           />
         </div>
+        </WizardFieldWrap>
       </div>
 
+      <WizardFieldWrap fieldId="mileage" invalid={invalidKeys.has("mileage")}>
       <div className="space-y-1.5">
         <label htmlFor="mileage" className="text-sm font-medium text-foreground">
           Kilometraje / Millaje
@@ -539,7 +513,9 @@ export function VehicleForm({ className }: { className?: string }) {
           ]}
         />
       </div>
+      </WizardFieldWrap>
 
+      <WizardFieldWrap fieldId="country" invalid={invalidKeys.has("country")}>
       <div className="space-y-1.5">
         <label htmlFor="country" className="text-sm font-medium text-foreground">
           País de Origen
@@ -573,7 +549,9 @@ export function VehicleForm({ className }: { className?: string }) {
           />
         </div>
       </div>
+      </WizardFieldWrap>
 
+      <WizardFieldWrap fieldId="combustionFuel" invalid={invalidKeys.has("combustionFuel")}>
       <div className="space-y-1.5">
         <span id="engine-label" className="text-sm font-medium text-foreground">
           Tipo de motor
@@ -633,6 +611,7 @@ export function VehicleForm({ className }: { className?: string }) {
           </div>
         ) : null}
       </div>
+      </WizardFieldWrap>
 
       <div className="space-y-3 rounded-2xl border border-border bg-muted/20 p-4">
         <p className="text-sm font-medium text-foreground">
@@ -698,7 +677,7 @@ export function VehicleForm({ className }: { className?: string }) {
       <div className="pt-2">
         <Button
           type="submit"
-          disabled={!isValid || submitting}
+          disabled={submitting}
           size="lg"
           className="h-12 w-full rounded-2xl border-0 bg-[#FF8C00] text-base font-semibold text-white hover:bg-[#FF8C00]/90"
         >
