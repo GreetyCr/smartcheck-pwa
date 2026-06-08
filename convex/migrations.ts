@@ -9,6 +9,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
+import { COMMISSION_SERVICE_FEE_CRC } from "./lib/commission";
 
 function inspectionNeedsClientIdBackfill(
   clientId: string | undefined,
@@ -408,5 +409,134 @@ export const backfillTraccionSectionInternal = internalMutation({
   returns: traccionBackfillReturns,
   handler: async (ctx) => {
     return await backfillTraccionSectionImpl(ctx);
+  },
+});
+
+const commissionBackfillStatsReturns = v.object({
+  total: v.number(),
+  withCommission: v.number(),
+  withoutCommission: v.number(),
+  needsFeeBackfill: v.number(),
+});
+
+const commissionBackfillReturns = v.object({
+  inspections: v.number(),
+  withCommission: v.number(),
+  patchedCommission: v.number(),
+  patchedZero: v.number(),
+  skipped: v.number(),
+});
+
+function commissionFeeNeedsBackfill(
+  biCommission: "si" | "no" | undefined,
+  commissionFeeAmount: number | undefined,
+): boolean {
+  if (biCommission === "si") {
+    return commissionFeeAmount !== COMMISSION_SERVICE_FEE_CRC;
+  }
+  return commissionFeeAmount !== 0;
+}
+
+async function countCommissionBackfillStatsImpl(ctx: QueryCtx) {
+  const rows = await ctx.db.query("inspections").collect();
+  let withCommission = 0;
+  let withoutCommission = 0;
+  let needsFeeBackfill = 0;
+
+  for (const row of rows) {
+    const flag = row.biCommission;
+    if (flag === "si") {
+      withCommission += 1;
+    } else {
+      withoutCommission += 1;
+    }
+    if (commissionFeeNeedsBackfill(flag, row.commissionFeeAmount)) {
+      needsFeeBackfill += 1;
+    }
+  }
+
+  return {
+    total: rows.length,
+    withCommission,
+    withoutCommission,
+    needsFeeBackfill,
+  };
+}
+
+/**
+ * Conteo previo al backfill de `commissionFeeAmount` (₡5,000 si `biCommission === "si"`, si no `0`).
+ */
+export const countCommissionBackfillStats = query({
+  args: {},
+  returns: commissionBackfillStatsReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await countCommissionBackfillStatsImpl(ctx);
+  },
+});
+
+export const countCommissionBackfillStatsInternal = internalQuery({
+  args: {},
+  returns: commissionBackfillStatsReturns,
+  handler: async (ctx) => {
+    return await countCommissionBackfillStatsImpl(ctx);
+  },
+});
+
+async function backfillCommissionFeeAmountImpl(ctx: MutationCtx) {
+  const rows = await ctx.db.query("inspections").collect();
+  let withCommission = 0;
+  let patchedCommission = 0;
+  let patchedZero = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    const flag = row.biCommission;
+    const current = row.commissionFeeAmount;
+
+    if (flag === "si") {
+      withCommission += 1;
+      if (current === COMMISSION_SERVICE_FEE_CRC) {
+        skipped += 1;
+        continue;
+      }
+      await ctx.db.patch(row._id, {
+        commissionFeeAmount: COMMISSION_SERVICE_FEE_CRC,
+      });
+      patchedCommission += 1;
+      continue;
+    }
+
+    if (current === 0) {
+      skipped += 1;
+      continue;
+    }
+    await ctx.db.patch(row._id, { commissionFeeAmount: 0 });
+    patchedZero += 1;
+  }
+
+  return {
+    inspections: rows.length,
+    withCommission,
+    patchedCommission,
+    patchedZero,
+    skipped,
+  };
+}
+
+export const backfillCommissionFeeAmount = mutation({
+  args: {},
+  returns: commissionBackfillReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await backfillCommissionFeeAmountImpl(ctx);
+  },
+});
+
+export const backfillCommissionFeeAmountInternal = internalMutation({
+  args: {},
+  returns: commissionBackfillReturns,
+  handler: async (ctx) => {
+    return await backfillCommissionFeeAmountImpl(ctx);
   },
 });

@@ -237,3 +237,75 @@ test("backfillInspectionClientIds: técnico no admin no puede ejecutar", async (
     asTech.mutation(api.migrations.backfillInspectionClientIds, {}),
   ).rejects.toThrow(/administrador/);
 });
+
+test("backfillCommissionFeeAmount: ₡5000 con comisión y 0 sin comisión", async () => {
+  const t = convexTest(schema, convexModules);
+  const now = Date.now();
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("users", {
+      clerkId: adminSubject,
+      email: "admin-commission@example.com",
+      role: "admin",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+      biCommission: "si",
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+      biCommission: "no",
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+    });
+    await ctx.db.insert("inspections", {
+      status: "draft",
+      findingsCount: 0,
+      biCommission: "si",
+      commissionFeeAmount: 5000,
+    });
+  });
+
+  const before = await t.query(
+    internal.migrations.countCommissionBackfillStatsInternal,
+    {},
+  );
+  expect(before).toMatchObject({
+    total: 4,
+    withCommission: 2,
+    withoutCommission: 2,
+    needsFeeBackfill: 3,
+  });
+
+  const asAdmin = t.withIdentity({ subject: adminSubject });
+  const result = await asAdmin.mutation(
+    api.migrations.backfillCommissionFeeAmount,
+    {},
+  );
+  expect(result).toMatchObject({
+    inspections: 4,
+    withCommission: 2,
+    patchedCommission: 1,
+    patchedZero: 2,
+    skipped: 1,
+  });
+
+  const rows = await t.run(async (ctx) => ctx.db.query("inspections").collect());
+  const withSi = rows.filter((r) => r.biCommission === "si");
+  expect(withSi.every((r) => r.commissionFeeAmount === 5000)).toBe(true);
+  const withoutSi = rows.filter((r) => r.biCommission !== "si");
+  expect(withoutSi.every((r) => r.commissionFeeAmount === 0)).toBe(true);
+
+  const after = await t.query(
+    internal.migrations.countCommissionBackfillStatsInternal,
+    {},
+  );
+  expect(after.needsFeeBackfill).toBe(0);
+});
