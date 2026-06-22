@@ -41,9 +41,10 @@ export function useUnifiedInspection(ref: string | undefined): {
   convexId: Id<"inspections"> | undefined;
 } {
   const convex = useConvex();
-  const { isOnline } = useSync();
+  const { isOnline, pendingCount, lastSyncAt } = useSync();
   const deps = useMemo(() => createConvexResolveDeps(convex), [convex]);
   const trimmed = useMemo(() => (ref ?? "").trim(), [ref]);
+  const lastSyncTick = lastSyncAt?.getTime() ?? 0;
 
   const [internal, setInternal] = useState<NonIdleUnifiedState>({
     status: "loading",
@@ -71,7 +72,7 @@ export function useUnifiedInspection(ref: string | undefined): {
     return () => {
       cancelled = true;
     };
-  }, [trimmed, deps]);
+  }, [trimmed, deps, pendingCount, lastSyncTick]);
 
   const state: UnifiedInspectionState = !trimmed
     ? { status: "idle" }
