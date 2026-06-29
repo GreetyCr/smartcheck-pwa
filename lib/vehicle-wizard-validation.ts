@@ -131,6 +131,7 @@ export type CabeceraEditValidationInput = {
   clientEmail: string;
   captureSource: CaptureSource | "";
   sellerType: SellerTypeKey | "";
+  province: string | null | undefined;
   photosOk: boolean;
   plate: string;
   vinInput: string;
@@ -177,6 +178,12 @@ export function validateCabeceraEditForm(
     errors.push({
       key: "captureSource",
       message: "Indica cómo nos conoció el cliente.",
+    });
+  }
+  if (!input.province) {
+    errors.push({
+      key: "province",
+      message: "Selecciona la provincia.",
     });
   }
 

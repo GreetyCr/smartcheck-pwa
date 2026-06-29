@@ -113,6 +113,7 @@ export const INSPECTION_PATCH_FIELD_KEYS = [
   "inspectionFee",
   "outOfGamFee",
   "inGam",
+  "province",
   "manychatId",
   "totalAmountCharged",
   "captureSource",
@@ -161,6 +162,18 @@ const patchFields = v.object({
   inspectionFee: v.optional(v.number()),
   outOfGamFee: v.optional(v.number()),
   inGam: v.optional(v.union(v.literal("si"), v.literal("no"))),
+  province: v.optional(
+    v.union(
+      v.literal("san_jose"),
+      v.literal("alajuela"),
+      v.literal("cartago"),
+      v.literal("heredia"),
+      v.literal("guanacaste"),
+      v.literal("puntarenas"),
+      v.literal("limon"),
+      v.null(),
+    ),
+  ),
   manychatId: v.optional(v.string()),
   totalAmountCharged: v.optional(v.number()),
   captureSource: v.optional(

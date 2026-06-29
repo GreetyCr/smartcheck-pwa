@@ -43,6 +43,15 @@ const inspectionStatus = z.enum([
 ]);
 const biCommission = z.enum(["si", "no"]);
 const inGam = z.enum(["si", "no"]);
+const province = z.enum([
+  "san_jose",
+  "alajuela",
+  "cartago",
+  "heredia",
+  "guanacaste",
+  "puntarenas",
+  "limon",
+]);
 const biVehicleCondition = z.union([
   z.literal(1),
   z.literal(2),
@@ -64,6 +73,7 @@ export const inspectionDraftPatchSchema = z.strictObject({
   inspectionFee: z.number().optional(),
   outOfGamFee: z.number().optional(),
   inGam: inGam.optional(),
+  province: province.nullable().optional(),
   manychatId: z.string().optional(),
   totalAmountCharged: z.number().nonnegative().optional(),
   captureSource: captureSource.optional(),

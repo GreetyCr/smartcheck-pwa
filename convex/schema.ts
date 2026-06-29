@@ -85,6 +85,16 @@ const sellerType = v.union(
   v.literal("particular"),
 );
 
+const costaRicaProvince = v.union(
+  v.literal("san_jose"),
+  v.literal("alajuela"),
+  v.literal("cartago"),
+  v.literal("heredia"),
+  v.literal("guanacaste"),
+  v.literal("puntarenas"),
+  v.literal("limon"),
+);
+
 const identifierType = v.union(v.literal("vin"), v.literal("placa"));
 
 const mileageUnit = v.union(v.literal("km"), v.literal("millas"));
@@ -127,6 +137,8 @@ export default defineSchema({
     outOfGamFee: v.optional(v.number()),
     /** ¿Inspección en la GAM? (solo BD; no PDF). */
     inGam: v.optional(v.union(v.literal("si"), v.literal("no"))),
+    /** Provincia de Costa Rica donde se realiza/cobra el servicio. Legacy puede estar ausente. */
+    province: v.optional(v.union(costaRicaProvince, v.null())),
     /** ID Manychat (integración webhook); se asigna al cerrar/entregar informe. */
     manychatId: v.optional(v.string()),
     /** Monto total cobrado al cliente (solo BD / ingresos; no PDF). */

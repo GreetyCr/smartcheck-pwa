@@ -10,9 +10,14 @@ import {
   isValidPhoneCr8Digits,
   normalizePhoneDigitsCr,
 } from "@/lib/phone-cr";
-import type { CaptureSource, SellerTypeKey } from "@/types/inspection-draft";
+import type {
+  CaptureSource,
+  CostaRicaProvinceKey,
+  SellerTypeKey,
+} from "@/types/inspection-draft";
 import { formControlValue } from "@/lib/browser-confirm";
 import { isValidOptionalEmail } from "@/lib/vehicle-form";
+import { COSTA_RICA_PROVINCES } from "@/lib/costa-rica-provinces";
 import { cn } from "@/lib/utils";
 import {
   digitsOnlyAmountInput,
@@ -53,16 +58,27 @@ export function ClientForm({ className }: { className?: string }) {
     const sourceOk = draft.captureSource !== "";
     const emailOk = isValidOptionalEmail(draft.clientEmail);
     const gamOk = draft.inGam === "si" || draft.inGam === "no";
+    const provinceOk = draft.province !== "";
     const feeOk =
       draft.inGam === "si" ||
       (draft.inGam === "no" && outOfGamAmount !== undefined && outOfGamAmount > 0);
-    return nameOk && phoneOk && sellerOk && sourceOk && emailOk && gamOk && feeOk;
+    return (
+      nameOk &&
+      phoneOk &&
+      sellerOk &&
+      sourceOk &&
+      emailOk &&
+      gamOk &&
+      provinceOk &&
+      feeOk
+    );
   }, [
     draft.clientName,
     draft.captureSource,
     draft.clientEmail,
     draft.sellerType,
     draft.inGam,
+    draft.province,
     outOfGamAmount,
     phoneDigits,
   ]);
@@ -221,6 +237,44 @@ export function ClientForm({ className }: { className?: string }) {
             { value: "no" as const, label: "No" },
           ]}
         />
+        <div className="space-y-1.5 pt-1">
+          <label
+            htmlFor="province"
+            className="text-sm font-medium text-foreground"
+          >
+            Provincia <span className="text-destructive">*</span>
+          </label>
+          <div className="relative">
+            <select
+              id="province"
+              name="province"
+              value={draft.province}
+              onChange={(e) =>
+                setDraft({
+                  province: formControlValue(e) as CostaRicaProvinceKey | "",
+                })
+              }
+              className={cn(
+                fieldClass,
+                "appearance-none bg-card pr-10",
+                draft.province === "" ? "text-muted-foreground" : "",
+              )}
+            >
+              <option value="" disabled>
+                Seleccione provincia
+              </option>
+              {COSTA_RICA_PROVINCES.map((province) => (
+                <option key={province.value} value={province.value}>
+                  {province.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+          </div>
+        </div>
         {showOutOfGamFee ? (
           <div className="space-y-1.5 pt-1">
             <label

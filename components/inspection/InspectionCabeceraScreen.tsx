@@ -19,6 +19,7 @@ import {
 import type {
   CaptureSource,
   CountryOriginKey,
+  CostaRicaProvinceKey,
   DraftCombustionFuel,
   DraftEngineCategory,
   MileageUnitKey,
@@ -33,6 +34,10 @@ import {
   resolvePrimaryVehicleId,
 } from "@/lib/vehicle-form";
 import { cn } from "@/lib/utils";
+import {
+  COSTA_RICA_PROVINCES,
+  isCostaRicaProvinceKey,
+} from "@/lib/costa-rica-provinces";
 import {
   scrollToFirstWizardField,
   WizardFieldWrap,
@@ -106,6 +111,7 @@ export function InspectionCabeceraScreen() {
   const [captureSource, setCaptureSource] = useState<CaptureSource | "">("");
   const [sellerType, setSellerType] = useState<SellerTypeKey | "">("");
   const [sellerNote, setSellerNote] = useState("");
+  const [province, setProvince] = useState<CostaRicaProvinceKey | "">("");
 
   const [vehiclePhotoFrontFile, setVehiclePhotoFrontFile] = useState<File | null>(
     null,
@@ -151,6 +157,7 @@ export function InspectionCabeceraScreen() {
     setCaptureSource((ins.captureSource as CaptureSource) ?? "");
     setSellerType((ins.sellerType as SellerTypeKey) ?? "");
     setSellerNote(ins.sellerNote ?? "");
+    setProvince(isCostaRicaProvinceKey(ins.province) ? ins.province : "");
 
     const idPlate =
       ins.identifierType === "placa" && ins.identifier
@@ -192,6 +199,7 @@ export function InspectionCabeceraScreen() {
         clientEmail,
         captureSource,
         sellerType,
+        province,
         photosOk,
         plate,
         vinInput,
@@ -283,6 +291,7 @@ export function InspectionCabeceraScreen() {
             vehicleBrand: brand.trim(),
             vehicleModel: model.trim(),
             vehicleYear: yearNum,
+            province: province || null,
             identifierType: ids.identifierType,
             identifier: ids.identifier,
             vin: ids.vin,
@@ -338,6 +347,7 @@ export function InspectionCabeceraScreen() {
       captureSource,
       sellerType,
       sellerNote,
+      province,
       brand,
       model,
       mileageUnit,
@@ -509,6 +519,35 @@ export function InspectionCabeceraScreen() {
             ))}
           </select>
         </div>
+        <WizardFieldWrap fieldId="province" invalid={invalidKeys.has("province")}>
+          <div className="space-y-1.5">
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor="ec-province"
+            >
+              Provincia <span className="text-destructive">*</span>
+            </label>
+            <select
+              id="ec-province"
+              value={province}
+              onChange={(e) =>
+                setProvince(formControlValue(e) as CostaRicaProvinceKey | "")
+              }
+              className={cn(
+                fieldClass,
+                "appearance-none bg-card pr-10",
+                province === "" ? "text-muted-foreground" : "",
+              )}
+            >
+              <option value="">Seleccionar provincia</option>
+              {COSTA_RICA_PROVINCES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </WizardFieldWrap>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground" htmlFor="ec-sn">
             Nota origen (opcional)

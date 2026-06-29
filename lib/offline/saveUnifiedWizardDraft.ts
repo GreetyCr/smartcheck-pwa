@@ -1,5 +1,11 @@
 import type { InspectionDraft } from "@/types/inspection-draft";
-import type { CaptureSource, CountryOriginKey, MileageUnitKey, SellerTypeKey } from "@/types/inspection-draft";
+import type {
+  CaptureSource,
+  CountryOriginKey,
+  CostaRicaProvinceKey,
+  MileageUnitKey,
+  SellerTypeKey,
+} from "@/types/inspection-draft";
 import {
   createEmptyPendingInspectionRow,
   getDB,
@@ -60,6 +66,8 @@ function buildInspectionPayload(
     sellerNote: draft.sellerNote.trim() || undefined,
     captureSource: source,
     inGam: draft.inGam === "si" || draft.inGam === "no" ? draft.inGam : undefined,
+    province:
+      draft.province !== "" ? (draft.province as CostaRicaProvinceKey) : undefined,
     outOfGamFee:
       draft.inGam === "no"
         ? parseDigitsToAmount(draft.outOfGamFeeInput)

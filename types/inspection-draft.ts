@@ -16,6 +16,15 @@ export type CountryOriginKey =
 
 export type SellerTypeKey = "concesionaria" | "particular";
 
+export type CostaRicaProvinceKey =
+  | "san_jose"
+  | "alajuela"
+  | "cartago"
+  | "heredia"
+  | "guanacaste"
+  | "puntarenas"
+  | "limon";
+
 export type MileageUnitKey = "km" | "millas";
 
 /** Categoría principal en el wizard de vehículo. */
@@ -34,6 +43,8 @@ export interface InspectionDraft {
   inspectionCount: 1 | 2 | 3;
   /** Vacío hasta elegir en paso cliente. */
   inGam: "si" | "no" | "";
+  /** Provincia donde se realiza/cobra la revisión (requerida en nuevas inspecciones). */
+  province: CostaRicaProvinceKey | "";
   /** Monto adicional (solo si `inGam === "no"`). Dígitos en UI vía `outOfGamFeeInput`. */
   outOfGamFeeInput: string;
   /** Vacío hasta que el usuario elija (validación paso 1). */
@@ -75,6 +86,7 @@ export function createEmptyInspectionDraft(): InspectionDraft {
     clientEmail: "",
     inspectionCount: 1,
     inGam: "",
+    province: "",
     outOfGamFeeInput: "",
     captureSource: "",
     sellerType: "",
