@@ -58,7 +58,9 @@ export function ClientForm({ className }: { className?: string }) {
     const sourceOk = draft.captureSource !== "";
     const emailOk = isValidOptionalEmail(draft.clientEmail);
     const gamOk = draft.inGam === "si" || draft.inGam === "no";
-    const provinceOk = draft.province !== "";
+    // Concesionaria: provincia opcional; particular / sin tipo: requerida.
+    const provinceOk =
+      draft.sellerType === "concesionaria" || draft.province !== "";
     const feeOk =
       draft.inGam === "si" ||
       (draft.inGam === "no" && outOfGamAmount !== undefined && outOfGamAmount > 0);
@@ -242,7 +244,15 @@ export function ClientForm({ className }: { className?: string }) {
             htmlFor="province"
             className="text-sm font-medium text-foreground"
           >
-            Provincia <span className="text-destructive">*</span>
+            Provincia
+            {draft.sellerType === "concesionaria" ? (
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                (opcional)
+              </span>
+            ) : (
+              <span className="text-destructive"> *</span>
+            )}
           </label>
           <div className="relative">
             <select

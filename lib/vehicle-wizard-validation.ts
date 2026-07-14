@@ -180,7 +180,8 @@ export function validateCabeceraEditForm(
       message: "Indica cómo nos conoció el cliente.",
     });
   }
-  if (!input.province) {
+  // Concesionaria: provincia opcional; particular: requerida.
+  if (input.sellerType !== "concesionaria" && !input.province) {
     errors.push({
       key: "province",
       message: "Selecciona la provincia.",

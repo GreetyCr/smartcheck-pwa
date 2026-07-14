@@ -525,7 +525,15 @@ export function InspectionCabeceraScreen() {
               className="text-sm font-medium text-foreground"
               htmlFor="ec-province"
             >
-              Provincia <span className="text-destructive">*</span>
+              Provincia
+              {sellerType === "concesionaria" ? (
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  (opcional)
+                </span>
+              ) : (
+                <span className="text-destructive"> *</span>
+              )}
             </label>
             <select
               id="ec-province"
