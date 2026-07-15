@@ -212,7 +212,7 @@ export function InspectionSectionsScreen() {
     }
 
     browserAlert(
-      "Aún no hay un PDF archivado en la nube para esta inspección. Un administrador debe generarlo en «Informe PDF»; después podrás compartir el archivo o el enlace del PDF con el cliente (sin necesidad de cuenta en Smartcheck).",
+      "Aún no hay un PDF archivado en la nube para esta inspección. Genéralo en «Informe PDF»; después podrás compartir el archivo o el enlace del PDF con el cliente (sin necesidad de cuenta en Smartcheck).",
     );
   }, [latestPdf, convexMutationId]);
 

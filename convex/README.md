@@ -56,7 +56,7 @@ Sin esto suele fallar: `POST .../tokens/convex` **404**.
 - **Primer usuario** en la BD → `admin`; el resto → `tecnico`.
 - Helpers en `convex/lib/auth.ts`: `getCurrentUser`, `requireAuth`, `requireUser`, `requireAdmin`, `canAccessInspection`, `canAccessInspectionByClientId`, `inspectionByClientId`, `canExportPdf`.
 - `users.promoteToAdmin` — solo admin.
-- `users.exportPdfAllowed` — `true` solo para admin (UI de exportar PDF).
+- `users.exportPdfAllowed` — `true` para admin o técnico aprobado (UI de generar/exportar PDF).
 
 URL del webhook en Clerk:
 

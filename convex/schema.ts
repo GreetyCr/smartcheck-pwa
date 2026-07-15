@@ -214,7 +214,7 @@ export default defineSchema({
     .index("by_clerk_user", ["clerkUserId"])
     .index("by_client_id", ["clientId"]),
 
-  /** PDFs generados del reporte de inspección (solo admin puede crear). */
+  /** PDFs generados del reporte de inspección (admin o técnico con acceso). */
   pdfs: defineTable({
     inspectionId: v.id("inspections"),
     storageId: v.id("_storage"),

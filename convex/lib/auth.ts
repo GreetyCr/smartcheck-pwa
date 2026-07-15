@@ -104,7 +104,9 @@ export async function canAccessInspectionByClientId(
   return canAccessInspection(ctx, doc._id);
 }
 
-/** Exportar PDF: solo admin (según matriz de permisos). */
+/** Exportar / generar PDF: admin o técnico aprobado. */
 export function canExportPdf(user: Doc<"users"> | null): boolean {
-  return user?.role === "admin";
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  return user.role === "tecnico" && userHasFullAccess(user);
 }

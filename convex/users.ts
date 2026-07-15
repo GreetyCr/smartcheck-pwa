@@ -112,7 +112,7 @@ export const list = query({
   },
 });
 
-/** Indica si el usuario actual puede exportar PDF (solo admin). */
+/** Indica si el usuario actual puede generar / exportar PDF (admin o técnico). */
 export const exportPdfAllowed = query({
   args: {},
   handler: async (ctx) => {

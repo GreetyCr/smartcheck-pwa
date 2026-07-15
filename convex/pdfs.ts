@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { canAccessInspection, requireAdmin } from "./lib/auth";
+import {
+  canAccessInspection,
+  requireAdmin,
+  requireUser,
+} from "./lib/auth";
 import { normalizeStoredPhotoUrl } from "./lib/externalPhotoUrl";
 import {
   getSectionDoc,
@@ -14,11 +18,14 @@ function visibleSectionTables(_transmissionType: string | undefined): SectionTab
   return [...SECTION_TABLE_ORDER];
 }
 
-/** Datos serializables para generar el PDF en el cliente (solo admin). */
+/** Datos serializables para generar el PDF en el cliente (admin o técnico con acceso). */
 export const getExportPayload = query({
   args: { inspectionId: v.id("inspections") },
   handler: async (ctx, { inspectionId }) => {
-    await requireAdmin(ctx);
+    await requireUser(ctx);
+    if (!(await canAccessInspection(ctx, inspectionId))) {
+      throw new Error("No autorizado");
+    }
     const inspection = await ctx.db.get(inspectionId);
     if (!inspection) throw new Error("Inspección no encontrada");
 
@@ -128,7 +135,7 @@ export const recordPdf = mutation({
     fileSize: v.number(),
   },
   handler: async (ctx, args) => {
-    const user = await requireAdmin(ctx);
+    const user = await requireUser(ctx);
     if (!(await canAccessInspection(ctx, args.inspectionId))) {
       throw new Error("No autorizado");
     }
@@ -200,11 +207,11 @@ export const getPdfStatusBatch = query({
   },
 });
 
-/** Generar URL de subida para PDF (admin). */
+/** Generar URL de subida para PDF (admin o técnico aprobado). */
 export const generatePdfUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireAdmin(ctx);
+    await requireUser(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });

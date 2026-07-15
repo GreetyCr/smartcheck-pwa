@@ -50,6 +50,8 @@ function formatPdfSavedAt(generatedAt: number | undefined): string {
 
 export function InspectionPdfExport({ inspectionId }: Props) {
   const canExport = useQuery(api.users.exportPdfAllowed, {});
+  const me = useQuery(api.users.getMe, {});
+  const isAdmin = me?.role === "admin";
   const inspection = useQuery(
     api.inspections.get,
     canExport === true ? { id: inspectionId } : "skip",
@@ -167,8 +169,8 @@ export function InspectionPdfExport({ inspectionId }: Props) {
         <div>
           <h2 className="text-sm font-bold text-primary">Informe PDF</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Genera el reporte completo (solo administradores). Se descarga en el
-            dispositivo y se guarda en la nube si hay conexión.
+            Genera el reporte completo. Se descarga en el dispositivo y se guarda
+            en la nube si hay conexión.
           </p>
           {latestLoading ? (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -213,51 +215,56 @@ export function InspectionPdfExport({ inspectionId }: Props) {
         </a>
       ) : null}
 
-      {deliveredAt ? (
-        <div
-          className={cn(
-            "mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-950",
-          )}
-        >
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
-          <div>
-            <p className="font-semibold">Informe entregado</p>
-            <p className="text-xs text-emerald-900/90">
-              Registrado el{" "}
-              {new Date(deliveredAt).toLocaleString("es-CR", {
-                dateStyle: "long",
-                timeStyle: "short",
-              })}
-            </p>
-          </div>
-        </div>
-      ) : hasPdfInCloud ? (
-        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
-          <p className="text-xs text-muted-foreground">
-            Cuando el informe impreso o digital haya sido entregado al cliente,
-            regístralo aquí para seguimiento.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3 gap-2 rounded-xl border-[#FF8C00] text-[#1E3A5F] hover:bg-[#FF8C00]/10"
-            disabled={deliverBusy}
-            onClick={() => void handleMarkDelivered()}
-          >
-            {deliverBusy ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <Truck className="size-4" aria-hidden />
+      {isAdmin ? (
+        deliveredAt ? (
+          <div
+            className={cn(
+              "mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-sm text-emerald-950",
             )}
-            Marcar como entregado
-          </Button>
-        </div>
-      ) : (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Tras generar y guardar el PDF en la nube, podrás marcar el informe como
-          entregado.
-        </p>
-      )}
+          >
+            <CheckCircle2
+              className="mt-0.5 size-4 shrink-0 text-emerald-600"
+              aria-hidden
+            />
+            <div>
+              <p className="font-semibold">Informe entregado</p>
+              <p className="text-xs text-emerald-900/90">
+                Registrado el{" "}
+                {new Date(deliveredAt).toLocaleString("es-CR", {
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })}
+              </p>
+            </div>
+          </div>
+        ) : hasPdfInCloud ? (
+          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">
+              Cuando el informe impreso o digital haya sido entregado al cliente,
+              regístralo aquí para seguimiento.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 gap-2 rounded-xl border-[#FF8C00] text-[#1E3A5F] hover:bg-[#FF8C00]/10"
+              disabled={deliverBusy}
+              onClick={() => void handleMarkDelivered()}
+            >
+              {deliverBusy ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Truck className="size-4" aria-hidden />
+              )}
+              Marcar como entregado
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Tras generar y guardar el PDF en la nube, podrás marcar el informe
+            como entregado.
+          </p>
+        )
+      ) : null}
     </div>
   );
 }
