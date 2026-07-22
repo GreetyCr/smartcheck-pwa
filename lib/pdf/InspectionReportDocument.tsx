@@ -67,6 +67,7 @@ export function InspectionReportDocument({ data }: Props) {
   const ins = inspection;
   const orderNo = String(ins._id ?? "—").slice(-8).toUpperCase();
   const created = ins._creationTime as number | undefined;
+  const startAt = ins.inspectionStartAt as number | undefined;
 
   const gallery: { n: number; caption: string; url: string }[] = [];
   let g = 0;
@@ -119,7 +120,9 @@ export function InspectionReportDocument({ data }: Props) {
       url: extraVehiclePhotoUrls.plate,
     },
     { caption: "Marchamo", url: extraVehiclePhotoUrls.marchamo },
-    { caption: "VIN (etiqueta)", url: extraVehiclePhotoUrls.vinSticker },
+    { caption: "VIN (etiqueta) — 1", url: extraVehiclePhotoUrls.vinSticker },
+    { caption: "VIN (etiqueta) — 2", url: extraVehiclePhotoUrls.vinSticker2 },
+    { caption: "Kilometraje", url: extraVehiclePhotoUrls.mileage },
   ];
   for (const row of extrasGallery) {
     if (row.url) {
@@ -252,6 +255,14 @@ export function InspectionReportDocument({ data }: Props) {
             {created ? formatDate(created) : "—"}
           </Text>
         </View>
+        <View style={styles.coverRow}>
+          <Text style={styles.coverLabel}>Hora de inicio</Text>
+          <Text style={styles.coverValue}>
+            {startAt != null && Number.isFinite(startAt)
+              ? formatDate(startAt)
+              : "—"}
+          </Text>
+        </View>
         {(() => {
           const coverUrls = [
             vehicleAnglePhotoUrls.front,
@@ -262,6 +273,8 @@ export function InspectionReportDocument({ data }: Props) {
             extraVehiclePhotoUrls.plate,
             extraVehiclePhotoUrls.marchamo,
             extraVehiclePhotoUrls.vinSticker,
+            extraVehiclePhotoUrls.vinSticker2,
+            extraVehiclePhotoUrls.mileage,
             circulationCardUrl,
           ].filter(Boolean) as string[];
           if (

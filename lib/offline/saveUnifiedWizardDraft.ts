@@ -25,6 +25,7 @@ import {
   draftEngineToConvex,
   resolvePrimaryVehicleId,
 } from "@/lib/vehicle-form";
+import { fromDatetimeLocalValue } from "@/lib/datetime-local";
 
 const WIZARD_PHOTO_SLOTS: {
   fileKey: keyof Pick<
@@ -37,6 +38,8 @@ const WIZARD_PHOTO_SLOTS: {
     | "photoPlateFile"
     | "photoMarchamoFile"
     | "photoVinStickerFile"
+    | "photoVinSticker2File"
+    | "photoMileageFile"
   >;
   slot: CabeceraPhotoSlot;
 }[] = [
@@ -48,6 +51,8 @@ const WIZARD_PHOTO_SLOTS: {
   { fileKey: "photoPlateFile", slot: "plate" },
   { fileKey: "photoMarchamoFile", slot: "marchamo" },
   { fileKey: "photoVinStickerFile", slot: "vinSticker" },
+  { fileKey: "photoVinSticker2File", slot: "vinSticker2" },
+  { fileKey: "photoMileageFile", slot: "mileage" },
 ];
 
 function buildInspectionPayload(
@@ -58,6 +63,7 @@ function buildInspectionPayload(
   const source = draft.captureSource as CaptureSource;
   const sellerType = draft.sellerType as SellerTypeKey;
   const ids = resolvePrimaryVehicleId(draft.plate, draft.vinInput);
+  const inspectionStartAt = fromDatetimeLocalValue(draft.inspectionStartAtLocal);
   return {
     clientName: draft.clientName.trim(),
     clientPhone: draft.clientPhone.trim(),
@@ -81,6 +87,7 @@ function buildInspectionPayload(
     plateNumber: ids.plateNumber,
     mileage: mileageNum,
     mileageUnit: draft.mileageUnit as MileageUnitKey,
+    inspectionStartAt,
     countryOfOrigin: draft.countryOfOrigin as CountryOriginKey,
     engineType: draftEngineToConvex({
       engineCategory: draft.engineCategory,

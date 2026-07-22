@@ -10,6 +10,8 @@ export const CABECERA_PHOTO_SLOTS = [
   "plate",
   "marchamo",
   "vinSticker",
+  "vinSticker2",
+  "mileage",
 ] as const;
 
 export type CabeceraPhotoSlot = (typeof CABECERA_PHOTO_SLOTS)[number];
@@ -29,6 +31,8 @@ export const CABECERA_SLOT_TO_PATCH_FIELD: Record<
   | "photoPlate"
   | "photoMarchamo"
   | "photoVinSticker"
+  | "photoVinSticker2"
+  | "photoMileage"
 > = {
   vehicleFront: "vehiclePhotoFront",
   vehicleSideLeft: "vehiclePhotoSideLeft",
@@ -38,6 +42,8 @@ export const CABECERA_SLOT_TO_PATCH_FIELD: Record<
   plate: "photoPlate",
   marchamo: "photoMarchamo",
   vinSticker: "photoVinSticker",
+  vinSticker2: "photoVinSticker2",
+  mileage: "photoMileage",
 };
 
 export type PhotoManifestEntry = {

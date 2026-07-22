@@ -1,4 +1,6 @@
 /** Fuente de captación (coincide con `captureSource` en Convex). */
+import { toDatetimeLocalValue } from "@/lib/datetime-local";
+
 export type CaptureSource =
   | "publicidad"
   | "tiktok"
@@ -62,8 +64,12 @@ export interface InspectionDraft {
   photoPlateFile: File | null;
   photoMarchamoFile: File | null;
   photoVinStickerFile: File | null;
+  photoVinSticker2File: File | null;
+  photoMileageFile: File | null;
   /** Texto opcional junto a la foto de placa. */
   platePhotoNote: string;
+  /** Valor de `<input type="datetime-local">` (hora de inicio del informe). */
+  inspectionStartAtLocal: string;
   plate: string;
   /** Vacío en UI hasta completar */
   yearInput: string;
@@ -99,7 +105,10 @@ export function createEmptyInspectionDraft(): InspectionDraft {
     photoPlateFile: null,
     photoMarchamoFile: null,
     photoVinStickerFile: null,
+    photoVinSticker2File: null,
+    photoMileageFile: null,
     platePhotoNote: "",
+    inspectionStartAtLocal: toDatetimeLocalValue(Date.now()),
     plate: "",
     yearInput: "",
     vinInput: "",

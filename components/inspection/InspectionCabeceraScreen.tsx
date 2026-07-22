@@ -43,6 +43,10 @@ import {
   WizardFieldWrap,
 } from "@/lib/wizard-form-wrap";
 import { validateCabeceraEditForm } from "@/lib/vehicle-wizard-validation";
+import {
+  fromDatetimeLocalValue,
+  toDatetimeLocalValue,
+} from "@/lib/datetime-local";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -129,7 +133,12 @@ export function InspectionCabeceraScreen() {
   const [photoVinStickerFile, setPhotoVinStickerFile] = useState<File | null>(
     null,
   );
+  const [photoVinSticker2File, setPhotoVinSticker2File] = useState<File | null>(
+    null,
+  );
+  const [photoMileageFile, setPhotoMileageFile] = useState<File | null>(null);
   const [platePhotoNote, setPlatePhotoNote] = useState("");
+  const [inspectionStartAtLocal, setInspectionStartAtLocal] = useState("");
   const [plate, setPlate] = useState("");
   const [yearInput, setYearInput] = useState("");
   const [vinInput, setVinInput] = useState("");
@@ -178,6 +187,13 @@ export function InspectionCabeceraScreen() {
     setEngineCategory(mapped.engineCategory);
     setCombustionFuel(mapped.combustionFuel);
     setPlatePhotoNote(ins.platePhotoNote ?? "");
+    setInspectionStartAtLocal(
+      toDatetimeLocalValue(
+        typeof ins.inspectionStartAt === "number"
+          ? ins.inspectionStartAt
+          : undefined,
+      ),
+    );
   }, [payload]);
 
   const phoneDigits = normalizePhoneDigitsCr(clientPhone);
@@ -269,15 +285,24 @@ export function InspectionCabeceraScreen() {
           throw new Error("Faltan fotos obligatorias del vehículo.");
         }
 
-        const [photoDekra, photoPlate, photoMarchamo, photoVinSticker] =
-          await Promise.all([
-            uploadIfFile(photoDekraFile, ins.photoDekra ?? undefined),
-            uploadIfFile(photoPlateFile, ins.photoPlate ?? undefined),
-            uploadIfFile(photoMarchamoFile, ins.photoMarchamo ?? undefined),
-            uploadIfFile(photoVinStickerFile, ins.photoVinSticker ?? undefined),
-          ]);
+        const [
+          photoDekra,
+          photoPlate,
+          photoMarchamo,
+          photoVinSticker,
+          photoVinSticker2,
+          photoMileage,
+        ] = await Promise.all([
+          uploadIfFile(photoDekraFile, ins.photoDekra ?? undefined),
+          uploadIfFile(photoPlateFile, ins.photoPlate ?? undefined),
+          uploadIfFile(photoMarchamoFile, ins.photoMarchamo ?? undefined),
+          uploadIfFile(photoVinStickerFile, ins.photoVinSticker ?? undefined),
+          uploadIfFile(photoVinSticker2File, ins.photoVinSticker2 ?? undefined),
+          uploadIfFile(photoMileageFile, ins.photoMileage ?? undefined),
+        ]);
 
         const ids = resolvePrimaryVehicleId(plate, vinInput);
+        const inspectionStartAt = fromDatetimeLocalValue(inspectionStartAtLocal);
 
         await patchInspection({
           id: convexMutationId!,
@@ -298,6 +323,7 @@ export function InspectionCabeceraScreen() {
             plateNumber: ids.plateNumber,
             mileage: mileageNum,
             mileageUnit,
+            inspectionStartAt,
             countryOfOrigin: countryOfOrigin as CountryOriginKey,
             engineType: draftEngineToConvex({
               engineCategory,
@@ -313,6 +339,8 @@ export function InspectionCabeceraScreen() {
             platePhotoNote: platePhotoNote.trim() || undefined,
             photoMarchamo,
             photoVinSticker,
+            photoVinSticker2,
+            photoMileage,
           },
         });
 
@@ -339,6 +367,8 @@ export function InspectionCabeceraScreen() {
       photoPlateFile,
       photoMarchamoFile,
       photoVinStickerFile,
+      photoVinSticker2File,
+      photoMileageFile,
       plate,
       vinInput,
       clientName,
@@ -355,6 +385,7 @@ export function InspectionCabeceraScreen() {
       engineCategory,
       combustionFuel,
       platePhotoNote,
+      inspectionStartAtLocal,
       patchInspection,
       convexMutationId,
       pathSeg,
@@ -678,6 +709,27 @@ export function InspectionCabeceraScreen() {
           </div>
         </div>
 
+        <div className="space-y-1.5">
+          <label
+            className="text-sm font-medium text-foreground"
+            htmlFor="ec-start-at"
+          >
+            Hora de inicio
+          </label>
+          <input
+            id="ec-start-at"
+            type="datetime-local"
+            value={inspectionStartAtLocal}
+            onChange={(e) =>
+              setInspectionStartAtLocal(formControlValue(e))
+            }
+            className={fieldClass}
+          />
+          <p className="text-xs text-muted-foreground">
+            Esta fecha y hora aparecen en el informe PDF.
+          </p>
+        </div>
+
         <WizardFieldWrap fieldId="mileage" invalid={invalidKeys.has("mileage")}>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground" htmlFor="ec-mileage">
@@ -704,6 +756,14 @@ export function InspectionCabeceraScreen() {
               { value: "km", label: "km" },
               { value: "millas", label: "mi" },
             ]}
+          />
+          <PhotoCapture
+            file={photoMileageFile}
+            existingImageUrl={pu.mileage}
+            onFileChange={setPhotoMileageFile}
+            disabled={submitting}
+            label="Foto de kilometraje"
+            className="mt-3"
           />
         </div>
         </WizardFieldWrap>
@@ -812,13 +872,32 @@ export function InspectionCabeceraScreen() {
             disabled={submitting}
             label="Marchamo"
           />
-          <PhotoCapture
-            file={photoVinStickerFile}
-            existingImageUrl={pu.vinSticker}
-            onFileChange={setPhotoVinStickerFile}
-            disabled={submitting}
-            label="VIN (etiqueta)"
-          />
+          <div className="space-y-2 rounded-xl border border-border/80 bg-background/60 p-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                VIN (etiqueta)
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Dos fotos del VIN: etiqueta y otra vista (ambas van al informe).
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PhotoCapture
+                file={photoVinStickerFile}
+                existingImageUrl={pu.vinSticker}
+                onFileChange={setPhotoVinStickerFile}
+                disabled={submitting}
+                label="VIN — foto 1"
+              />
+              <PhotoCapture
+                file={photoVinSticker2File}
+                existingImageUrl={pu.vinSticker2}
+                onFileChange={setPhotoVinSticker2File}
+                disabled={submitting}
+                label="VIN — foto 2"
+              />
+            </div>
+          </div>
         </div>
 
         {submitError ? (

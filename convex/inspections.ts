@@ -52,6 +52,8 @@ const photoManifestSlot = v.union(
   v.literal("plate"),
   v.literal("marchamo"),
   v.literal("vinSticker"),
+  v.literal("vinSticker2"),
+  v.literal("mileage"),
 );
 
 const photoManifestEntry = v.object({
@@ -70,6 +72,8 @@ const CABECERA_SLOT_TO_PATCH: Record<
   | "photoPlate"
   | "photoMarchamo"
   | "photoVinSticker"
+  | "photoVinSticker2"
+  | "photoMileage"
 > = {
   vehicleFront: "vehiclePhotoFront",
   vehicleSideLeft: "vehiclePhotoSideLeft",
@@ -79,6 +83,8 @@ const CABECERA_SLOT_TO_PATCH: Record<
   plate: "photoPlate",
   marchamo: "photoMarchamo",
   vinSticker: "photoVinSticker",
+  vinSticker2: "photoVinSticker2",
+  mileage: "photoMileage",
 };
 
 function applyPhotoManifestToPayload(
@@ -130,6 +136,7 @@ export const INSPECTION_PATCH_FIELD_KEYS = [
   "vin",
   "mileage",
   "mileageUnit",
+  "inspectionStartAt",
   "vehiclePhoto",
   "vehiclePhotoFront",
   "vehiclePhotoSideLeft",
@@ -141,6 +148,8 @@ export const INSPECTION_PATCH_FIELD_KEYS = [
   "platePhotoNote",
   "photoMarchamo",
   "photoVinSticker",
+  "photoVinSticker2",
+  "photoMileage",
   "status",
   "findingsCount",
   "lastSyncedAt",
@@ -213,6 +222,7 @@ const patchFields = v.object({
   vin: v.optional(v.string()),
   mileage: v.optional(v.number()),
   mileageUnit: v.optional(v.union(v.literal("km"), v.literal("millas"))),
+  inspectionStartAt: v.optional(v.number()),
   vehiclePhoto: v.optional(v.id("_storage")),
   vehiclePhotoFront: v.optional(v.id("_storage")),
   vehiclePhotoSideLeft: v.optional(v.id("_storage")),
@@ -224,6 +234,8 @@ const patchFields = v.object({
   platePhotoNote: v.optional(v.string()),
   photoMarchamo: v.optional(v.id("_storage")),
   photoVinSticker: v.optional(v.id("_storage")),
+  photoVinSticker2: v.optional(v.id("_storage")),
+  photoMileage: v.optional(v.id("_storage")),
   status: v.optional(inspectionStatus),
   findingsCount: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
@@ -454,6 +466,8 @@ export const getCabeceraEdit = query({
         plate: await urlOf(doc.photoPlate ?? undefined),
         marchamo: await urlOf(doc.photoMarchamo ?? undefined),
         vinSticker: await urlOf(doc.photoVinSticker ?? undefined),
+        vinSticker2: await urlOf(doc.photoVinSticker2 ?? undefined),
+        mileage: await urlOf(doc.photoMileage ?? undefined),
       },
     };
   },

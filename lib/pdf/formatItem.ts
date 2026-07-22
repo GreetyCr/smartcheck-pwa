@@ -29,6 +29,8 @@ const SELECT_LABELS: Record<string, string> = {
   "2wd": "2WD",
   "4wd": "4WD",
   "4x4": "4x4",
+  manual: "Manual",
+  automatico: "Automático",
 };
 
 function str(v: unknown): string {

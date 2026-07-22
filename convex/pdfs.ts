@@ -107,6 +107,8 @@ export const getExportPayload = query({
       plate: await storageUrl(inspection.photoPlate ?? undefined),
       marchamo: await storageUrl(inspection.photoMarchamo ?? undefined),
       vinSticker: await storageUrl(inspection.photoVinSticker ?? undefined),
+      vinSticker2: await storageUrl(inspection.photoVinSticker2 ?? undefined),
+      mileage: await storageUrl(inspection.photoMileage ?? undefined),
     };
 
     const circulationCardUrl = await storageUrl(

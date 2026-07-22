@@ -144,7 +144,16 @@ export const pdfStyles = StyleSheet.create({
     justifyContent: "space-between",
   },
   galleryCell: { width: "48%", marginBottom: 12 },
-  galleryImg: { width: "100%", height: 140, objectFit: "cover" },
+  /**
+   * Galería final / hallazgos: `contain` para no recortar (antes `cover` en caja ~2:1
+   * cortaba más que los thumbs 4:3 de portada).
+   */
+  galleryImg: {
+    width: "100%",
+    height: 160,
+    objectFit: "contain",
+    backgroundColor: "#f5f5f5",
+  },
   galleryCap: { fontSize: 8, marginTop: 4, color: "#555" },
   pageHeader: {
     fontSize: 8,

@@ -10,6 +10,8 @@ export type ExtraVehiclePhotoUrls = {
   plate: string | null;
   marchamo: string | null;
   vinSticker: string | null;
+  vinSticker2: string | null;
+  mileage: string | null;
 };
 
 export type PdfExportPayload = {

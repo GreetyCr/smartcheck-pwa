@@ -131,6 +131,11 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
         type: "bien_reparacion_na",
       },
       {
+        key: "nivel_coolant",
+        label: "Nivel de coolant",
+        type: "bien_reparacion_na",
+      },
+      {
         key: "fugas_coolant",
         label: "Fugas de coolant",
         type: "si_no_na",
@@ -177,6 +182,12 @@ export const SECTIONS_CONFIG: SectionConfig[] = [
     table: "section_transmision",
     icon: "GitBranch",
     items: [
+      {
+        key: "tipo_transmision",
+        label: "Tipo de transmisión",
+        type: "select",
+        options: ["manual", "automatico"],
+      },
       {
         key: "aspecto_liquido_transmision",
         label: "Aspecto de líquido de transmisión",

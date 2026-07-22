@@ -160,6 +160,11 @@ export default defineSchema({
     vin: v.optional(v.string()),
     mileage: v.optional(v.number()),
     mileageUnit: v.optional(mileageUnit),
+    /**
+     * Hora de inicio elegida por el técnico/admin para el informe (ms epoch).
+     * Opcional en legacy; si falta, el PDF puede omitirla o usar `_creationTime`.
+     */
+    inspectionStartAt: v.optional(v.number()),
 
     /** Legacy: una sola foto exterior; nuevas inspecciones usan los cuatro ángulos. */
     vehiclePhoto: v.optional(v.id("_storage")),
@@ -174,6 +179,10 @@ export default defineSchema({
     platePhotoNote: v.optional(v.string()),
     photoMarchamo: v.optional(v.id("_storage")),
     photoVinSticker: v.optional(v.id("_storage")),
+    /** Segunda foto del VIN (misma etiqueta / otra vista). */
+    photoVinSticker2: v.optional(v.id("_storage")),
+    /** Foto del odómetro / kilometraje. */
+    photoMileage: v.optional(v.id("_storage")),
 
     /**
      * draft: en curso
@@ -239,6 +248,7 @@ export default defineSchema({
     fuga_aceite: v.optional(itemSnNa),
     indicios_reparacion_prematura: v.optional(itemSnNa),
     estado_radiador_condensador: v.optional(itemBrNa),
+    nivel_coolant: v.optional(itemBrNa),
     fugas_coolant: v.optional(itemSnNa),
     indicios_malas_manipulaciones: v.optional(itemSnNa),
     ruidos_anormales: v.optional(itemSnNa),
@@ -252,6 +262,12 @@ export default defineSchema({
     inspectionId: v.id("inspections"),
     photos: sectionPhotos,
     itemPhotos: sectionItemPhotos,
+    tipo_transmision: v.optional(
+      v.object({
+        value: v.union(v.literal("manual"), v.literal("automatico")),
+        observation: v.optional(v.string()),
+      }),
+    ),
     aspecto_liquido_transmision: v.optional(itemBrNa),
     fugas_aceite: v.optional(itemSnNa),
     estado_botas_eje: v.optional(itemBrNa),

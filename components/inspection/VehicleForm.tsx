@@ -52,6 +52,7 @@ import {
   WizardFieldWrap,
 } from "@/lib/wizard-form-wrap";
 import { validateVehicleWizardForm } from "@/lib/vehicle-wizard-validation";
+import { fromDatetimeLocalValue } from "@/lib/datetime-local";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -66,6 +67,8 @@ type VehicleWizardPhotoKey = keyof Pick<
   | "photoPlateFile"
   | "photoMarchamoFile"
   | "photoVinStickerFile"
+  | "photoVinSticker2File"
+  | "photoMileageFile"
 >;
 
 async function uploadOne(
@@ -216,25 +219,40 @@ export function VehicleForm({ className }: { className?: string }) {
       ]);
 
       /** Opcionales también en paralelo si existen. */
-      const [photoDekra, photoPlate, photoMarchamo, photoVinSticker] =
-        await Promise.all([
-          draft.photoDekraFile
-            ? uploadOne(gen, draft.photoDekraFile)
-            : Promise.resolve(undefined),
-          draft.photoPlateFile
-            ? uploadOne(gen, draft.photoPlateFile)
-            : Promise.resolve(undefined),
-          draft.photoMarchamoFile
-            ? uploadOne(gen, draft.photoMarchamoFile)
-            : Promise.resolve(undefined),
-          draft.photoVinStickerFile
-            ? uploadOne(gen, draft.photoVinStickerFile)
-            : Promise.resolve(undefined),
-        ]);
+      const [
+        photoDekra,
+        photoPlate,
+        photoMarchamo,
+        photoVinSticker,
+        photoVinSticker2,
+        photoMileage,
+      ] = await Promise.all([
+        draft.photoDekraFile
+          ? uploadOne(gen, draft.photoDekraFile)
+          : Promise.resolve(undefined),
+        draft.photoPlateFile
+          ? uploadOne(gen, draft.photoPlateFile)
+          : Promise.resolve(undefined),
+        draft.photoMarchamoFile
+          ? uploadOne(gen, draft.photoMarchamoFile)
+          : Promise.resolve(undefined),
+        draft.photoVinStickerFile
+          ? uploadOne(gen, draft.photoVinStickerFile)
+          : Promise.resolve(undefined),
+        draft.photoVinSticker2File
+          ? uploadOne(gen, draft.photoVinSticker2File)
+          : Promise.resolve(undefined),
+        draft.photoMileageFile
+          ? uploadOne(gen, draft.photoMileageFile)
+          : Promise.resolve(undefined),
+      ]);
 
       const ids = resolvePrimaryVehicleId(draft.plate, draft.vinInput);
 
       const mileageUnit = draft.mileageUnit as MileageUnitKey;
+      const inspectionStartAt = fromDatetimeLocalValue(
+        draft.inspectionStartAtLocal,
+      );
 
       await patchInspection({
         id: inspectionId,
@@ -263,6 +281,7 @@ export function VehicleForm({ className }: { className?: string }) {
           plateNumber: ids.plateNumber,
           mileage: mileageNum,
           mileageUnit,
+          inspectionStartAt,
           countryOfOrigin: draft.countryOfOrigin as CountryOriginKey,
           engineType: draftEngineToConvex({
             engineCategory: draft.engineCategory,
@@ -278,6 +297,8 @@ export function VehicleForm({ className }: { className?: string }) {
           platePhotoNote: draft.platePhotoNote.trim() || undefined,
           photoMarchamo,
           photoVinSticker,
+          photoVinSticker2,
+          photoMileage,
           status: "draft",
         },
       });
@@ -480,6 +501,28 @@ export function VehicleForm({ className }: { className?: string }) {
         </WizardFieldWrap>
       </div>
 
+      <div className="space-y-1.5">
+        <label
+          htmlFor="inspection-start-at"
+          className="text-sm font-medium text-foreground"
+        >
+          Hora de inicio
+        </label>
+        <input
+          id="inspection-start-at"
+          name="inspectionStartAt"
+          type="datetime-local"
+          value={draft.inspectionStartAtLocal}
+          onChange={(e) =>
+            setDraft({ inspectionStartAtLocal: formControlValue(e) })
+          }
+          className={fieldClass}
+        />
+        <p className="text-xs text-muted-foreground">
+          Esta fecha y hora aparecen en el informe PDF.
+        </p>
+      </div>
+
       <WizardFieldWrap fieldId="mileage" invalid={invalidKeys.has("mileage")}>
       <div className="space-y-1.5">
         <label htmlFor="mileage" className="text-sm font-medium text-foreground">
@@ -516,6 +559,13 @@ export function VehicleForm({ className }: { className?: string }) {
             { value: "km" as const, label: "Kilómetros (km)" },
             { value: "millas" as const, label: "Millas (mi)" },
           ]}
+        />
+        <PhotoCapture
+          file={draft.photoMileageFile}
+          onFileChange={(f) => void onVehiclePhotoPicked("photoMileageFile", f)}
+          disabled={submitting}
+          label="Foto de kilometraje"
+          className="mt-3"
         />
       </div>
       </WizardFieldWrap>
@@ -656,14 +706,32 @@ export function VehicleForm({ className }: { className?: string }) {
           disabled={submitting}
           label="Foto de marchamo"
         />
-        <PhotoCapture
-          file={draft.photoVinStickerFile}
-          onFileChange={(f) =>
-            void onVehiclePhotoPicked("photoVinStickerFile", f)
-          }
-          disabled={submitting}
-          label="Foto de VIN (etiqueta)"
-        />
+        <div className="space-y-2 rounded-xl border border-border/80 bg-background/60 p-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">VIN (etiqueta)</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Dos fotos del VIN: etiqueta y otra vista (ambas van al informe).
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <PhotoCapture
+              file={draft.photoVinStickerFile}
+              onFileChange={(f) =>
+                void onVehiclePhotoPicked("photoVinStickerFile", f)
+              }
+              disabled={submitting}
+              label="VIN — foto 1"
+            />
+            <PhotoCapture
+              file={draft.photoVinSticker2File}
+              onFileChange={(f) =>
+                void onVehiclePhotoPicked("photoVinSticker2File", f)
+              }
+              disabled={submitting}
+              label="VIN — foto 2"
+            />
+          </div>
+        </div>
       </div>
 
       {submitError ? (
