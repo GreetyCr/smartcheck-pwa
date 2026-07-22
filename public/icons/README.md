@@ -1,8 +1,12 @@
 # Iconos PWA
 
-Para instalación en pantalla de inicio, añade:
+Fuente: checkmark azul/amarillo (asset de marca).
 
-- `icon-192.png` — 192×192 px  
-- `icon-512.png` — 512×512 px  
+| Archivo | Uso |
+|---------|-----|
+| `icon-192.png` | Manifest / Android (192×192) |
+| `icon-512.png` | Manifest / splash (512×512) |
+| `icon-maskable.png` | Maskable 512×512 |
+| `icon-source.png` | Original 64×64 |
 
-Luego actualiza `app/manifest.ts` para referenciar estos archivos (además de `logo.svg` si lo deseas).
+También: `app/icon.png`, `app/apple-icon.png`, `public/favicon.png`.
