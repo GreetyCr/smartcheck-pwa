@@ -5,6 +5,12 @@ const transmission: Record<string, string> = {
   manual_4wd: "Manual 4WD",
 };
 
+/** Valores del ítem `tipo_transmision` en section_transmision. */
+const transmissionKind: Record<string, string> = {
+  manual: "Manual",
+  automatico: "Automático",
+};
+
 const engine: Record<string, string> = {
   gasolina: "Gasolina",
   diesel: "Diésel",
@@ -29,7 +35,26 @@ const country: Record<string, string> = {
 
 export function labelTransmission(v: string | undefined): string {
   if (!v) return "—";
-  return transmission[v] ?? v;
+  return transmission[v] ?? transmissionKind[v] ?? v;
+}
+
+/**
+ * Etiqueta de transmisión para la portada del PDF.
+ * Prioridad: ítem de sección `tipo_transmision` (Manual/Automático) →
+ * campo legacy `inspections.transmissionType`.
+ */
+export function labelTransmissionForReport(args: {
+  inspectionTransmissionType?: string | null;
+  sectionTipoTransmision?: unknown;
+}): string {
+  const raw = args.sectionTipoTransmision;
+  if (raw && typeof raw === "object" && !Array.isArray(raw) && "value" in raw) {
+    const v = (raw as { value?: unknown }).value;
+    if (typeof v === "string" && v.trim()) {
+      return transmissionKind[v] ?? labelTransmission(v);
+    }
+  }
+  return labelTransmission(args.inspectionTransmissionType ?? undefined);
 }
 
 export function labelEngine(v: string | undefined): string {

@@ -22,7 +22,7 @@ import {
   labelCountry,
   labelEngine,
   labelSellerType,
-  labelTransmission,
+  labelTransmissionForReport,
 } from "@/lib/pdf/vehicleLabels";
 
 const DISCLAIMER = `El presente informe describe el estado aparente del vehículo en el momento y lugar de la inspección, con base en una revisión visual y funcional limitada. No constituye garantía de condición futura, ausencia de defectos ocultos ni valor comercial. Smartcheck y el inspector no se hacen responsables por defectos no detectables en esta evaluación, ni por reparaciones o decisiones de compra basadas en este documento. El cliente declara haber leído y comprendido estas limitaciones.`;
@@ -152,6 +152,13 @@ export function InspectionReportDocument({ data }: Props) {
   );
 
   const finalDoc = sections.find((s) => s.table === "section_finalizacion")?.doc;
+  const transmisionDoc = sections.find(
+    (s) => s.table === "section_transmision",
+  )?.doc;
+  const transmissionLabel = labelTransmissionForReport({
+    inspectionTransmissionType: ins.transmissionType as string | undefined,
+    sectionTipoTransmision: transmisionDoc?.tipo_transmision,
+  });
   const inspectorName =
     (finalDoc?.nombre_inspector as string | undefined)?.trim() || "—";
   const fechaHora = finalDoc?.fecha_hora as number | undefined;
@@ -245,9 +252,7 @@ export function InspectionReportDocument({ data }: Props) {
         </View>
         <View style={styles.coverRow}>
           <Text style={styles.coverLabel}>Transmisión</Text>
-          <Text style={styles.coverValue}>
-            {labelTransmission(ins.transmissionType as string | undefined)}
-          </Text>
+          <Text style={styles.coverValue}>{transmissionLabel}</Text>
         </View>
         <View style={styles.coverRow}>
           <Text style={styles.coverLabel}>Fecha de inspección</Text>
