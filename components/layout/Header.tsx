@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Shield } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -36,9 +36,10 @@ function buildGreeting(
 export function Header({ unreadNotifications }: HeaderProps) {
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const convexUser = useQuery(api.users.getMe, {});
+  const isAdmin = convexUser?.role === "admin";
   const pendingApprovals = useQuery(
     api.users.pendingApprovalCount,
-    convexUser?.role === "admin" ? {} : "skip",
+    isAdmin ? {} : "skip",
   );
 
   const greeting = buildGreeting(
@@ -51,8 +52,7 @@ export function Header({ unreadNotifications }: HeaderProps) {
   const imageUrl =
     convexUser?.imageUrl || clerkUser?.imageUrl || null;
 
-  const adminPending =
-    convexUser?.role === "admin" && (pendingApprovals ?? 0) > 0;
+  const adminPending = isAdmin && (pendingApprovals ?? 0) > 0;
   const showPlaceholderDot =
     !adminPending &&
     unreadNotifications !== undefined &&
@@ -100,29 +100,41 @@ export function Header({ unreadNotifications }: HeaderProps) {
           </p>
         </div>
       </div>
-      {adminPending ? (
-        <Link
-          href="/admin/tecnicos"
-          className="relative shrink-0 rounded-full p-2 text-primary transition-colors hover:bg-muted"
-          aria-label={`${pendingApprovals ?? 0} solicitudes de nuevos usuarios`}
-        >
-          <Bell className="size-6" strokeWidth={2} />
-          <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-[#DC3545] text-[10px] font-bold text-white ring-2 ring-card">
-            {(pendingApprovals ?? 0) > 9 ? "9+" : pendingApprovals}
-          </span>
-        </Link>
-      ) : (
-        <button
-          type="button"
-          className="relative shrink-0 rounded-full p-2 text-primary transition-colors hover:bg-muted"
-          aria-label="Notificaciones"
-        >
-          <Bell className="size-6" strokeWidth={2} />
-          {showPlaceholderDot ? (
-            <span className="absolute right-1 top-1 size-2 rounded-full bg-[#DC3545] ring-2 ring-card" />
-          ) : null}
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-0.5">
+        {isAdmin ? (
+          <Link
+            href="/admin"
+            className="rounded-full p-2 text-primary transition-colors hover:bg-muted"
+            aria-label="Panel de administrador"
+            title="Admin"
+          >
+            <Shield className="size-6" strokeWidth={2} />
+          </Link>
+        ) : null}
+        {adminPending ? (
+          <Link
+            href="/admin/tecnicos"
+            className="relative rounded-full p-2 text-primary transition-colors hover:bg-muted"
+            aria-label={`${pendingApprovals ?? 0} solicitudes de nuevos usuarios`}
+          >
+            <Bell className="size-6" strokeWidth={2} />
+            <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-[#DC3545] text-[10px] font-bold text-white ring-2 ring-card">
+              {(pendingApprovals ?? 0) > 9 ? "9+" : pendingApprovals}
+            </span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="relative rounded-full p-2 text-primary transition-colors hover:bg-muted"
+            aria-label="Notificaciones"
+          >
+            <Bell className="size-6" strokeWidth={2} />
+            {showPlaceholderDot ? (
+              <span className="absolute right-1 top-1 size-2 rounded-full bg-[#DC3545] ring-2 ring-card" />
+            ) : null}
+          </button>
+        )}
+      </div>
     </header>
   );
 }
