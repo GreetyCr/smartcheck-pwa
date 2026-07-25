@@ -144,7 +144,7 @@ export default function AdminInspeccionesPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-left">
+          <table className="w-full min-w-[720px] border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-3">Placa / ID</th>
@@ -152,19 +152,20 @@ export default function AdminInspeccionesPage() {
                 <th className="px-3 py-3">Técnico</th>
                 <th className="hidden px-3 py-3 md:table-cell">Fecha</th>
                 <th className="px-3 py-3">Estado</th>
+                <th className="px-3 py-3 text-right">Cobrado</th>
                 <th className="px-3 py-3 text-right">PDF</th>
               </tr>
             </thead>
             <tbody>
               {rows === undefined ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
                     Cargando…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
                     No hay inspecciones con estos filtros.
                   </td>
                 </tr>
