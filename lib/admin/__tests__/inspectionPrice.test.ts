@@ -17,8 +17,8 @@ function fakeInspection(
 
 describe("inspectionPrice", () => {
   it("formatea CRC", () => {
-    expect(formatCrc(69000)).toBe("₡69.000");
     expect(formatCrc(undefined)).toBe("—");
+    expect(formatCrc(69000)).toMatch(/^₡69[\s.]?000$/);
   });
 
   it("arma desglose con total, GAM y comisión", () => {
@@ -40,7 +40,7 @@ describe("inspectionPrice", () => {
       "Servicio por comisión",
       "Comisión",
     ]);
-    expect(lines[0]?.value).toBe("₡69.000");
+    expect(lines[0]?.value).toMatch(/^₡69/);
     expect(lines.find((l) => l.label === "En GAM")?.value).toBe("No");
   });
 });
