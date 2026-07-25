@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FileText } from "lucide-react";
 import type { Doc } from "@/convex/_generated/dataModel";
 import {
@@ -20,6 +22,8 @@ type InspectionTableRowProps = {
   } | null;
 };
 
+type TooltipPos = { top: number; left: number };
+
 function formatPlate(inspection: Doc<"inspections">): string {
   if (inspection.identifierType === "placa" && inspection.identifier?.trim()) {
     return inspection.identifier.trim().toUpperCase();
@@ -28,6 +32,135 @@ function formatPlate(inspection: Doc<"inspections">): string {
     return inspection.identifier.trim().slice(-8);
   }
   return "—";
+}
+
+function PriceBreakdownTooltip({
+  totalLabel,
+  breakdown,
+}: {
+  totalLabel: string;
+  breakdown: ReturnType<typeof buildInspectionPriceBreakdown>;
+}) {
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const tipId = useId();
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<TooltipPos | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const tip = tipRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const tipWidth = tip?.offsetWidth ?? 224;
+    const tipHeight = tip?.offsetHeight ?? 160;
+    const gap = 8;
+    const margin = 8;
+
+    let left = rect.right - tipWidth;
+    left = Math.max(margin, Math.min(left, window.innerWidth - tipWidth - margin));
+
+    const spaceAbove = rect.top;
+    const placeBelow = spaceAbove < tipHeight + gap + margin;
+    const top = placeBelow
+      ? rect.bottom + gap
+      : rect.top - tipHeight - gap;
+
+    setPos({
+      top: Math.max(margin, top),
+      left,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const onScrollOrResize = () => updatePosition();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, updatePosition]);
+
+  const show = () => {
+    const trigger = triggerRef.current;
+    if (trigger) {
+      const rect = trigger.getBoundingClientRect();
+      // Posición provisional; se refina tras montar el tip.
+      setPos({
+        top: Math.max(8, rect.top - 168),
+        left: Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232)),
+      });
+    }
+    setOpen(true);
+  };
+  const hide = () => {
+    setOpen(false);
+    setPos(null);
+  };
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className={cn(
+          "cursor-default font-semibold tabular-nums text-[#1E3A5F]",
+          totalLabel === "—" && "font-normal text-muted-foreground",
+        )}
+        tabIndex={0}
+        aria-describedby={open ? tipId : undefined}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+      >
+        {totalLabel}
+      </span>
+      {mounted && open && pos
+        ? createPortal(
+            <div
+              ref={(node) => {
+                tipRef.current = node;
+                if (node) {
+                  // Remedir con tamaño real en el siguiente frame.
+                  requestAnimationFrame(updatePosition);
+                }
+              }}
+              id={tipId}
+              role="tooltip"
+              className="pointer-events-none fixed z-9999 w-56 rounded-xl border border-border bg-white p-3 text-left shadow-lg"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                Desglose de precio
+              </p>
+              <ul className="space-y-1.5">
+                {breakdown.map((line) => (
+                  <li
+                    key={line.label}
+                    className="flex items-start justify-between gap-3 text-xs"
+                  >
+                    <span className="text-muted-foreground">{line.label}</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                      {line.value}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
 }
 
 export function InspectionTableRow({
@@ -69,42 +202,7 @@ export function InspectionTableRow({
         </span>
       </td>
       <td className="px-3 py-3 text-right">
-        <div className="group relative inline-flex justify-end">
-          <span
-            className={cn(
-              "cursor-default font-semibold tabular-nums text-[#1E3A5F]",
-              totalLabel === "—" && "font-normal text-muted-foreground",
-            )}
-            tabIndex={0}
-          >
-            {totalLabel}
-          </span>
-          <div
-            role="tooltip"
-            className={cn(
-              "pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-56 rounded-xl border border-border bg-white p-3 text-left shadow-lg",
-              "opacity-0 transition-opacity duration-150",
-              "group-hover:opacity-100 group-focus-within:opacity-100",
-            )}
-          >
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Desglose de precio
-            </p>
-            <ul className="space-y-1.5">
-              {breakdown.map((line) => (
-                <li
-                  key={line.label}
-                  className="flex items-start justify-between gap-3 text-xs"
-                >
-                  <span className="text-muted-foreground">{line.label}</span>
-                  <span className="shrink-0 font-semibold tabular-nums text-foreground">
-                    {line.value}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        <PriceBreakdownTooltip totalLabel={totalLabel} breakdown={breakdown} />
       </td>
       <td className="px-3 py-3 text-right">
         {pdfInfo?.url ? (
