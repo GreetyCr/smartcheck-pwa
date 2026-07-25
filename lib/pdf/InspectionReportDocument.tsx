@@ -66,7 +66,6 @@ export function InspectionReportDocument({ data }: Props) {
   } = data;
   const ins = inspection;
   const orderNo = String(ins._id ?? "—").slice(-8).toUpperCase();
-  const created = ins._creationTime as number | undefined;
   const startAt = ins.inspectionStartAt as number | undefined;
 
   const gallery: { n: number; caption: string; url: string }[] = [];
@@ -255,13 +254,7 @@ export function InspectionReportDocument({ data }: Props) {
           <Text style={styles.coverValue}>{transmissionLabel}</Text>
         </View>
         <View style={styles.coverRow}>
-          <Text style={styles.coverLabel}>Fecha de inspección</Text>
-          <Text style={styles.coverValue}>
-            {created ? formatDate(created) : "—"}
-          </Text>
-        </View>
-        <View style={styles.coverRow}>
-          <Text style={styles.coverLabel}>Hora de inicio</Text>
+          <Text style={styles.coverLabel}>Fecha y hora de inicio</Text>
           <Text style={styles.coverValue}>
             {startAt != null && Number.isFinite(startAt)
               ? formatDate(startAt)
@@ -471,7 +464,7 @@ export function InspectionReportDocument({ data }: Props) {
         <View style={styles.coverRow}>
           <Text style={styles.coverLabel}>Fecha y hora (cierre)</Text>
           <Text style={styles.coverValue}>
-            {fechaHora ? formatDate(fechaHora) : created ? formatDate(created) : "—"}
+            {fechaHora ? formatDate(fechaHora) : "—"}
           </Text>
         </View>
         {comentarioFinal ? (

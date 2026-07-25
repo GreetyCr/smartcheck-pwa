@@ -44,7 +44,9 @@ import {
 } from "@/lib/wizard-form-wrap";
 import { validateCabeceraEditForm } from "@/lib/vehicle-wizard-validation";
 import {
+  clampInspectionStartAtLocal,
   fromDatetimeLocalValue,
+  isInspectionStartAtInFuture,
   toDatetimeLocalValue,
 } from "@/lib/datetime-local";
 
@@ -240,6 +242,15 @@ export function InspectionCabeceraScreen() {
         return;
       }
       setInvalidKeys(new Set());
+
+      if (isInspectionStartAtInFuture(inspectionStartAtLocal)) {
+        const clamped = clampInspectionStartAtLocal(inspectionStartAtLocal);
+        setInspectionStartAtLocal(clamped);
+        browserAlert(
+          "La hora de inicio no puede ser posterior a la hora actual. Ajustala e intentá de nuevo.",
+        );
+        return;
+      }
 
       if (!payload || !yearNum || !mileageNum) {
         return;
@@ -714,19 +725,22 @@ export function InspectionCabeceraScreen() {
             className="text-sm font-medium text-foreground"
             htmlFor="ec-start-at"
           >
-            Hora de inicio
+            Fecha y hora de inicio
           </label>
           <input
             id="ec-start-at"
             type="datetime-local"
+            max={toDatetimeLocalValue(Date.now())}
             value={inspectionStartAtLocal}
             onChange={(e) =>
-              setInspectionStartAtLocal(formControlValue(e))
+              setInspectionStartAtLocal(
+                clampInspectionStartAtLocal(formControlValue(e)),
+              )
             }
             className={fieldClass}
           />
           <p className="text-xs text-muted-foreground">
-            Esta fecha y hora aparecen en el informe PDF.
+            Aparece en el informe. No puede ser posterior a la hora actual.
           </p>
         </div>
 

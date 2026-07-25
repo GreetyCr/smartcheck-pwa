@@ -25,7 +25,10 @@ import {
   draftEngineToConvex,
   resolvePrimaryVehicleId,
 } from "@/lib/vehicle-form";
-import { fromDatetimeLocalValue } from "@/lib/datetime-local";
+import {
+  clampInspectionStartAtLocal,
+  fromDatetimeLocalValue,
+} from "@/lib/datetime-local";
 
 const WIZARD_PHOTO_SLOTS: {
   fileKey: keyof Pick<
@@ -63,7 +66,9 @@ function buildInspectionPayload(
   const source = draft.captureSource as CaptureSource;
   const sellerType = draft.sellerType as SellerTypeKey;
   const ids = resolvePrimaryVehicleId(draft.plate, draft.vinInput);
-  const inspectionStartAt = fromDatetimeLocalValue(draft.inspectionStartAtLocal);
+  const inspectionStartAt = fromDatetimeLocalValue(
+    clampInspectionStartAtLocal(draft.inspectionStartAtLocal),
+  );
   return {
     clientName: draft.clientName.trim(),
     clientPhone: draft.clientPhone.trim(),

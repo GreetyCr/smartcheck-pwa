@@ -52,7 +52,12 @@ import {
   WizardFieldWrap,
 } from "@/lib/wizard-form-wrap";
 import { validateVehicleWizardForm } from "@/lib/vehicle-wizard-validation";
-import { fromDatetimeLocalValue } from "@/lib/datetime-local";
+import {
+  clampInspectionStartAtLocal,
+  fromDatetimeLocalValue,
+  isInspectionStartAtInFuture,
+  toDatetimeLocalValue,
+} from "@/lib/datetime-local";
 
 const fieldClass =
   "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30";
@@ -160,6 +165,15 @@ export function VehicleForm({ className }: { className?: string }) {
       return;
     }
     setInvalidKeys(new Set());
+
+    if (isInspectionStartAtInFuture(draft.inspectionStartAtLocal)) {
+      const clamped = clampInspectionStartAtLocal(draft.inspectionStartAtLocal);
+      setDraft({ inspectionStartAtLocal: clamped });
+      browserAlert(
+        "La hora de inicio no puede ser posterior a la hora actual. Ajustala e intentá de nuevo.",
+      );
+      return;
+    }
 
     if (
       !yearNum ||
@@ -506,20 +520,22 @@ export function VehicleForm({ className }: { className?: string }) {
           htmlFor="inspection-start-at"
           className="text-sm font-medium text-foreground"
         >
-          Hora de inicio
+          Fecha y hora de inicio
         </label>
         <input
           id="inspection-start-at"
           name="inspectionStartAt"
           type="datetime-local"
+          max={toDatetimeLocalValue(Date.now())}
           value={draft.inspectionStartAtLocal}
-          onChange={(e) =>
-            setDraft({ inspectionStartAtLocal: formControlValue(e) })
-          }
+          onChange={(e) => {
+            const next = clampInspectionStartAtLocal(formControlValue(e));
+            setDraft({ inspectionStartAtLocal: next });
+          }}
           className={fieldClass}
         />
         <p className="text-xs text-muted-foreground">
-          Esta fecha y hora aparecen en el informe PDF.
+          Aparece en el informe. No puede ser posterior a la hora actual.
         </p>
       </div>
 
