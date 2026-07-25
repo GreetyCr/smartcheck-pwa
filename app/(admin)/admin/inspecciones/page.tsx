@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { InspectionTableRow } from "@/components/admin/InspectionTableRow";
 import { Button } from "@/components/ui/button";
+import { formatCrc } from "@/lib/admin/inspectionPrice";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos los estados" },
@@ -53,6 +54,15 @@ export default function AdminInspeccionesPage() {
       ? { inspectionIds: rows.map((r) => r.inspection._id) }
       : "skip",
   );
+
+  const chargedTotal = useMemo(() => {
+    if (!rows) return null;
+    return rows.reduce((sum, row) => {
+      const amount = row.inspection.totalAmountCharged;
+      if (amount == null || !Number.isFinite(amount)) return sum;
+      return sum + amount;
+    }, 0);
+  }, [rows]);
 
   return (
     <div className="space-y-6">
@@ -186,6 +196,19 @@ export default function AdminInspeccionesPage() {
             </tbody>
           </table>
         </div>
+        {rows !== undefined ? (
+          <div className="flex flex-col gap-1 border-t border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {rows.length === 0
+                ? "Sin resultados para el filtro actual"
+                : `Suma de ${rows.length} inspección${rows.length === 1 ? "" : "es"} del filtro actual`}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-[#1E3A5F]">
+              Total cobrado:{" "}
+              <span className="text-base">{formatCrc(chargedTotal ?? 0)}</span>
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
