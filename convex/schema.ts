@@ -491,4 +491,90 @@ export default defineSchema({
       }),
     ),
   }).index("by_inspection", ["inspectionId"]),
+
+  /* -------------------------------------------------------------------------- */
+  /* BI — tablas nuevas (ADITIVO). Prefijo propio; solo lectura sobre operativas. */
+  /* Ver SmartCheck-BI-Proyecto/docs/MODELO-DATOS.md §1.2, §1.4, §1.6.           */
+  /* -------------------------------------------------------------------------- */
+
+  /** Ledger único: ingresos + gastos + viáticos (Sheet F1 + captura F5). §1.2 */
+  finance_entries: defineTable({
+    kind: v.union(v.literal("income"), v.literal("expense")),
+    category: v.string(), // allow-list en la mutation (RF-11)
+    isViatico: v.boolean(), // true si category ∈ {comida,gasolina,bonos,otros} (B16, RF-18)
+    amountCRC: v.number(), // NORMALIZADO a ₡ (única cifra para métricas)
+    originalAmount: v.optional(v.number()),
+    originalCurrency: v.union(v.literal("CRC"), v.literal("USD")),
+    fxRate: v.optional(v.number()), // ₡/US$ congelado (solo sep2025–feb2026)
+    date: v.number(),
+    yearMonth: v.string(), // "2025-09"
+    source: v.union(v.literal("sheet"), v.literal("manual")),
+    externalKey: v.optional(v.string()), // "sheet:<pestaña>:<etiqueta>:<n>" — idempotencia F1
+    note: v.optional(v.string()),
+    tecnico: v.optional(v.string()), // viático (RF-19)
+    localidad: v.optional(v.string()),
+    linkedInspectionId: v.optional(v.id("inspections")),
+    isDeleted: v.boolean(), // soft-delete (nunca hard-delete)
+    createdBy: v.optional(v.string()), // clerkId (Esteban) en captura manual (RF-14)
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_external_key", ["externalKey"])
+    .index("by_year_month", ["yearMonth"])
+    .index("by_kind", ["kind"]),
+
+  /** Log de calidad (nunca filtrar en silencio — AGENTS §3). §1.4 */
+  bi_quality_issues: defineTable({
+    issueType: v.string(), // orphan_pdf | zero_revenue | inspection_dup | lead_dup | ambiguous_match | anomalous_phone | incomplete_sections | fx_missing | reconciliation_gap
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warn"),
+      v.literal("error"),
+    ),
+    entity: v.string(), // tabla/entidad afectada
+    entityRef: v.string(), // id/clave
+    detail: v.optional(v.string()),
+    runId: v.string(), // corrida que lo detectó
+    detectedAt: v.number(),
+    resolved: v.boolean(),
+  })
+    .index("by_type", ["issueType"])
+    .index("by_run", ["runId"]),
+
+  /**
+   * Inspecciones históricas del CRM (Google Sheet "CRM Smartcheck") — import
+   * único, frozen (ya no se actualiza). MODELO-DATOS §8 (WP-L). ADITIVO, solo BI.
+   * `by_source_row` (extra vs §8) da la llave idempotente del import.
+   */
+  inspections_legacy: defineTable({
+    sourceRowId: v.string(), // fila del CRM (idempotencia del import)
+    inspectionDate: v.number(), // epoch ms (CR); 0 = sentinela sin fecha (ver issue missing_date)
+    clientName: v.optional(v.string()), // PII
+    phone8: v.optional(v.string()), // teléfono normalizado (27% presente)
+    plate: v.optional(v.string()), // placa (65%) — mejor llave de unión
+    vehicleBrand: v.optional(v.string()),
+    vehicleModel: v.optional(v.string()),
+    engineType: v.optional(v.string()), // Tipo de Motor (filtro B3)
+    channel: v.optional(v.string()), // Fuente (canal) — poblado
+    province: v.optional(v.string()),
+    amountCRC: v.optional(v.number()), // USD→₡ (FX WP-2) o ₡ directo; ausente si ambiguo/sin convertir
+    originalAmount: v.optional(v.number()),
+    originalCurrency: v.union(v.literal("CRC"), v.literal("USD")),
+    fxRate: v.optional(v.number()),
+    reportLink: v.optional(v.string()),
+    note: v.optional(v.string()), // outliers/flags
+  })
+    .index("by_source_row", ["sourceRowId"])
+    .index("by_plate", ["plate"])
+    .index("by_phone8", ["phone8"])
+    .index("by_date", ["inspectionDate"]),
+
+  /** Frescura/estado por proceso (RF-09). §1.6 */
+  bi_meta: defineTable({
+    key: v.string(), // "leads_sync" | "finance_migration" | "matches_rebuild"
+    lastRunAt: v.number(), // "última actualización" (RF-09)
+    lastStatus: v.union(v.literal("ok"), v.literal("error")),
+    rowsProcessed: v.optional(v.number()),
+    message: v.optional(v.string()),
+  }).index("by_key", ["key"]),
 });

@@ -128,3 +128,38 @@ pnpm test
 `tests/convex/inspections.test.ts` comprueba idempotencia: dos llamadas con el mismo `clientId` → la segunda **patchea** (`created: false`) y no crea otra fila. `tests/convex/migrations.test.ts` cubre el backfill admin de `clientId` en Convex. Los tests de Convex usan `environment: edge-runtime` (ver `vitest.config.mjs`). Con **`N8N_WEBHOOK_DISABLED=true`** (fijado en config de Vitest para esos archivos) no se encola n8n. Los módulos Convex se cargan vía `import.meta.glob` sobre `convex/**/*.ts` excluyendo solo `*.test.ts` (Vite no admite `ignore` en glob; hay que filtrar a mano).
 
 Las mutaciones por sección se pueden añadir en `sections.ts` o archivos por dominio.
+
+## BI (Business Intelligence) — `convex/bi/` + tablas `finance_entries`, `inspections_legacy`, `bi_*`
+
+> ⚠️ **NO ELIMINAR estas tablas ni la carpeta `convex/bi/`.** Convex despliega **toda** la
+> carpeta `convex/`: un `deploy` de `main` que **no** incluya `convex/bi/` **borra esas funciones
+> de producción** y rompe el dashboard BI (los datos de las tablas persisten, pero las queries/mutations
+> desaparecen). Igual, quitar una tabla del `schema.ts` la marca *"missing from schema"* y rompe las
+> funciones que la referencian. Si vas a refactorizar el schema o limpiar funciones, **deja intacto todo
+> lo marcado como BI** salvo que coordines con el proyecto BI.
+
+**Qué es esto.** SmartCheck tiene un dashboard de BI (app Next.js aparte, **dominio propio**, solo para
+Esteban) que **comparte este mismo backend de Convex**. Por eso conviven aquí lo operativo (PWA de
+inspecciones) y lo analítico (BI). Todo lo BI es **aditivo** y **solo lectura** sobre lo operativo:
+no modifica `inspections` ni las secciones.
+
+- **Modelo canónico y decisiones:** `SmartCheck-BI-Proyecto/docs/MODELO-DATOS.md` (fuera de este repo).
+- **Tablas nuevas** (prefijo/marca propia, ver comentarios en `schema.ts`):
+  | Tabla | Rol |
+  |-------|-----|
+  | `finance_entries` | Ledger único ingresos/gastos/viáticos (histórico del Sheet + captura manual futura). Cifra normalizada en **₡** (`amountCRC`). Idempotencia por `externalKey`. Soft-delete (`isDeleted`), **nunca hard-delete**. |
+  | `inspections_legacy` | Inspecciones históricas del CRM (Google Sheet, **frozen**). Import único. Idempotencia por `sourceRowId`. La PWA es el registro oficial de **este mes en adelante**; legacy cubre lo anterior. |
+  | `bi_quality_issues` | Log de calidad (outliers, ambigüedades, errores de carga). Regla: **nunca filtrar en silencio** — se marca aquí. |
+  | `bi_meta` | Frescura/estado por proceso (última corrida, ok/error). |
+
+- **Funciones (`convex/bi/`):** todas `internalMutation` / `internalQuery` — **no** accesibles desde el
+  cliente (`ConvexReactClient`), solo por CLI (`npx convex run bi/…`) o desde otras funciones internal.
+  - `bi/finance.ts` — `loadFinanceBatch` (upsert idempotente), `financeMonthlyTotals`, `setFinanceMeta`, `resetFinanceIssues`.
+  - `bi/legacy.ts` — `loadLegacyBatch`, `applyLegacyCorrections`, `legacyStats`, `loadLegacyIssues`, `setLegacyMeta`, `resetLegacyIssues`.
+  - `bi/lib/dates.ts` — helpers de fecha/period en zona `America/Costa_Rica`.
+
+- **Mutations de migración = un solo uso, idempotentes.** Cargan el histórico (Sheet financiero + CRM)
+  y aplican correcciones puntuales de Esteban. Re-correrlas **no duplica** (upsert por llave estable).
+  Se quedan en el repo como registro reproducible/auditable de la migración; son inofensivas (internal).
+
+- **Backups locales:** `/.convex-snapshots/` (gitignored) — zips de export dev/prod. **No versionar.**
