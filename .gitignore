@@ -48,3 +48,6 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# Convex — backups/exports locales (BI): zips pesados, nunca versionar
+/.convex-snapshots/
