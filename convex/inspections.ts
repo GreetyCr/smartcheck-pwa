@@ -592,14 +592,17 @@ export const getVehicleHistory = query({
   },
 });
 
-/** Admin: marca el informe PDF como entregado al cliente. */
+/** Marca el informe PDF como entregado al cliente (admin o técnico con acceso). */
 export const markReportDelivered = mutation({
   args: {
     inspectionId: v.id("inspections"),
     manychatId: v.optional(v.string()),
   },
   handler: async (ctx, { inspectionId, manychatId }) => {
-    await requireAdmin(ctx);
+    await requireUser(ctx);
+    if (!(await canAccessInspection(ctx, inspectionId))) {
+      throw new Error("No autorizado");
+    }
     const doc = await ctx.db.get(inspectionId);
     if (!doc) throw new Error("Inspección no encontrada");
     const trimmedManychat = manychatId?.trim();
