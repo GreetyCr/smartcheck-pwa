@@ -24,6 +24,7 @@ import {
   internalMutation,
   internalQuery,
 } from "../_generated/server";
+import type { FunctionArgs } from "convex/server";
 import { internal } from "../_generated/api";
 import { requireAdmin } from "../lib/auth";
 
@@ -292,6 +293,37 @@ export const writeSyncMeta = internalMutation({
 });
 
 /* ------------------------------ El sync ----------------------------------- */
+
+/**
+ * Resultado del sync. Se declara como tipo con nombre porque el handler
+ * referencia funciones de **su propio módulo** (`internal.bi.leadsSync.*`), lo
+ * que crea un ciclo de inferencia en TypeScript (TS7022/TS7023). Anotar el
+ * retorno lo corta — y sin eso, `next build` falla y los tipos de `api` se
+ * degradan a `any` para todo el repo.
+ */
+type SyncLeadsResult = {
+  skipped: boolean;
+  mode: string;
+  fetched: number;
+  inserted: number;
+  patched: number;
+  failed: number;
+  issues: number;
+  ms: number;
+};
+
+type SyncCursor = { lastRunAt: number; lastStatus: string } | null;
+
+/**
+ * Forma de fila que espera `loadLeadsBatch`, derivada de **su propio validador**
+ * (no duplicada acá). `mapRecord` construye la fila como `Record<string, any>`
+ * porque borra las claves `undefined` en caliente; el validador de la mutation
+ * es la autoridad en tiempo de ejecución y rechaza cualquier desvío.
+ */
+type LeadRowArg = FunctionArgs<
+  typeof internal.bi.leads.loadLeadsBatch
+>["rows"][number];
+
 export const syncLeadsFromAirtable = internalAction({
   args: { mode: v.optional(v.union(v.literal("full"), v.literal("incremental"))) },
   returns: v.object({
@@ -304,7 +336,7 @@ export const syncLeadsFromAirtable = internalAction({
     issues: v.number(),
     ms: v.number(),
   }),
-  handler: async (ctx, { mode }) => {
+  handler: async (ctx, { mode }): Promise<SyncLeadsResult> => {
     const startedAt = Date.now();
     const empty = { skipped: true, mode: mode ?? "", fetched: 0, inserted: 0, patched: 0, failed: 0, issues: 0, ms: 0 };
     if (process.env.AIRTABLE_SYNC_DISABLED === "true") return empty;
@@ -317,7 +349,10 @@ export const syncLeadsFromAirtable = internalAction({
       throw new Error("AIRTABLE_PAT no configurado");
     }
 
-    const cursor = await ctx.runQuery(internal.bi.leadsSync.readSyncCursor, {});
+    const cursor: SyncCursor = await ctx.runQuery(
+      internal.bi.leadsSync.readSyncCursor,
+      {},
+    );
     const isFull = mode === "full" || !cursor || !cursor.lastRunAt;
     const sinceISO = isFull ? null : new Date(cursor!.lastRunAt).toISOString();
     const runId = `leads_sync_${isFull ? "full" : "inc"}_${startedAt}`;
@@ -347,7 +382,7 @@ export const syncLeadsFromAirtable = internalAction({
 
     // 2) Mapear + upsert idempotente por airtableId (reusa loadLeadsBatch)
     const mapped = records.map(mapRecord);
-    const rows = mapped.map((m) => m.row);
+    const rows = mapped.map((m) => m.row as LeadRowArg);
     if (isFull) await ctx.runMutation(internal.bi.leads.resetLeadIssues, {});
 
     const totals = { received: 0, inserted: 0, patched: 0, failed: 0 };
