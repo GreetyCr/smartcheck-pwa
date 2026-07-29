@@ -8,9 +8,12 @@ import { FinanzasPreview } from "./preview";
  * iniciar sesión y **sin tocar datos reales**: renderiza los mismos componentes
  * con datos de muestra y las acciones de escritura desactivadas.
  *
- * No existe en producción (404) — es una herramienta de desarrollo.
+ * Disponible en local y en los **Previews de Vercel** (para que se pueda dar el
+ * visto bueno por link), pero **404 en producción real**. No se usa `NODE_ENV`:
+ * los Previews también compilan como `production`, así que la guarda mira
+ * `VERCEL_ENV`, que solo vale `"production"` en el dominio de producción.
  */
 export default function DevFinanzasPage() {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.VERCEL_ENV === "production") notFound();
   return <FinanzasPreview />;
 }
