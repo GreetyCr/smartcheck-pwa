@@ -60,12 +60,13 @@ const ENGINE_OTHER = "Otro";
 /* Helpers de normalización de texto                                          */
 /* -------------------------------------------------------------------------- */
 
-/** minúsculas, sin acentos, espacios colapsados (para comparar/mapear). */
+/** minúsculas, sin acentos, guiones bajos→espacio, espacios colapsados. */
 function norm(s: string | undefined | null): string {
   return String(s ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
+    .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -191,6 +192,121 @@ function normalizeEngine(raw: string | undefined | null): string | undefined {
 }
 
 /* -------------------------------------------------------------------------- */
+/* A32 · Clasificar ubicación del CRM: PROVINCIA vs AGENCIA vs junk            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * B26: Esteban usa el campo "Provincia"/Ubicación del CRM también para anotar el
+ * nombre de la AGENCIA/comercio donde revisó el carro (para contar revisiones por
+ * agencia). Por eso separamos:
+ *   - provincia/localidad CR  → provincia (San José, Heredia, …)
+ *   - nombre de agencia/comercio → dimensión `byAgency`; en el eje provincia = "En agencia"
+ *   - vacío / basura ("0","135","-") → "Desconocido" (único que se flagea)
+ */
+const PROVINCE_IN_AGENCY = "En agencia";
+
+/** Marcadores de "esto es un comercio/agencia" (substrings normalizados). */
+const AGENCY_MARKERS = [
+  "auto", "motor", "garage", "garaje", "seminuevos", "usados", "renta", "rent ",
+  "importad", "comercial", "agencia", "grupo", "premium", "luxury", "elite",
+  "prestige", "swap", "quality", "vehiculos", "concesionaria", "dealer",
+  // cadenas conocidas sin marcador genérico:
+  "veinsa", "danissa", "danisa", "dannissa", "carsot", "carasot", "koreauto",
+  "kautos", "jarcar", "faco", "ambacar", "purdy", "villamotors", "villa motors",
+  "zmotor", "farah", "corimotors", "starcars", "fabro", "carswap", "kardon",
+  "natura", "avis", "tqc", "goi cars", "top cars", "chito cars", "anc",
+  "star cars", "ticocar", "kia motors", "bmw uruca", "pz motors", "pzmotors",
+  "casa conde", "koreautos",
+];
+
+/** ¿La ubicación es sólo vacío/número/basura? */
+function isJunkLocation(raw: string | undefined | null): boolean {
+  const t = norm(raw);
+  if (t === "" || t === "-") return true;
+  if (/^[\d.,\s-]+$/.test(t)) return true; // "0", "135", "49000", "69.357"
+  return false;
+}
+
+/** ¿La ubicación parece nombre de agencia/comercio? */
+function isAgencyLocation(raw: string | undefined | null): boolean {
+  const t = norm(raw);
+  if (/\bcars?\b/.test(t)) return true; // "cars", "car" como palabra (no "cartago"/"cariari")
+  for (const m of AGENCY_MARKERS) if (t.includes(m)) return true;
+  return false;
+}
+
+/** Canonicaliza el nombre de agencia (colapsa variantes de las cadenas frecuentes). */
+function canonicalAgency(raw: string): string {
+  const t = norm(raw);
+  const map: Array<[string[], string]> = [
+    [["danissa", "danisa", "dannissa"], "Danissa"],
+    [["veinsa"], "VEINSA"],
+    [["carsot", "carasot"], "Carsot"],
+    [["koreauto"], "Koreautos"],
+    [["zmotor"], "ZMotors"],
+    [["quality motor"], "Quality Motors"],
+    [["red moto"], "Red Motors"],
+    [["grupo q"], "Grupo Q"],
+    [["purdy"], "Purdy"],
+    [["garage 46", "garaje 46", "garaje, 46", "garage, 46", "garaje46", "garage46"], "Autos Garage 46"],
+    [["ceroestres", "cero estres", "ceroestress", "cero estress"], "Autos Ceroestres"],
+    [["autoxperience", "auto experience", "autoexperience"], "AutoXperience"],
+    [["auto time", "autotime"], "Auto Time"],
+    [["farah"], "Farah"],
+    [["motores britanicos"], "Motores Británicos"],
+    [["villamotors", "villa motors"], "VillaMotors"],
+    [["ambacar"], "Ambacar"],
+    [["jarcar"], "Jarcar"],
+    [["faco"], "FACO"],
+    [["avis"], "Avis"],
+    [["top cars"], "Top Cars"],
+    [["goi cars"], "Goi Cars"],
+    [["luxury car"], "Luxury Car"],
+    [["pz motors", "pzmotors", "pz  motors"], "PZ Motors"],
+    [["koreautos"], "Koreautos"],
+  ];
+  for (const [keys, label] of map) {
+    for (const k of keys) if (t.includes(k)) return label;
+  }
+  // sin cadena conocida: usar el crudo original (trim + espacios colapsados).
+  return String(raw).replace(/\s+/g, " ").trim();
+}
+
+/** Clasifica la ubicación cruda → { province (etiqueta), agency? }. */
+function classifyLocation(raw: string | undefined | null): {
+  province: string;
+  agency?: string;
+} {
+  if (isJunkLocation(raw)) return { province: PROVINCE_UNKNOWN };
+  if (isAgencyLocation(raw))
+    return { province: PROVINCE_IN_AGENCY, agency: canonicalAgency(String(raw)) };
+  const prov = normalizeProvince(raw);
+  if (prov !== PROVINCE_UNKNOWN) return { province: prov };
+  // No es lugar reconocido ni basura → Esteban anotó una agencia sin marcador (B26).
+  return { province: PROVINCE_IN_AGENCY, agency: canonicalAgency(String(raw)) };
+}
+
+/* -------------------------------------------------------------------------- */
+/* A34 · Unificar CANAL a un solo vocabulario title-case                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Fusiona `Fuente` del CRM (Publicidad/Referido/Recompra/Tik Tok/Buscador) y
+ * `captureSource` de era-app (minúscula) en un eje único:
+ * Publicidad / TikTok / Buscador / Recompra / Referido / Otro. undefined si vacío.
+ */
+function normalizeChannel(raw: string | undefined | null): string | undefined {
+  const t = norm(raw);
+  if (!t) return undefined;
+  if (t.includes("tiktok") || t.includes("tik tok") || t === "tik") return "TikTok";
+  if (t.includes("publicidad")) return "Publicidad";
+  if (t.includes("buscador") || t.includes("google")) return "Buscador";
+  if (t.includes("recompra")) return "Recompra";
+  if (t.includes("referido")) return "Referido";
+  return "Otro";
+}
+
+/* -------------------------------------------------------------------------- */
 /* Vista unificada `inspections_all` (helper compartido, A30)                 */
 /* -------------------------------------------------------------------------- */
 
@@ -199,9 +315,10 @@ type UnifiedRow = {
   date: number; // epoch ms CR
   amountCRC: number | undefined;
   isPlaceholderIncome: boolean; // amount === 1000 → cuenta como revisión, sin ingreso
-  province: string; // NORMALIZADA (7 provincias CR o "Desconocido")
+  province: string; // etiqueta: 7 provincias CR | "En agencia" | "Desconocido" (A32)
+  agency: string | undefined; // nombre de agencia si la ubicación era un comercio (A32)
   engineType: string | undefined; // NORMALIZADO (canónico) o undefined si sin dato
-  channel: string | undefined; // captureSource (era-app) | Fuente CRM (legacy)
+  channel: string | undefined; // CANAL unificado title-case (A34)
   source: "legacy" | "era_app";
 };
 
@@ -275,13 +392,15 @@ async function buildInspectionsAll(ctx: { db: any }): Promise<{
       junkExcludedEra++;
       continue;
     }
+    const eraLoc = classifyLocation(r.province ?? undefined);
     eraRich.push({
       date,
       amountCRC: amount,
       isPlaceholderIncome: amount === 1000,
-      province: normalizeProvince(r.province),
+      province: eraLoc.province,
+      agency: eraLoc.agency,
       engineType: normalizeEngine(r.engineType),
-      channel: r.captureSource ?? undefined,
+      channel: normalizeChannel(r.captureSource),
       source: "era_app",
       name: norm(r.clientName),
       phone8: last8(r.clientPhone),
@@ -301,13 +420,15 @@ async function buildInspectionsAll(ctx: { db: any }): Promise<{
       junkExcludedLegacy++;
       continue;
     }
+    const legLoc = classifyLocation(r.province ?? undefined);
     legacyRich.push({
       date: r.inspectionDate,
       amountCRC: amount,
       isPlaceholderIncome: amount === 1000,
-      province: normalizeProvince(r.province),
+      province: legLoc.province,
+      agency: legLoc.agency,
       engineType: normalizeEngine(r.engineType),
-      channel: r.channel ?? undefined,
+      channel: normalizeChannel(r.channel),
       source: "legacy",
       name: norm(r.clientName),
       phone8: last8(r.phone8),
@@ -346,6 +467,7 @@ async function buildInspectionsAll(ctx: { db: any }): Promise<{
     amountCRC: r.amountCRC,
     isPlaceholderIncome: r.isPlaceholderIncome,
     province: r.province,
+    agency: r.agency,
     engineType: r.engineType,
     channel: r.channel,
     source: r.source,
@@ -419,6 +541,7 @@ export const inspectionsAll = internalQuery({
         dateISO: v.string(),
         amountCRC: v.optional(v.number()),
         province: v.string(),
+        agency: v.optional(v.string()),
         engineType: v.optional(v.string()),
         channel: v.optional(v.string()),
         source: v.string(),
@@ -447,6 +570,7 @@ export const inspectionsAll = internalQuery({
         dateISO: isoDate(r.date),
         amountCRC: r.amountCRC,
         province: r.province,
+        agency: r.agency,
         engineType: r.engineType,
         channel: r.channel,
         source: r.source,
@@ -487,6 +611,10 @@ export const totalRevisiones = internalQuery({
     byProvince: v.array(
       v.object({ key: v.string(), rows: v.number(), amountCRC: v.number() }),
     ),
+    byAgency: v.array(
+      v.object({ key: v.string(), rows: v.number(), amountCRC: v.number() }),
+    ),
+    agencyDistinct: v.number(),
     byEngineType: v.array(
       v.object({ key: v.string(), rows: v.number(), amountCRC: v.number() }),
     ),
@@ -502,12 +630,17 @@ export const totalRevisiones = internalQuery({
     const rows = built.all.filter((r) => passesFilters(r, args));
     let placeholderRows = 0;
     for (const r of rows) if (r.isPlaceholderIncome) placeholderRows++;
+    // byAgency: solo filas cuya ubicación era una agencia (A32).
+    const agencyRows = rows.filter((r) => r.agency !== undefined);
+    const byAgency = groupBy(agencyRows, (r) => r.agency as string);
     return {
       total: rows.length,
       totalSinPlaceholder: countNoPlaceholder(rows),
       placeholderRows,
       byMonth: groupBy(rows, (r) => ymFromMs(r.date), true),
       byProvince: groupBy(rows, (r) => r.province),
+      byAgency,
+      agencyDistinct: byAgency.length,
       byEngineType: groupBy(rows, (r) => r.engineType ?? "(sin motor)"),
       byChannel: groupBy(rows, (r) => r.channel ?? "(sin canal)"),
       bySource: groupBy(rows, (r) => r.source),
@@ -987,11 +1120,11 @@ export const cutoverDiagnostic = internalQuery({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Recorre legacy+era-app y marca (idempotente) en `bi_quality_issues` los valores
- * crudos de `province` que NO mapean a una provincia CR ("Desconocido"). SOLO
- * escribe en el log de calidad. Devuelve los valores crudos distintos sin mapear
- * (para curación). No flaggea engineType (los no reconocidos caen en "Otro",
- * categoría válida).
+ * Recorre legacy+era-app y marca (idempotente) en `bi_quality_issues` SOLO las
+ * ubicaciones verdaderamente vacías/basura ("0", "135", "-", en blanco) que caen
+ * en "Desconocido" (A32: los nombres de agencia YA no son basura, son dato válido
+ * en `byAgency`). SOLO escribe en el log de calidad. No flaggea engineType (no
+ * reconocidos → "Otro", categoría válida).
  */
 export const flagUnmappedProvinces = internalMutation({
   args: { runId: v.optional(v.string()) },
@@ -1023,7 +1156,8 @@ export const flagUnmappedProvinces = internalMutation({
     ) => {
       if (isJunk(name, phoneDigits, amount)) return;
       const raw = String(rawProvince ?? "").trim();
-      if (normalizeProvince(raw) === PROVINCE_UNKNOWN) {
+      // A32: solo la basura real cae en "Desconocido"; las agencias son válidas.
+      if (classifyLocation(raw).province === PROVINCE_UNKNOWN) {
         const key = raw === "" ? "(vacío)" : raw;
         unmapped.set(key, (unmapped.get(key) ?? 0) + 1);
       }
