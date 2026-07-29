@@ -13,6 +13,7 @@ import type * as bi_finance from "../bi/finance.js";
 import type * as bi_leads from "../bi/leads.js";
 import type * as bi_legacy from "../bi/legacy.js";
 import type * as bi_lib_dates from "../bi/lib/dates.js";
+import type * as bi_matches from "../bi/matches.js";
 import type * as http from "../http.js";
 import type * as inspections from "../inspections.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   "bi/leads": typeof bi_leads;
   "bi/legacy": typeof bi_legacy;
   "bi/lib/dates": typeof bi_lib_dates;
+  "bi/matches": typeof bi_matches;
   http: typeof http;
   inspections: typeof inspections;
   "lib/auth": typeof lib_auth;

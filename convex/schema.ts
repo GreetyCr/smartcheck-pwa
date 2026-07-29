@@ -569,6 +569,65 @@ export default defineSchema({
     .index("by_phone8", ["phone8"])
     .index("by_date", ["inspectionDate"]),
 
+  /**
+   * Emparejamiento materializado lead ↔ inspección (embudo de conversión). §1.3 + §8.
+   *
+   * ADITIVO, solo BI. Se **recomputa completo** en cada rebuild (barato a esta
+   * escala). "Lead convertido" = existe un `bi_matches` con `validIncome=true`
+   * (la inspección emparejada tiene ingreso válido). La verdad de conversión es
+   * ESTA tabla, no `leads_contacts.leadStage` (que es caché).
+   *
+   * EXTENSIONES sobre el §1.3 original (que precede a la tabla legacy del §8):
+   *  - `legacyInspectionId` + `matchTarget`: la vista unificada `inspections_all`
+   *    (§8) abarca DOS tablas (`inspections` era-app ≥ corte, `inspections_legacy`
+   *    < corte). El §1.3 solo referenciaba `inspections`; se añade la referencia a
+   *    legacy para poder materializar matches de ambas fuentes (espeja los cachés
+   *    `linkedInspectionId`/`linkedLegacyId` de `leads_contacts`).
+   *  - `name_vehicle_window` en `matchMethod` y `confidenceBand`: la cascada de
+   *    confianza pedida (alta/media/baja) incluye el fallback débil nombre+vehículo.
+   *  - `validIncome`/`amountCRC`/`inspectionDate` desnormalizados: sirven el
+   *    embudo y la muestra "quiénes convierten" sin re-leer las inspecciones.
+   */
+  bi_matches: defineTable({
+    // Lado lead
+    phone8: v.optional(v.string()), // llave de join (ausente si match por nombre sin teléfono)
+    leadDedupKey: v.optional(v.string()), // → leads_contacts.dedupKey (FK lógica, §4)
+    leadId: v.optional(v.id("leads_contacts")), // referencia directa (conveniencia)
+    // Lado inspección (una de las dos según matchTarget; vista unificada §8)
+    matchTarget: v.union(
+      v.literal("era_app"), // inspección Convex (≥ corte)
+      v.literal("legacy"), // inspección CRM histórica (< corte)
+      v.literal("none"), // reservado (fila sin inspección)
+    ),
+    inspectionId: v.optional(v.id("inspections")), // era-app (§1.3)
+    legacyInspectionId: v.optional(v.id("inspections_legacy")), // legacy (§8, extensión)
+    // Método / confianza (cascada §2)
+    matchMethod: v.union(
+      v.literal("manychat"), // futuro (cuando el dev pueble manychatId)
+      v.literal("phone_exact"), // phone8 exacto, sin ambigüedad → alta
+      v.literal("phone_vehicle_window"), // phone8 + desambiguación vehículo/ventana → media
+      v.literal("name_vehicle_window"), // fallback débil nombre+vehículo+ventana → baja
+      v.literal("unmatched"), // reservado
+    ),
+    matchKey: v.string(), // valor natural usado ("phone:<8>" o "name:<n>|brand:<b>")
+    confidence: v.number(), // 0..1
+    confidenceBand: v.union(
+      v.literal("alta"),
+      v.literal("media"),
+      v.literal("baja"),
+    ),
+    ambiguous: v.boolean(), // varios leads/inspecciones para el mismo phone8
+    validIncome: v.boolean(), // la inspección emparejada tiene ingreso válido (define conversión)
+    // Desnormalizado de la inspección (embudo / muestra "quiénes convierten")
+    inspectionDate: v.optional(v.number()),
+    amountCRC: v.optional(v.number()),
+    computedAt: v.number(),
+  })
+    .index("by_phone8", ["phone8"])
+    .index("by_lead", ["leadDedupKey"])
+    .index("by_inspection", ["inspectionId"])
+    .index("by_legacy_inspection", ["legacyInspectionId"]),
+
   /** Frescura/estado por proceso (RF-09). §1.6 */
   bi_meta: defineTable({
     key: v.string(), // "leads_sync" | "finance_migration" | "matches_rebuild"
