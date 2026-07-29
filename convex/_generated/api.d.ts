@@ -11,10 +11,12 @@
 import type * as admin from "../admin.js";
 import type * as bi_finance from "../bi/finance.js";
 import type * as bi_leads from "../bi/leads.js";
+import type * as bi_leadsSync from "../bi/leadsSync.js";
 import type * as bi_legacy from "../bi/legacy.js";
 import type * as bi_lib_dates from "../bi/lib/dates.js";
 import type * as bi_matches from "../bi/matches.js";
 import type * as bi_metrics from "../bi/metrics.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as inspections from "../inspections.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -38,10 +40,12 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   "bi/finance": typeof bi_finance;
   "bi/leads": typeof bi_leads;
+  "bi/leadsSync": typeof bi_leadsSync;
   "bi/legacy": typeof bi_legacy;
   "bi/lib/dates": typeof bi_lib_dates;
   "bi/matches": typeof bi_matches;
   "bi/metrics": typeof bi_metrics;
+  crons: typeof crons;
   http: typeof http;
   inspections: typeof inspections;
   "lib/auth": typeof lib_auth;
