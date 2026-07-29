@@ -60,6 +60,17 @@ export function isoDate(epochMs: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/**
+ * Medianoche local CR (UTC-6 fijo, sin DST) de un día ISO "YYYY-MM-DD" → epoch ms.
+ * Lanza si el día es inválido. Usado por la carga (`bi/finance.ts`) y por la
+ * captura manual del formulario de finanzas (F5) — misma conversión en ambos.
+ */
+export function crMidnightMs(isoDay: string): number {
+  const ms = Date.parse(`${isoDay}T00:00:00-06:00`);
+  if (Number.isNaN(ms)) throw new Error(`fecha inválida: "${isoDay}"`);
+  return ms;
+}
+
 /** Epoch ms actual (indirección testeable para `Date.now()`). */
 export function nowMs(): number {
   return Date.now();
