@@ -28,6 +28,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
 
 /* -------------------------------------------------------------------------- */
@@ -652,84 +653,101 @@ export const totalRevisiones = internalQuery({
 /* 3. financeSummary — ingresos/gastos/utilidad por mes (finance_entries, ₡)   */
 /* -------------------------------------------------------------------------- */
 
-export const financeSummary = internalQuery({
-  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
-  returns: v.object({
-    months: v.array(
-      v.object({
-        yearMonth: v.string(),
-        rows: v.number(),
-        income: v.number(),
-        expense: v.number(),
-        utilidad: v.number(),
-        marginPct: v.number(),
-      }),
-    ),
-    totals: v.object({
+/** Validador de salida de `financeSummary` (compartido con el wrapper público `bi/public.ts`). */
+export const financeSummaryReturns = v.object({
+  months: v.array(
+    v.object({
+      yearMonth: v.string(),
       rows: v.number(),
       income: v.number(),
       expense: v.number(),
       utilidad: v.number(),
       marginPct: v.number(),
-      viaticoCount: v.number(),
-      viaticoAmountCRC: v.number(),
     }),
+  ),
+  totals: v.object({
+    rows: v.number(),
+    income: v.number(),
+    expense: v.number(),
+    utilidad: v.number(),
+    marginPct: v.number(),
+    viaticoCount: v.number(),
+    viaticoAmountCRC: v.number(),
   }),
+});
+
+/**
+ * Cómputo PURO de `financeSummary` (sin Convex): recibe las filas ya leídas de
+ * `finance_entries` y devuelve la serie mensual + totales. Se comparte entre la
+ * `internalQuery` y el wrapper público (`bi/public.ts`) porque en Convex una
+ * `query` no puede `ctx.runQuery` (A41). Excluye `isDeleted`.
+ */
+export function computeFinanceSummary(
+  rows: Doc<"finance_entries">[],
+  fromMs?: number,
+  toMs?: number,
+) {
+  const byMonth = new Map<
+    string,
+    { rows: number; income: number; expense: number }
+  >();
+  let viaticoCount = 0;
+  let viaticoAmountCRC = 0;
+  for (const r of rows) {
+    if (r.isDeleted) continue;
+    if (fromMs != null && r.date < fromMs) continue;
+    if (toMs != null && r.date >= toMs) continue;
+    if (r.isViatico) {
+      viaticoCount++;
+      viaticoAmountCRC += r.amountCRC;
+    }
+    const m = byMonth.get(r.yearMonth) ?? { rows: 0, income: 0, expense: 0 };
+    m.rows++;
+    if (r.kind === "income") m.income += r.amountCRC;
+    else m.expense += r.amountCRC;
+    byMonth.set(r.yearMonth, m);
+  }
+  const pct = (util: number, inc: number) =>
+    inc > 0 ? Math.round((util / inc) * 10000) / 100 : 0;
+  const months = [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([yearMonth, m]) => ({
+      yearMonth,
+      rows: m.rows,
+      income: m.income,
+      expense: m.expense,
+      utilidad: m.income - m.expense,
+      marginPct: pct(m.income - m.expense, m.income),
+    }));
+  const t = months.reduce(
+    (acc, m) => ({
+      rows: acc.rows + m.rows,
+      income: acc.income + m.income,
+      expense: acc.expense + m.expense,
+    }),
+    { rows: 0, income: 0, expense: 0 },
+  );
+  const utilidad = t.income - t.expense;
+  return {
+    months,
+    totals: {
+      rows: t.rows,
+      income: t.income,
+      expense: t.expense,
+      utilidad,
+      marginPct: pct(utilidad, t.income),
+      viaticoCount,
+      viaticoAmountCRC,
+    },
+  };
+}
+
+export const financeSummary = internalQuery({
+  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
+  returns: financeSummaryReturns,
   handler: async (ctx, { fromMs, toMs }) => {
     const rows = await ctx.db.query("finance_entries").collect();
-    const byMonth = new Map<
-      string,
-      { rows: number; income: number; expense: number }
-    >();
-    let viaticoCount = 0;
-    let viaticoAmountCRC = 0;
-    for (const r of rows) {
-      if (r.isDeleted) continue;
-      if (fromMs != null && r.date < fromMs) continue;
-      if (toMs != null && r.date >= toMs) continue;
-      if (r.isViatico) {
-        viaticoCount++;
-        viaticoAmountCRC += r.amountCRC;
-      }
-      const m = byMonth.get(r.yearMonth) ?? { rows: 0, income: 0, expense: 0 };
-      m.rows++;
-      if (r.kind === "income") m.income += r.amountCRC;
-      else m.expense += r.amountCRC;
-      byMonth.set(r.yearMonth, m);
-    }
-    const pct = (util: number, inc: number) =>
-      inc > 0 ? Math.round((util / inc) * 10000) / 100 : 0;
-    const months = [...byMonth.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([yearMonth, m]) => ({
-        yearMonth,
-        rows: m.rows,
-        income: m.income,
-        expense: m.expense,
-        utilidad: m.income - m.expense,
-        marginPct: pct(m.income - m.expense, m.income),
-      }));
-    const t = months.reduce(
-      (acc, m) => ({
-        rows: acc.rows + m.rows,
-        income: acc.income + m.income,
-        expense: acc.expense + m.expense,
-      }),
-      { rows: 0, income: 0, expense: 0 },
-    );
-    const utilidad = t.income - t.expense;
-    return {
-      months,
-      totals: {
-        rows: t.rows,
-        income: t.income,
-        expense: t.expense,
-        utilidad,
-        marginPct: pct(utilidad, t.income),
-        viaticoCount,
-        viaticoAmountCRC,
-      },
-    };
+    return computeFinanceSummary(rows, fromMs, toMs);
   },
 });
 
