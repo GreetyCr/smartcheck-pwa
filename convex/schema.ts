@@ -577,4 +577,93 @@ export default defineSchema({
     rowsProcessed: v.optional(v.number()),
     message: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  /**
+   * Leads / contactos — FUENTE DE VERDAD (operativa + BI), reemplaza a Airtable
+   * "Vehículos". MODELO-LEADS-CONTACTS-v2. ADITIVO. Carga histórica 1:1 por
+   * `airtableId` (sin fusionar; duplicados → `bi_quality_issues` para curación,
+   * A26). Dedup en cascada manychatId→phone8 en el upsert continuo.
+   */
+  leads_contacts: defineTable({
+    // Identidad / dedup
+    dedupKey: v.string(), // COALESCE(manychatId, phone8, "synthetic:"+_id)
+    manychatId: v.optional(v.string()), // llave fuerte a futuro (bots); vacía en histórico
+    phone8: v.optional(v.string()), // últimos 8 díg CR — join con inspections
+    phoneValid: v.boolean(), // false si placeholder/PSID/anómalo
+    rawPhone: v.optional(v.string()), // WhatsApp original (auditar normalización)
+    // Contacto / persona (PII)
+    name: v.optional(v.string()),
+    locality: v.optional(v.string()),
+    needsInvoice: v.optional(v.boolean()),
+    // Vehículo (desambiguar match tel↔inspección)
+    vehicleBrand: v.optional(v.string()),
+    vehicleModel: v.optional(v.string()),
+    vehicleYear: v.optional(v.number()),
+    transmissionType: v.optional(v.string()),
+    engineType: v.optional(v.string()),
+    tractionType: v.optional(v.string()),
+    vehicleConditionNote: v.optional(v.string()),
+    // Ciclo de vida operativo
+    leadStage: v.union(
+      v.literal("nuevo"),
+      v.literal("contactado"),
+      v.literal("en_seguimiento"),
+      v.literal("agendado"),
+      v.literal("convertido"), // caché derivada de bi_matches, no verdad de conversión
+      v.literal("perdido"),
+      v.literal("expirado"),
+    ),
+    paymentStatus: v.optional(
+      v.union(
+        v.literal("esperando"),
+        v.literal("recibido"),
+        v.literal("expirado"),
+        v.literal("en_handoff"),
+      ),
+    ),
+    channel: v.optional(
+      v.union(
+        v.literal("publicidad"),
+        v.literal("tiktok"),
+        v.literal("buscador"),
+        v.literal("recompra"),
+        v.literal("referido"),
+        v.literal("otro"),
+      ),
+    ),
+    chatbotActive: v.optional(v.boolean()), // "Chatbot Activado"
+    reminders: v.optional(v.string()),
+    // Cadencia de seguimiento (banderas del bot)
+    followup2hDone: v.optional(v.boolean()),
+    followup23hDone: v.optional(v.boolean()),
+    followup48hDone: v.optional(v.boolean()),
+    auditCompleted: v.optional(v.boolean()),
+    sentToSecondTech: v.optional(v.boolean()),
+    // Timestamps de negocio (epoch ms, TZ CR)
+    sourceCreatedAt: v.optional(v.number()), // "Creada" de Airtable
+    lastContactAt: v.optional(v.number()),
+    appointmentAt: v.optional(v.number()),
+    paymentPendingAt: v.optional(v.number()),
+    // Enlace con el modelo (cachés del match; inspections NO se toca)
+    linkedInspectionId: v.optional(v.id("inspections")),
+    linkedLegacyId: v.optional(v.id("inspections_legacy")),
+    // Provenance / dedup / auditoría
+    source: v.union(
+      v.literal("airtable_migration"),
+      v.literal("bot"),
+      v.literal("manual"),
+    ),
+    airtableId: v.optional(v.string()), // "rec…" — trazabilidad de la migración
+    mergedAirtableIds: v.optional(v.array(v.string())), // reservado (no se fusiona en la carga inicial, A26)
+    isDeleted: v.boolean(), // soft-delete (nunca hard-delete)
+    createdAt: v.number(), // alta EN CONVEX
+    updatedAt: v.number(),
+  })
+    .index("by_dedup_key", ["dedupKey"])
+    .index("by_manychat", ["manychatId"])
+    .index("by_phone8", ["phone8"])
+    .index("by_airtable_id", ["airtableId"]) // idempotencia de la carga 1:1 (A26)
+    .index("by_stage", ["leadStage"])
+    .index("by_source_created", ["sourceCreatedAt"])
+    .index("by_created", ["createdAt"]),
 });
