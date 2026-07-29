@@ -27,6 +27,7 @@ const nav: {
   exact?: boolean;
 }[] = [
   { href: "/admin", label: "Dashboard", Icon: LayoutDashboard, exact: true },
+  { href: "/admin/finanzas", label: "Finanzas", Icon: BarChart3 },
   { href: "/admin/inspecciones", label: "Inspecciones", Icon: Car },
   { href: "/admin/tecnicos", label: "Técnicos", Icon: Users },
   { href: "/admin/configuracion", label: "Configuración", Icon: Settings },
