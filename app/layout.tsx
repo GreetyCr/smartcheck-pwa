@@ -85,11 +85,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Las variables de fuente van en `<html>`, no en `<body>`: `@layer base`
+  // aplica `font-family` sobre `html`, y una variable declarada en `body` no es
+  // visible ahí (la búsqueda ocurre en el elemento donde se aplica la
+  // propiedad). Con ellas en `body`, `font-family` quedaba inválida y toda la
+  // app heredaba el serif del navegador.
   return (
-    <html lang="es">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${barlowCondensed.variable} antialiased`}
-      >
+    <html
+      lang="es"
+      className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${barlowCondensed.variable}`}
+    >
+      <body className="antialiased">
         <ClerkProvider>
           <NextSSRPlugin
             routerConfig={extractRouterConfig(ourFileRouter)}
