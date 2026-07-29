@@ -16,16 +16,26 @@ export default async function AdminLayout({
   }
 
   // Gate por ROL admin, no solo por sesión. El rol vive en la tabla `users` de
-  // Convex (sincronizada por webhook de Clerk). Los datos ya están protegidos
-  // por `requireAdmin` en cada función; este chequeo server-side evita además
-  // que la UI del panel sea navegable por un técnico. Fail-closed: si no se
-  // resuelve el rol como admin, se redirige al área de técnico.
-  const token = audIncludesConvex(sessionClaims?.aud)
-    ? await getToken()
-    : await getToken({ template: "convex" });
-  const me = token ? await fetchQuery(api.users.getMe, {}, { token }) : null;
+  // Convex (sincronizada por webhook de Clerk).
+  //
+  // Solo redirige ante un **no-admin confirmado**. Si el rol no se puede
+  // resolver (token que no se emite, Convex inalcanzable, fila de `users` aún
+  // no sincronizada por el webhook), deja pasar a propósito: los gates reales
+  // son `requireAdmin` en cada función de Convex — sin él no sale ni un dato —
+  // y el chequeo de rol de `AdminAppShell`, ya probado en producción. Este
+  // chequeo es de UX (que un técnico no navegue el panel), así que no debe
+  // poder dejar a los admins afuera por un problema de infraestructura.
+  let me: { role?: string } | null = null;
+  try {
+    const token = audIncludesConvex(sessionClaims?.aud)
+      ? await getToken()
+      : await getToken({ template: "convex" });
+    me = token ? await fetchQuery(api.users.getMe, {}, { token }) : null;
+  } catch {
+    me = null; // no se pudo resolver → decide el shell/backend
+  }
 
-  if (me?.role !== "admin") {
+  if (me && me.role !== "admin") {
     redirect("/inspecciones");
   }
 
