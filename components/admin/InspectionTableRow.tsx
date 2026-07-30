@@ -9,8 +9,37 @@ import {
   buildInspectionPriceBreakdown,
   formatCrc,
 } from "@/lib/admin/inspectionPrice";
-import { formatInspectionDate, getInspectionUiStatus } from "@/lib/inspection-ui";
+import {
+  formatInspectionDate,
+  getInspectionUiStatus,
+  type InspectionBadgeKind,
+} from "@/lib/inspection-ui";
 import { cn } from "@/lib/utils";
+
+/**
+ * Badges del estado sobre la superficie grafito.
+ *
+ * `getInspectionUiStatus` devuelve clases pensadas para fondo claro (`text-…-900`)
+ * y la comparte la app de técnicos, así que **no se toca**: acá se reusa solo su
+ * `kind` + `label` y se repinta con los tokens del BI.
+ *
+ * Contraste del texto sobre `--bi-plane` (#0f1318): income 5,9:1 · warn 10,2:1 ·
+ * good 9,2:1 — todos por encima del 4,5:1 exigido para texto pequeño.
+ * "Sincronizado" e "Informe entregado" comparten hue: se distinguen por relleno
+ * (contorno vs. sólido) **y** por el rótulo, nunca por color solo.
+ */
+const BADGE_CLASS: Record<InspectionBadgeKind, string> = {
+  borrador:
+    "border-[var(--bi-ring)] bg-[var(--bi-plane)] text-[var(--bi-ink-2)]",
+  completado:
+    "border-[var(--bi-income)]/45 bg-[var(--bi-plane)] text-[var(--bi-income)]",
+  pendiente_sync:
+    "border-[var(--bi-warn)]/50 bg-[var(--bi-plane)] text-[var(--bi-warn)]",
+  sincronizado:
+    "border-[var(--bi-good)]/45 bg-[var(--bi-plane)] text-[var(--bi-good)]",
+  informe_entregado:
+    "border-transparent bg-[var(--bi-good)] text-[#06220f]",
+};
 
 type InspectionTableRowProps = {
   inspection: Doc<"inspections">;
@@ -112,8 +141,8 @@ function PriceBreakdownTooltip({
       <span
         ref={triggerRef}
         className={cn(
-          "cursor-default font-semibold tabular-nums text-[#1E3A5F]",
-          totalLabel === "—" && "font-normal text-muted-foreground",
+          "bi-num cursor-default rounded font-semibold text-[var(--bi-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]",
+          totalLabel === "—" && "font-normal text-[var(--bi-ink-3)]",
         )}
         tabIndex={0}
         aria-describedby={open ? tipId : undefined}
@@ -124,6 +153,9 @@ function PriceBreakdownTooltip({
       >
         {totalLabel}
       </span>
+      {/* El tooltip se monta en `document.body`, fuera de `.bi-graphite`, así
+          que lleva su propio ámbito de tema: sin él los tokens no resuelven y
+          la tarjeta sale transparente. */}
       {mounted && open && pos
         ? createPortal(
             <div
@@ -136,10 +168,10 @@ function PriceBreakdownTooltip({
               }}
               id={tipId}
               role="tooltip"
-              className="pointer-events-none fixed z-9999 w-56 rounded-xl border border-border bg-white p-3 text-left shadow-lg"
+              className="bi-graphite pointer-events-none fixed z-9999 w-56 rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-surface-2)] p-3 text-left shadow-2xl"
               style={{ top: pos.top, left: pos.left }}
             >
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              <p className="bi-num mb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--bi-ink-3)]">
                 Desglose de precio
               </p>
               <ul className="space-y-1.5">
@@ -148,8 +180,8 @@ function PriceBreakdownTooltip({
                     key={line.label}
                     className="flex items-start justify-between gap-3 text-xs"
                   >
-                    <span className="text-muted-foreground">{line.label}</span>
-                    <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                    <span className="text-[var(--bi-ink-3)]">{line.label}</span>
+                    <span className="bi-num shrink-0 font-medium text-[var(--bi-ink)]">
                       {line.value}
                     </span>
                   </li>
@@ -168,34 +200,34 @@ export function InspectionTableRow({
   technicianName,
   pdfInfo,
 }: InspectionTableRowProps) {
-  const { label, className: badgeClass } = getInspectionUiStatus(inspection);
+  const { kind, label } = getInspectionUiStatus(inspection);
   const breakdown = buildInspectionPriceBreakdown(inspection);
   const totalLabel = formatCrc(inspection.totalAmountCharged);
 
   return (
-    <tr className="border-b border-border/80 bg-white text-sm last:border-0">
-      <td className="px-3 py-3 font-semibold text-[#1E3A5F]">
+    <tr className="border-b border-[var(--bi-ring)]/60 text-sm transition-colors last:border-0 hover:bg-[var(--bi-surface-2)]">
+      <td className="px-3 py-3">
         <Link
           href={`/inspecciones/${inspection._id}`}
-          className="hover:underline"
+          className="bi-num rounded font-semibold text-[var(--bi-ink)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]"
         >
           {formatPlate(inspection)}
         </Link>
       </td>
-      <td className="hidden px-3 py-3 text-muted-foreground sm:table-cell">
+      <td className="hidden px-3 py-3 text-[var(--bi-ink-2)] sm:table-cell">
         {[inspection.vehicleBrand, inspection.vehicleModel, inspection.vehicleYear]
           .filter(Boolean)
           .join(" ") || "—"}
       </td>
-      <td className="px-3 py-3 text-muted-foreground">{technicianName}</td>
-      <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">
+      <td className="px-3 py-3 text-[var(--bi-ink-2)]">{technicianName}</td>
+      <td className="hidden whitespace-nowrap px-3 py-3 text-[var(--bi-ink-3)] md:table-cell">
         {formatInspectionDate(inspection._creationTime)}
       </td>
       <td className="px-3 py-3">
         <span
           className={cn(
-            "inline-block rounded-lg px-2 py-1 text-[10px] font-bold uppercase",
-            badgeClass,
+            "inline-block whitespace-nowrap rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide",
+            BADGE_CLASS[kind],
           )}
         >
           {label}
@@ -206,17 +238,26 @@ export function InspectionTableRow({
       </td>
       <td className="px-3 py-3 text-right">
         {pdfInfo?.url ? (
+          /* `relative` es obligatorio: el `sr-only` de abajo es
+             `position:absolute` y, sin ancestro posicionado, su bloque
+             contenedor sería el ICB. Al estar a ~730px del borde izquierdo se
+             escapaba del `overflow-x-auto` de la tabla y le metía scroll
+             horizontal al documento entero. */
           <a
             href={pdfInfo.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-lg border border-[#FF8C00]/40 px-2 py-1 text-xs font-semibold text-[#FF8C00] hover:bg-[#FF8C00]/10"
+            className="relative inline-flex items-center gap-1 rounded-lg border border-[var(--bi-income)]/45 px-2 py-1 text-xs font-semibold text-[var(--bi-income)] transition-colors hover:bg-[var(--bi-income)]/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]"
           >
-            <FileText className="size-3.5" />
+            <FileText className="size-3.5" aria-hidden />
             PDF
+            <span className="sr-only">
+              {" "}
+              de la inspección {formatPlate(inspection)}
+            </span>
           </a>
         ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="text-xs text-[var(--bi-ink-3)]">—</span>
         )}
       </td>
     </tr>

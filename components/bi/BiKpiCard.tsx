@@ -1,19 +1,20 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /**
  * Tarjeta de indicador (stat tile). El valor grande usa cifras proporcionales
  * (no tabulares: no es una columna que deba alinearse). El delta va **siempre
  * con icono + rótulo**, nunca comunicado solo por color.
  */
-export type KpiTone = "income" | "expense" | "utilidad" | "neutral";
+export type KpiTone = "income" | "expense" | "utilidad" | "warn" | "neutral";
 
 const TONE_VAR: Record<KpiTone, string> = {
   income: "var(--bi-income)",
   expense: "var(--bi-expense)",
   utilidad: "var(--bi-good)",
+  /** Métrica que pide acción (p. ej. inspecciones sin sincronizar). */
+  warn: "var(--bi-warn)",
   neutral: "var(--bi-ink-3)",
 };
 

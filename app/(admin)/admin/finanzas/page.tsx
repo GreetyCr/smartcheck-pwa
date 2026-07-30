@@ -33,7 +33,8 @@ export default function FinanzasPage() {
 
   if (summary === undefined) {
     return (
-      <div className="bi-graphite -m-4 min-h-[calc(100dvh-4rem)] bg-[var(--bi-plane)] p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
+      // El fondo grafito lo pone el shell; acá solo va el esqueleto.
+      <div>
         <div className="bi-skeleton h-9 w-48 rounded-lg" />
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (

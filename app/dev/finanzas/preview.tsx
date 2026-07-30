@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
 import type { FinanceEntry, FinanceSummary } from "@/components/bi/types";
+import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
+import { cn } from "@/lib/utils";
 
 /**
  * Datos de MUESTRA (no salen de Convex) con magnitudes parecidas a las reales
@@ -56,11 +58,10 @@ export function FinanzasPreview() {
         <strong>Vista de revisión visual</strong> — datos de muestra, acciones de
         escritura desactivadas. No existe en producción.
       </div>
-      {/* El tablero cancela con márgenes negativos el padding del `main` del
-          shell de /admin (sangrado a los bordes). Acá no hay shell, así que se
-          replica ese padding: sin esto el contenido sobresale 32px y la página
-          scrollea horizontalmente. */}
-      <div className="p-4 md:p-6 lg:p-8">
+      {/* Acá no hay shell de /admin, así que este envoltorio hace su papel:
+          aplica el tema grafito y el mismo padding de contenido. Sin él el
+          tablero se vería sobre fondo claro y sin tokens. */}
+      <div className={cn(ADMIN_THEME_CLASS, ADMIN_CONTENT_PADDING, "min-h-dvh")}>
         {/* Interactivo a propósito: el formulario y el diálogo de borrado también
             se revisan. Los handlers rechazan con un mensaje claro en vez de
             simular un guardado que no ocurre. */}

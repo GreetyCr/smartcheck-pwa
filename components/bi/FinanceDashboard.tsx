@@ -142,7 +142,10 @@ export function FinanceDashboard({
     : "Todo el histórico";
 
   return (
-    <div className="bi-graphite -m-4 min-h-[calc(100dvh-4rem)] bg-[var(--bi-plane)] p-4 text-[var(--bi-ink)] md:-m-6 md:p-6 lg:-m-8 lg:p-8">
+    /* El tema (`.bi-graphite`, plano y tinta) lo aplica el contenedor: el shell
+       de `/admin` o el envoltorio de la vista de revisión. Este componente solo
+       maqueta —antes cancelaba el padding del `main` con márgenes negativos. */
+    <div>
       {/* ---------- encabezado ---------- */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
