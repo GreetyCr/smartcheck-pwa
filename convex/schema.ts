@@ -569,6 +569,65 @@ export default defineSchema({
     .index("by_phone8", ["phone8"])
     .index("by_date", ["inspectionDate"]),
 
+  /**
+   * Emparejamiento materializado lead ↔ inspección (embudo de conversión). §1.3 + §8.
+   *
+   * ADITIVO, solo BI. Se **recomputa completo** en cada rebuild (barato a esta
+   * escala). "Lead convertido" = existe un `bi_matches` con `validIncome=true`
+   * (la inspección emparejada tiene ingreso válido). La verdad de conversión es
+   * ESTA tabla, no `leads_contacts.leadStage` (que es caché).
+   *
+   * EXTENSIONES sobre el §1.3 original (que precede a la tabla legacy del §8):
+   *  - `legacyInspectionId` + `matchTarget`: la vista unificada `inspections_all`
+   *    (§8) abarca DOS tablas (`inspections` era-app ≥ corte, `inspections_legacy`
+   *    < corte). El §1.3 solo referenciaba `inspections`; se añade la referencia a
+   *    legacy para poder materializar matches de ambas fuentes (espeja los cachés
+   *    `linkedInspectionId`/`linkedLegacyId` de `leads_contacts`).
+   *  - `name_vehicle_window` en `matchMethod` y `confidenceBand`: la cascada de
+   *    confianza pedida (alta/media/baja) incluye el fallback débil nombre+vehículo.
+   *  - `validIncome`/`amountCRC`/`inspectionDate` desnormalizados: sirven el
+   *    embudo y la muestra "quiénes convierten" sin re-leer las inspecciones.
+   */
+  bi_matches: defineTable({
+    // Lado lead
+    phone8: v.optional(v.string()), // llave de join (ausente si match por nombre sin teléfono)
+    leadDedupKey: v.optional(v.string()), // → leads_contacts.dedupKey (FK lógica, §4)
+    leadId: v.optional(v.id("leads_contacts")), // referencia directa (conveniencia)
+    // Lado inspección (una de las dos según matchTarget; vista unificada §8)
+    matchTarget: v.union(
+      v.literal("era_app"), // inspección Convex (≥ corte)
+      v.literal("legacy"), // inspección CRM histórica (< corte)
+      v.literal("none"), // reservado (fila sin inspección)
+    ),
+    inspectionId: v.optional(v.id("inspections")), // era-app (§1.3)
+    legacyInspectionId: v.optional(v.id("inspections_legacy")), // legacy (§8, extensión)
+    // Método / confianza (cascada §2)
+    matchMethod: v.union(
+      v.literal("manychat"), // futuro (cuando el dev pueble manychatId)
+      v.literal("phone_exact"), // phone8 exacto, sin ambigüedad → alta
+      v.literal("phone_vehicle_window"), // phone8 + desambiguación vehículo/ventana → media
+      v.literal("name_vehicle_window"), // fallback débil nombre+vehículo+ventana → baja
+      v.literal("unmatched"), // reservado
+    ),
+    matchKey: v.string(), // valor natural usado ("phone:<8>" o "name:<n>|brand:<b>")
+    confidence: v.number(), // 0..1
+    confidenceBand: v.union(
+      v.literal("alta"),
+      v.literal("media"),
+      v.literal("baja"),
+    ),
+    ambiguous: v.boolean(), // varios leads/inspecciones para el mismo phone8
+    validIncome: v.boolean(), // la inspección emparejada tiene ingreso válido (define conversión)
+    // Desnormalizado de la inspección (embudo / muestra "quiénes convierten")
+    inspectionDate: v.optional(v.number()),
+    amountCRC: v.optional(v.number()),
+    computedAt: v.number(),
+  })
+    .index("by_phone8", ["phone8"])
+    .index("by_lead", ["leadDedupKey"])
+    .index("by_inspection", ["inspectionId"])
+    .index("by_legacy_inspection", ["legacyInspectionId"]),
+
   /** Frescura/estado por proceso (RF-09). §1.6 */
   bi_meta: defineTable({
     key: v.string(), // "leads_sync" | "finance_migration" | "matches_rebuild"
@@ -577,4 +636,93 @@ export default defineSchema({
     rowsProcessed: v.optional(v.number()),
     message: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  /**
+   * Leads / contactos — FUENTE DE VERDAD (operativa + BI), reemplaza a Airtable
+   * "Vehículos". MODELO-LEADS-CONTACTS-v2. ADITIVO. Carga histórica 1:1 por
+   * `airtableId` (sin fusionar; duplicados → `bi_quality_issues` para curación,
+   * A26). Dedup en cascada manychatId→phone8 en el upsert continuo.
+   */
+  leads_contacts: defineTable({
+    // Identidad / dedup
+    dedupKey: v.string(), // COALESCE(manychatId, phone8, "synthetic:"+_id)
+    manychatId: v.optional(v.string()), // llave fuerte a futuro (bots); vacía en histórico
+    phone8: v.optional(v.string()), // últimos 8 díg CR — join con inspections
+    phoneValid: v.boolean(), // false si placeholder/PSID/anómalo
+    rawPhone: v.optional(v.string()), // WhatsApp original (auditar normalización)
+    // Contacto / persona (PII)
+    name: v.optional(v.string()),
+    locality: v.optional(v.string()),
+    needsInvoice: v.optional(v.boolean()),
+    // Vehículo (desambiguar match tel↔inspección)
+    vehicleBrand: v.optional(v.string()),
+    vehicleModel: v.optional(v.string()),
+    vehicleYear: v.optional(v.number()),
+    transmissionType: v.optional(v.string()),
+    engineType: v.optional(v.string()),
+    tractionType: v.optional(v.string()),
+    vehicleConditionNote: v.optional(v.string()),
+    // Ciclo de vida operativo
+    leadStage: v.union(
+      v.literal("nuevo"),
+      v.literal("contactado"),
+      v.literal("en_seguimiento"),
+      v.literal("agendado"),
+      v.literal("convertido"), // caché derivada de bi_matches, no verdad de conversión
+      v.literal("perdido"),
+      v.literal("expirado"),
+    ),
+    paymentStatus: v.optional(
+      v.union(
+        v.literal("esperando"),
+        v.literal("recibido"),
+        v.literal("expirado"),
+        v.literal("en_handoff"),
+      ),
+    ),
+    channel: v.optional(
+      v.union(
+        v.literal("publicidad"),
+        v.literal("tiktok"),
+        v.literal("buscador"),
+        v.literal("recompra"),
+        v.literal("referido"),
+        v.literal("otro"),
+      ),
+    ),
+    chatbotActive: v.optional(v.boolean()), // "Chatbot Activado"
+    reminders: v.optional(v.string()),
+    // Cadencia de seguimiento (banderas del bot)
+    followup2hDone: v.optional(v.boolean()),
+    followup23hDone: v.optional(v.boolean()),
+    followup48hDone: v.optional(v.boolean()),
+    auditCompleted: v.optional(v.boolean()),
+    sentToSecondTech: v.optional(v.boolean()),
+    // Timestamps de negocio (epoch ms, TZ CR)
+    sourceCreatedAt: v.optional(v.number()), // "Creada" de Airtable
+    lastContactAt: v.optional(v.number()),
+    appointmentAt: v.optional(v.number()),
+    paymentPendingAt: v.optional(v.number()),
+    // Enlace con el modelo (cachés del match; inspections NO se toca)
+    linkedInspectionId: v.optional(v.id("inspections")),
+    linkedLegacyId: v.optional(v.id("inspections_legacy")),
+    // Provenance / dedup / auditoría
+    source: v.union(
+      v.literal("airtable_migration"),
+      v.literal("bot"),
+      v.literal("manual"),
+    ),
+    airtableId: v.optional(v.string()), // "rec…" — trazabilidad de la migración
+    mergedAirtableIds: v.optional(v.array(v.string())), // reservado (no se fusiona en la carga inicial, A26)
+    isDeleted: v.boolean(), // soft-delete (nunca hard-delete)
+    createdAt: v.number(), // alta EN CONVEX
+    updatedAt: v.number(),
+  })
+    .index("by_dedup_key", ["dedupKey"])
+    .index("by_manychat", ["manychatId"])
+    .index("by_phone8", ["phone8"])
+    .index("by_airtable_id", ["airtableId"]) // idempotencia de la carga 1:1 (A26)
+    .index("by_stage", ["leadStage"])
+    .index("by_source_created", ["sourceCreatedAt"])
+    .index("by_created", ["createdAt"]),
 });

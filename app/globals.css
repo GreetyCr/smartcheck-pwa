@@ -7,7 +7,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* Antes decía `var(--font-sans)`: auto-referencial e indefinida en `:root`,
+     así que `html { @apply font-sans }` resolvía a vacío y TODA la app caía al
+     serif por defecto del navegador (Times), pese a cargar Geist. Las variables
+     de `next/font` se declaran en `<html>` (ver layout.tsx) para que sean
+     visibles donde se aplica `font-family`. */
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -136,4 +141,187 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ==========================================================================
+   BI · Tema "grafito de precisión" (tablero de Finanzas)
+   --------------------------------------------------------------------------
+   Ámbito ACOTADO a `.bi-graphite` para no alterar el resto del panel (que
+   sigue en claro). Si Esteban aprueba el estilo, estos tokens se promueven a
+   `:root`/`.dark` sin reescribir componentes.
+
+   Paleta de series VALIDADA con el validador de dataviz sobre la superficie
+   #191F26 (modo oscuro): banda de luminosidad, piso de croma, separación CVD
+   (protan/deutan) y contraste ≥3:1 — las seis comprobaciones en PASS.
+   ========================================================================== */
+.bi-graphite {
+  color-scheme: dark;
+
+  /* superficies */
+  --bi-plane: #0f1318; /* plano de página */
+  --bi-surface: #191f26; /* tarjeta / superficie de gráfico */
+  --bi-surface-2: #20272f; /* elevada / hover */
+  --bi-ring: rgba(255, 255, 255, 0.08);
+
+  /* tinta (contraste medido vs superficie: 15.2 / 8.4 / 5.6) */
+  --bi-ink: #f2f5f7;
+  --bi-ink-2: #aebac6;
+  --bi-ink-3: #8a97a4;
+
+  /* cromo del gráfico */
+  --bi-grid: #2c333b;
+  --bi-axis: #39424c;
+
+  /* series categóricas (orden fijo, nunca cíclico) */
+  --bi-income: #2b9eb4;
+  --bi-expense: #d97706;
+
+  /* estado / delta — siempre con icono o rótulo, nunca color solo */
+  --bi-good: #3ecf6a;
+  --bi-bad: #f1746e;
+  --bi-warn: #fab219;
+
+  --bi-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* --- microinteracciones ---------------------------------------------------- */
+@keyframes bi-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes bi-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bi-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes bi-shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+@keyframes bi-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bi-flash {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.bi-graphite .bi-rise {
+  transform-origin: bottom;
+  animation: bi-rise 520ms var(--bi-ease) both;
+}
+.bi-graphite .bi-grow-x {
+  transform-origin: left;
+  animation: bi-grow-x 560ms var(--bi-ease) both;
+}
+.bi-graphite .bi-fade-up {
+  animation: bi-fade-up 420ms var(--bi-ease) both;
+}
+.bi-graphite .bi-slide-in {
+  animation: bi-slide-in 260ms var(--bi-ease) both;
+}
+.bi-graphite .bi-flash {
+  animation: bi-flash 2.4s linear forwards;
+}
+.bi-graphite .bi-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bi-surface-2) 25%,
+    #2a323b 37%,
+    var(--bi-surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: bi-shimmer 1.4s linear infinite;
+}
+
+/* Tarjeta: elevación sutil al pasar el puntero (herramienta de uso diario). */
+.bi-graphite .bi-lift {
+  transition:
+    transform 180ms var(--bi-ease),
+    box-shadow 180ms var(--bi-ease),
+    border-color 180ms var(--bi-ease);
+}
+@media (hover: hover) {
+  .bi-graphite .bi-lift:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Acciones de fila: aparecen al hover/foco donde hay puntero; siempre visibles en táctil. */
+@media (hover: hover) {
+  .bi-graphite .bi-row-actions {
+    opacity: 0;
+    transition: opacity 140ms var(--bi-ease);
+  }
+  .bi-graphite tr:hover .bi-row-actions,
+  .bi-graphite tr:focus-within .bi-row-actions {
+    opacity: 1;
+  }
+}
+
+/* Respeto por quien pide menos movimiento (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  .bi-graphite .bi-rise,
+  .bi-graphite .bi-grow-x,
+  .bi-graphite .bi-fade-up,
+  .bi-graphite .bi-slide-in,
+  .bi-graphite .bi-skeleton,
+  .bi-graphite .bi-flash {
+    animation: none;
+  }
+  .bi-graphite .bi-lift,
+  .bi-graphite .bi-row-actions {
+    transition: none;
+  }
+  .bi-graphite .bi-lift:hover {
+    transform: none;
+  }
+}
+
+/* --- tipografía del BI ------------------------------------------------------
+   Se fija explícitamente en el ámbito para no depender de `--font-sans` global.
+   `.bi-display` (condensada) solo en títulos del cromo; dentro de los gráficos
+   todo usa la sans de UI. Cifras en columnas: mono tabular para que alineen. */
+.bi-graphite {
+  font-family: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+}
+.bi-graphite .bi-display {
+  font-family: var(--font-display), var(--font-sora), sans-serif;
+  letter-spacing: 0.02em;
+}
+.bi-graphite .bi-num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }

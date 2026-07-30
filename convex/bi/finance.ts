@@ -13,46 +13,12 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { yearMonth as ymFromMs } from "./lib/dates";
-
-/* -------------------------------------------------------------------------- */
-/* Reglas de negocio                                                          */
-/* -------------------------------------------------------------------------- */
-
-/**
- * B22 — payroll / impuestos / gastos fijos NO son viáticos. Se fuerza
- * `isViatico=false` para estas categorías. Solo `comida`/`gasolina`/`bonos`
- * (y `otros` variable marcado en WP-3) son gastos variables/viáticos.
- */
-const FORCE_NON_VIATICO = new Set([
-  "salario",
-  "impuestos",
-  "seguro",
-  "mantenimiento",
-  "publicidad",
-  "otros-fijo",
-]);
-
-/** Allow-list de categorías (RF-11). Fuera de lista → issue `unmapped_category` (warn), pero se carga. */
-const INCOME_CATS = new Set(["inspeccion", "adicional_gasolina", "otros"]);
-const EXPENSE_CATS = new Set([
-  "comida",
-  "gasolina",
-  "bonos",
-  "otros",
-  "salario",
-  "mantenimiento",
-  "publicidad",
-  "seguro",
-  "impuestos",
-]);
-
-/** Zona CR (UTC-6 fijo, sin DST): medianoche local del día de negocio → epoch ms. */
-function crMidnightMs(isoDay: string): number {
-  const ms = Date.parse(`${isoDay}T00:00:00-06:00`);
-  if (Number.isNaN(ms)) throw new Error(`fecha inválida: "${isoDay}"`);
-  return ms;
-}
+import { crMidnightMs, yearMonth as ymFromMs } from "./lib/dates";
+import {
+  enforceViatico,
+  isCategoryAllowed,
+  isFxMissing,
+} from "./lib/financeRules";
 
 /* -------------------------------------------------------------------------- */
 /* Validadores                                                                */
@@ -106,15 +72,14 @@ export const loadFinanceBatch = internalMutation({
         // --- transformaciones / reglas ---
         const dateMs = crMidnightMs(e.date);
 
-        // B22: forzar isViatico=false en payroll/impuestos/fijos.
-        let isViatico = e.isViatico;
-        if (FORCE_NON_VIATICO.has(e.category)) {
-          if (isViatico) viaticoForced++; // contamos solo los flips reales true→false
-          isViatico = false;
-        }
+        // B22: forzar isViatico=false en payroll/impuestos/fijos (regla en lib).
+        const { isViatico, forced: viaticoFlip } = enforceViatico(
+          e.category,
+          e.isViatico,
+        );
+        if (viaticoFlip) viaticoForced++; // solo los flips reales true→false
 
-        const allow = e.kind === "income" ? INCOME_CATS : EXPENSE_CATS;
-        if (!allow.has(e.category)) {
+        if (!isCategoryAllowed(e.kind, e.category)) {
           unmappedCategory++;
           await ctx.db.insert("bi_quality_issues", {
             issueType: "unmapped_category",
@@ -130,7 +95,7 @@ export const loadFinanceBatch = internalMutation({
 
         const fxRate =
           e.fxRate === null || e.fxRate === undefined ? undefined : e.fxRate;
-        if (e.originalCurrency === "USD" && fxRate === undefined) {
+        if (isFxMissing(e.originalCurrency, fxRate)) {
           fxMissing++;
           await ctx.db.insert("bi_quality_issues", {
             issueType: "fx_missing",
