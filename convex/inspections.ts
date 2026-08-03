@@ -188,6 +188,7 @@ const patchFields = v.object({
   captureSource: v.optional(
     v.union(
       v.literal("publicidad"),
+      v.literal("mercadeo"),
       v.literal("tiktok"),
       v.literal("buscador"),
       v.literal("recompra"),

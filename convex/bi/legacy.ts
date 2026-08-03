@@ -18,6 +18,7 @@ import { yearMonth as ymFromMs } from "./lib/dates";
 
 /** Canales conocidos del CRM (Fuente). Fuera de lista → issue `unmapped_channel` (info), pero se carga. */
 const KNOWN_CHANNELS = new Set([
+  "Mercadeo",
   "Publicidad",
   "Recompra",
   "Referido",

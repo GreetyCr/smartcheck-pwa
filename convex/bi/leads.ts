@@ -33,6 +33,7 @@ const paymentStatus = v.union(
 
 const channel = v.union(
   v.literal("publicidad"),
+  v.literal("mercadeo"),
   v.literal("tiktok"),
   v.literal("buscador"),
   v.literal("recompra"),

@@ -25,7 +25,7 @@ import {
 } from "@/lib/amount-input";
 
 const CAPTURE_LABELS: Record<CaptureSource, string> = {
-  publicidad: "Publicidad",
+  mercadeo: "Mercadeo",
   tiktok: "TikTok",
   buscador: "Buscador",
   recompra: "Recompra",
@@ -33,7 +33,7 @@ const CAPTURE_LABELS: Record<CaptureSource, string> = {
 };
 
 const CAPTURE_ORDER: CaptureSource[] = [
-  "publicidad",
+  "mercadeo",
   "tiktok",
   "buscador",
   "recompra",

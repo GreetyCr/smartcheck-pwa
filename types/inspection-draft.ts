@@ -2,7 +2,7 @@
 import { toDatetimeLocalValue } from "@/lib/datetime-local";
 
 export type CaptureSource =
-  | "publicidad"
+  | "mercadeo"
   | "tiktok"
   | "buscador"
   | "recompra"

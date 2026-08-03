@@ -43,7 +43,9 @@ const sectionItemPhotos = v.optional(
 /* -------------------------------------------------------------------------- */
 
 const captureSource = v.union(
+  /** @deprecated Preferir `mercadeo`. Se mantiene para no romper docs legacy hasta migrar. */
   v.literal("publicidad"),
+  v.literal("mercadeo"),
   v.literal("tiktok"),
   v.literal("buscador"),
   v.literal("recompra"),
@@ -683,6 +685,7 @@ export default defineSchema({
     channel: v.optional(
       v.union(
         v.literal("publicidad"),
+        v.literal("mercadeo"),
         v.literal("tiktok"),
         v.literal("buscador"),
         v.literal("recompra"),

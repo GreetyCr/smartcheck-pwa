@@ -292,15 +292,15 @@ function classifyLocation(raw: string | undefined | null): {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fusiona `Fuente` del CRM (Publicidad/Referido/Recompra/Tik Tok/Buscador) y
+ * Fusiona `Fuente` del CRM (Mercadeo/Publicidad/Referido/…) y
  * `captureSource` de era-app (minúscula) en un eje único:
- * Publicidad / TikTok / Buscador / Recompra / Referido / Otro. undefined si vacío.
+ * Mercadeo / TikTok / Buscador / Recompra / Referido / Otro. undefined si vacío.
  */
 function normalizeChannel(raw: string | undefined | null): string | undefined {
   const t = norm(raw);
   if (!t) return undefined;
   if (t.includes("tiktok") || t.includes("tik tok") || t === "tik") return "TikTok";
-  if (t.includes("publicidad")) return "Publicidad";
+  if (t.includes("mercadeo") || t.includes("publicidad")) return "Mercadeo";
   if (t.includes("buscador") || t.includes("google")) return "Buscador";
   if (t.includes("recompra")) return "Recompra";
   if (t.includes("referido")) return "Referido";

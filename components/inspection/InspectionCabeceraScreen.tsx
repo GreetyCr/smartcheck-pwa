@@ -78,12 +78,38 @@ function normalizeCountryForSelect(
 }
 
 const CAPTURE_ORDER: CaptureSource[] = [
-  "publicidad",
+  "mercadeo",
   "tiktok",
   "buscador",
   "recompra",
   "referido",
 ];
+
+const CAPTURE_LABELS: Record<CaptureSource, string> = {
+  mercadeo: "Mercadeo",
+  tiktok: "TikTok",
+  buscador: "Buscador",
+  recompra: "Recompra",
+  referido: "Referido",
+};
+
+/** Normaliza valores legacy (`publicidad`) al catálogo actual. */
+function normalizeCaptureSource(
+  raw: string | undefined,
+): CaptureSource | "" {
+  if (!raw) return "";
+  if (raw === "publicidad") return "mercadeo";
+  if (
+    raw === "mercadeo" ||
+    raw === "tiktok" ||
+    raw === "buscador" ||
+    raw === "recompra" ||
+    raw === "referido"
+  ) {
+    return raw;
+  }
+  return "";
+}
 
 import { useSync } from "@/contexts/SyncContext";
 import {
@@ -165,7 +191,7 @@ export function InspectionCabeceraScreen() {
     setClientName(ins.clientName ?? "");
     setClientPhone(ins.clientPhone ?? "");
     setClientEmail(ins.clientEmail ?? "");
-    setCaptureSource((ins.captureSource as CaptureSource) ?? "");
+    setCaptureSource(normalizeCaptureSource(ins.captureSource));
     setSellerType((ins.sellerType as SellerTypeKey) ?? "");
     setSellerNote(ins.sellerNote ?? "");
     setProvince(isCostaRicaProvinceKey(ins.province) ? ins.province : "");
@@ -548,15 +574,7 @@ export function InspectionCabeceraScreen() {
             <option value="">Seleccionar</option>
             {CAPTURE_ORDER.map((c) => (
               <option key={c} value={c}>
-                {c === "publicidad"
-                  ? "Publicidad"
-                  : c === "tiktok"
-                    ? "TikTok"
-                    : c === "buscador"
-                      ? "Buscador"
-                      : c === "recompra"
-                        ? "Recompra"
-                        : "Referido"}
+                {CAPTURE_LABELS[c]}
               </option>
             ))}
           </select>
