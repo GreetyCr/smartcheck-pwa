@@ -96,7 +96,8 @@ function mapChatbot(sel: any): boolean | undefined {
   return undefined;
 }
 const CHANNEL_VOCAB: Record<string, string> = {
-  publicidad: "publicidad",
+  publicidad: "mercadeo",
+  mercadeo: "mercadeo",
   tiktok: "tiktok",
   "tik tok": "tiktok",
   buscador: "buscador",

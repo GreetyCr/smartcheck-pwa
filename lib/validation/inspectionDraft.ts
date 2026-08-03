@@ -5,7 +5,7 @@ const convexStorageId = z.string().min(1);
 
 const sellerType = z.enum(["concesionaria", "particular"]);
 const captureSource = z.enum([
-  "publicidad",
+  "mercadeo",
   "tiktok",
   "buscador",
   "recompra",

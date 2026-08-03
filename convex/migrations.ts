@@ -540,3 +540,63 @@ export const backfillCommissionFeeAmountInternal = internalMutation({
     return await backfillCommissionFeeAmountImpl(ctx);
   },
 });
+
+const captureSourceRenameReturns = v.object({
+  inspectionsScanned: v.number(),
+  inspectionsPatched: v.number(),
+  leadsScanned: v.number(),
+  leadsPatched: v.number(),
+});
+
+/**
+ * Renombra `captureSource` / canal de leads `publicidad` → `mercadeo`
+ * (UI: «Cómo nos conoció»). Idempotente.
+ */
+async function migratePublicidadToMercadeoImpl(ctx: MutationCtx) {
+  const inspections = await ctx.db.query("inspections").collect();
+  let inspectionsPatched = 0;
+  for (const row of inspections) {
+    if (row.captureSource !== "publicidad") continue;
+    await ctx.db.patch(row._id, { captureSource: "mercadeo" });
+    inspectionsPatched += 1;
+  }
+
+  let leadsScanned = 0;
+  let leadsPatched = 0;
+  try {
+    const leads = await ctx.db.query("leads_contacts").collect();
+    leadsScanned = leads.length;
+    for (const row of leads) {
+      if (row.channel !== "publicidad") continue;
+      await ctx.db.patch(row._id, { channel: "mercadeo" });
+      leadsPatched += 1;
+    }
+  } catch {
+    // Tabla leads puede no existir en entornos sin BI aún.
+  }
+
+  return {
+    inspectionsScanned: inspections.length,
+    inspectionsPatched,
+    leadsScanned,
+    leadsPatched,
+  };
+}
+
+export const migratePublicidadToMercadeo = mutation({
+  args: {},
+  returns: captureSourceRenameReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await migratePublicidadToMercadeoImpl(ctx);
+  },
+});
+
+/** Igual sin sesión Clerk (CLI / Dashboard). */
+export const migratePublicidadToMercadeoInternal = internalMutation({
+  args: {},
+  returns: captureSourceRenameReturns,
+  handler: async (ctx) => {
+    return await migratePublicidadToMercadeoImpl(ctx);
+  },
+});
