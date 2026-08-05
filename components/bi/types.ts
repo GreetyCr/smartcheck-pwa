@@ -43,7 +43,9 @@ export type FinanceEntry = {
   note?: string;
   tecnico?: string;
   localidad?: string;
-  source: "sheet" | "manual";
+  source: "sheet" | "manual" | "inspection";
+  /** false en las filas que genera el sistema al entregar el reporte. */
+  editable: boolean;
   createdAt: number;
 };
 

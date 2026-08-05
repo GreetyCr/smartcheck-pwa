@@ -510,8 +510,17 @@ export default defineSchema({
     fxRate: v.optional(v.number()), // ₡/US$ congelado (solo sep2025–feb2026)
     date: v.number(),
     yearMonth: v.string(), // "2025-09"
-    source: v.union(v.literal("sheet"), v.literal("manual")),
-    externalKey: v.optional(v.string()), // "sheet:<pestaña>:<etiqueta>:<n>" — idempotencia F1
+    // "inspection" = generada por el sistema al entregar el reporte (F5-auto):
+    // NO editable desde el formulario; se re-deriva de la inspección enlazada.
+    source: v.union(
+      v.literal("sheet"),
+      v.literal("manual"),
+      v.literal("inspection"),
+    ),
+    // Idempotencia. Dos vocabularios:
+    //   F1 (Sheet):     "sheet:<pestaña>:<etiqueta>:<n>"
+    //   F5-auto (app):  "inspection:<inspectionId>:income" | ":comision"
+    externalKey: v.optional(v.string()),
     note: v.optional(v.string()),
     tecnico: v.optional(v.string()), // viático (RF-19)
     localidad: v.optional(v.string()),
