@@ -37,6 +37,8 @@ const SUMMARY: FinanceSummary = {
 const D = (iso: string) => Date.parse(`${iso}T00:00:00-06:00`);
 
 const ENTRIES: FinanceEntry[] = [
+  { id: "s11", kind: "income", category: "inspeccion", amountCRC: 59_000, originalAmount: 59_000, originalCurrency: "CRC", date: D("2026-07-26"), yearMonth: "2026-07", isViatico: false, note: "Hyundai Tucson 2021 — al entregar el reporte", source: "inspection", editable: false, createdAt: D("2026-07-26") },
+  { id: "s12", kind: "expense", category: "comision", amountCRC: 5_000, originalAmount: 5_000, originalCurrency: "CRC", date: D("2026-07-26"), yearMonth: "2026-07", isViatico: false, note: "Comisión de la venta — Hyundai Tucson 2021", source: "inspection", editable: false, createdAt: D("2026-07-26") },
   { id: "s1", kind: "income", category: "inspeccion", amountCRC: 50_000, originalAmount: 50_000, originalCurrency: "CRC", date: D("2026-07-24"), yearMonth: "2026-07", isViatico: false, note: "Toyota Fortuner 2019", source: "manual", editable: true, createdAt: D("2026-07-24") },
   { id: "s2", kind: "income", category: "inspeccion", amountCRC: 68_850, originalAmount: 135, originalCurrency: "USD", fxRate: 510, date: D("2026-07-22"), yearMonth: "2026-07", isViatico: false, note: "Cliente fuera del GAM", source: "manual", editable: true, createdAt: D("2026-07-22") },
   { id: "s3", kind: "expense", category: "gasolina", amountCRC: 18_500, originalAmount: 18_500, originalCurrency: "CRC", date: D("2026-07-22"), yearMonth: "2026-07", isViatico: true, tecnico: "Técnico 2", localidad: "Alajuela", source: "manual", editable: true, createdAt: D("2026-07-22") },
@@ -47,8 +49,6 @@ const ENTRIES: FinanceEntry[] = [
   { id: "s8", kind: "expense", category: "mantenimiento", amountCRC: 62_400, originalAmount: 62_400, originalCurrency: "CRC", date: D("2026-07-12"), yearMonth: "2026-07", isViatico: false, source: "sheet", editable: true, createdAt: D("2026-07-12") },
   { id: "s9", kind: "expense", category: "bonos", amountCRC: 40_000, originalAmount: 40_000, originalCurrency: "CRC", date: D("2026-07-10"), yearMonth: "2026-07", isViatico: true, tecnico: "Técnico 3", source: "manual", editable: true, createdAt: D("2026-07-10") },
   { id: "s10", kind: "expense", category: "seguro", amountCRC: 78_000, originalAmount: 78_000, originalCurrency: "CRC", date: D("2026-07-05"), yearMonth: "2026-07", isViatico: false, source: "sheet", editable: true, createdAt: D("2026-07-05") },
-  { id: "s11", kind: "income", category: "inspeccion", amountCRC: 59_000, originalAmount: 59_000, originalCurrency: "CRC", date: D("2026-07-26"), yearMonth: "2026-07", isViatico: false, note: "Hyundai Tucson 2021 — al entregar el reporte", source: "inspection", editable: false, createdAt: D("2026-07-26") },
-  { id: "s12", kind: "expense", category: "comision", amountCRC: 5_000, originalAmount: 5_000, originalCurrency: "CRC", date: D("2026-07-26"), yearMonth: "2026-07", isViatico: false, note: "Comisión de la venta — Hyundai Tucson 2021", source: "inspection", editable: false, createdAt: D("2026-07-26") },
 ];
 
 export function FinanzasPreview() {
