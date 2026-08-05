@@ -10,6 +10,7 @@
 
 import type * as admin from "../admin.js";
 import type * as bi_finance from "../bi/finance.js";
+import type * as bi_financeAuto from "../bi/financeAuto.js";
 import type * as bi_financeForm from "../bi/financeForm.js";
 import type * as bi_leads from "../bi/leads.js";
 import type * as bi_leadsSync from "../bi/leadsSync.js";
@@ -42,6 +43,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   "bi/finance": typeof bi_finance;
+  "bi/financeAuto": typeof bi_financeAuto;
   "bi/financeForm": typeof bi_financeForm;
   "bi/leads": typeof bi_leads;
   "bi/leadsSync": typeof bi_leadsSync;

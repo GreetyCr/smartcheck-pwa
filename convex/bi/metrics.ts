@@ -847,7 +847,7 @@ export const reconciliation = internalQuery({
       },
       thresholdPct: RECON_GAP_PCT_THRESHOLD,
       financeStartISO: isoDate(FINANCE_START_MS),
-      note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0: fuentes distintas (CRM vs Sheet) con desfases; se cuantifica, no se anula.",
+      note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0 y se cuantifica, no se anula. Cambia de significado según el periodo: hasta jul-2026 mide fuentes independientes (CRM vs Sheet) con desfases de registro; desde la auto-captura (F5-auto) el ingreso de la inspección entregada ya entra solo, así que el gap pasa a medir el ingreso NO explicado por una inspección (venta de reportes, adicionales — A33). Los dos lados se fechan distinto a propósito: la inspección por su fecha de realización y el ingreso por la de entrega/pago, que es cuando el dinero entró (mediana 1,2 días de diferencia; solo cruzan de mes los casos de fin de mes).",
     };
   },
 });
