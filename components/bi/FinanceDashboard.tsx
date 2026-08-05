@@ -52,8 +52,42 @@ export function FinanceDashboard({
   const [confirm, setConfirm] = useState<FinanceEntry | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<FinanceEntry["source"] | "todos">("todos");
 
   const { months, totals } = summary;
+
+  /**
+   * Filtro por origen. Con F5-auto la tabla pasa de ~7 filas de ingreso al mes a
+   * una por inspección (~45–65), así que hace falta poder aislar lo que Esteban
+   * escribió a mano de lo que generó el sistema. Solo se muestra cuando hay más
+   * de un origen presente: si todo viene del Sheet, el control sobra.
+   */
+  const sourceCounts = useMemo(() => {
+    const counts = new Map<FinanceEntry["source"], number>();
+    for (const e of entries) counts.set(e.source, (counts.get(e.source) ?? 0) + 1);
+    return counts;
+  }, [entries]);
+
+  const sourceOptions = useMemo(() => {
+    const labels: Record<FinanceEntry["source"], string> = {
+      inspection: "Automáticos",
+      manual: "Manuales",
+      sheet: "Sheet",
+    };
+    return (["inspection", "manual", "sheet"] as const)
+      // El origen elegido se queda aunque el mes filtrado no tenga filas suyas:
+      // si el botón desapareciera, la tabla quedaría vacía sin explicación.
+      .filter((s) => (sourceCounts.get(s) ?? 0) > 0 || s === sourceFilter)
+      .map((s) => ({ value: s, label: labels[s], count: sourceCounts.get(s) ?? 0 }));
+  }, [sourceCounts, sourceFilter]);
+
+  const visibleEntries = useMemo(
+    () =>
+      sourceFilter === "todos"
+        ? entries
+        : entries.filter((e) => e.source === sourceFilter),
+    [entries, sourceFilter],
+  );
 
   // El periodo mostrado en los KPIs: el mes elegido, o el acumulado.
   const monthIdx = selectedMonth
@@ -287,7 +321,9 @@ export function FinanceDashboard({
               </span>
             ) : (
               <span className="bi-num text-xs text-[var(--bi-ink-3)]">
-                {formatInt(entries.length)} filas
+                {sourceFilter === "todos"
+                  ? `${formatInt(entries.length)} filas`
+                  : `${formatInt(visibleEntries.length)} de ${formatInt(entries.length)} filas`}
               </span>
             )
           }
@@ -299,19 +335,55 @@ export function FinanceDashboard({
               ))}
             </div>
           ) : (
-            <BiEntriesTable
-              entries={entries}
-              busyId={busyId}
-              onEdit={
-                readOnly
-                  ? undefined
-                  : (e) => {
-                      setEditing(e);
-                      setDrawerOpen(true);
-                    }
-              }
-              onDelete={readOnly ? undefined : (e) => setConfirm(e)}
-            />
+            <>
+              {sourceOptions.length > 1 ? (
+                <div
+                  role="group"
+                  aria-label="Filtrar movimientos por origen"
+                  className="flex flex-wrap items-center gap-1.5 pb-3 pt-4"
+                >
+                  {[
+                    { value: "todos" as const, label: "Todos", count: entries.length },
+                    ...sourceOptions,
+                  ].map((opt) => {
+                    const active = sourceFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSourceFilter(opt.value)}
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]",
+                          active
+                            ? "border-[var(--bi-income)] bg-[var(--bi-income)]/12 text-[var(--bi-ink)]"
+                            : "border-[var(--bi-ring)] text-[var(--bi-ink-3)] hover:text-[var(--bi-ink-2)]",
+                        )}
+                      >
+                        {opt.label}
+                        <span className="bi-num ml-1.5 text-[var(--bi-ink-3)]">
+                          {formatInt(opt.count)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <BiEntriesTable
+                entries={visibleEntries}
+                busyId={busyId}
+                onEdit={
+                  readOnly
+                    ? undefined
+                    : (e) => {
+                        setEditing(e);
+                        setDrawerOpen(true);
+                      }
+                }
+                onDelete={readOnly ? undefined : (e) => setConfirm(e)}
+              />
+            </>
           )}
         </BiCard>
       </div>

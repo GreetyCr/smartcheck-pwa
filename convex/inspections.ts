@@ -27,6 +27,24 @@ async function scheduleN8nNotify(
   await ctx.scheduler.runAfter(0, internal.n8nWebhook.deliver, args);
 }
 
+/**
+ * F5-auto — manda el cobro de la inspección a finanzas (BI).
+ *
+ * Va por el scheduler a propósito: el BI es un consumidor, no puede tener voto
+ * sobre si la entrega del reporte se completa. Si esto falla, la entrega ya
+ * ocurrió igual. Apagable con `BI_FINANCE_AUTO_DISABLED=true`, mismo patrón que
+ * el webhook de n8n y que `AIRTABLE_SYNC_DISABLED`.
+ */
+async function scheduleFinanceAuto(
+  ctx: MutationCtx,
+  inspectionId: Id<"inspections">,
+): Promise<void> {
+  if (process.env.BI_FINANCE_AUTO_DISABLED === "true") return;
+  await ctx.scheduler.runAfter(0, internal.bi.financeAuto.syncFromInspection, {
+    inspectionId,
+  });
+}
+
 const inspectionStatus = v.union(
   v.literal("draft"),
   v.literal("completed"),
@@ -616,6 +634,7 @@ export const markReportDelivered = mutation({
       event: "report_delivered",
       inspectionId,
     });
+    await scheduleFinanceAuto(ctx, inspectionId);
   },
 });
 

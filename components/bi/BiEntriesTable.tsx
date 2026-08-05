@@ -103,6 +103,14 @@ export function BiEntriesTable({
                         sheet
                       </span>
                     ) : null}
+                    {e.source === "inspection" ? (
+                      <span
+                        title="Generado al entregar el reporte de la inspección"
+                        className="rounded-full border border-[var(--bi-ring)] px-1.5 py-px text-[10px] text-[var(--bi-ink-3)]"
+                      >
+                        automático
+                      </span>
+                    ) : null}
                   </span>
                 </td>
                 <td className="max-w-[220px] px-4 py-3 text-[13px] text-[var(--bi-ink-3)]">
@@ -125,7 +133,12 @@ export function BiEntriesTable({
                     <button
                       type="button"
                       onClick={() => onEdit?.(e)}
-                      disabled={busy}
+                      disabled={busy || !e.editable}
+                      title={
+                        e.editable
+                          ? undefined
+                          : "Lo genera el sistema: corregí el monto en la inspección"
+                      }
                       aria-label={`Editar movimiento de ${categoryLabel(e.category)} del ${formatDateCR(e.date)}`}
                       className="rounded-lg p-1.5 text-[var(--bi-ink-3)] transition-colors hover:bg-white/5 hover:text-[var(--bi-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)] disabled:opacity-40"
                     >
@@ -134,7 +147,12 @@ export function BiEntriesTable({
                     <button
                       type="button"
                       onClick={() => onDelete?.(e)}
-                      disabled={busy}
+                      disabled={busy || !e.editable}
+                      title={
+                        e.editable
+                          ? undefined
+                          : "Lo genera el sistema al entregar el reporte"
+                      }
                       aria-label={`Eliminar movimiento de ${categoryLabel(e.category)} del ${formatDateCR(e.date)}`}
                       className="rounded-lg p-1.5 text-[var(--bi-ink-3)] transition-colors hover:bg-white/5 hover:text-[var(--bi-bad)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-bad)] disabled:opacity-40"
                     >

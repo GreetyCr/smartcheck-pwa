@@ -123,6 +123,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   publicidad: "Publicidad",
   seguro: "Seguro",
   impuestos: "Impuestos",
+  comision: "Comisión",
 };
 
 export function categoryLabel(key: string): string {
@@ -142,6 +143,7 @@ export const EXPENSE_CATEGORIES = [
   "bonos",
   "otros",
   "salario",
+  "comision",
   "mantenimiento",
   "publicidad",
   "seguro",

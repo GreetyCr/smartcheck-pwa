@@ -20,6 +20,7 @@ import {
   enforceViatico,
   isCategoryAllowed,
   isFxMissing,
+  isSystemGenerated,
   type Currency,
   type FinanceKind,
 } from "./lib/financeRules";
@@ -144,6 +145,12 @@ export const updateFinanceEntry = mutation({
     if (!existing || existing.isDeleted) {
       throw new Error("Entrada no encontrada o eliminada.");
     }
+    if (isSystemGenerated(existing.source)) {
+      throw new Error(
+        "Este movimiento lo genera el sistema al entregar el reporte. " +
+          "Para corregirlo, ajustá el monto cobrado en la inspección.",
+      );
+    }
     const fields = normalizeEntry(rest);
     await ctx.db.patch(id, { ...fields, updatedAt: Date.now() });
     return { id };
@@ -159,6 +166,12 @@ export const deleteFinanceEntry = mutation({
     const existing = await ctx.db.get(id);
     if (!existing) throw new Error("Entrada no encontrada.");
     if (existing.isDeleted) return { id }; // idempotente
+    if (isSystemGenerated(existing.source)) {
+      throw new Error(
+        "Este movimiento lo genera el sistema al entregar el reporte y no se " +
+          "puede eliminar a mano.",
+      );
+    }
     await ctx.db.patch(id, { isDeleted: true, updatedAt: Date.now() });
     return { id };
   },
@@ -190,7 +203,13 @@ export const listFinanceEntries = query({
       note: v.optional(v.string()),
       tecnico: v.optional(v.string()),
       localidad: v.optional(v.string()),
-      source: v.union(v.literal("sheet"), v.literal("manual")),
+      source: v.union(
+        v.literal("sheet"),
+        v.literal("manual"),
+        v.literal("inspection"),
+      ),
+      // La regla vive en el backend: el cliente no decide qué se puede tocar.
+      editable: v.boolean(),
       createdAt: v.number(),
     }),
   ),
@@ -223,6 +242,7 @@ export const listFinanceEntries = query({
         tecnico: r.tecnico,
         localidad: r.localidad,
         source: r.source,
+        editable: !isSystemGenerated(r.source),
         createdAt: r.createdAt,
       }));
   },
