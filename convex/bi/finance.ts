@@ -13,6 +13,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
 import { crMidnightMs, yearMonth as ymFromMs } from "./lib/dates";
 import {
   enforceViatico,
@@ -191,6 +192,94 @@ export const loadFinanceBatch = internalMutation({
       fxMissing,
       viaticoReview,
     };
+  },
+});
+
+/**
+ * Retira filas del ledger con borrado SUAVE — la otra mitad de `loadFinanceBatch`.
+ *
+ * El loader hace upsert por `externalKey` y **nunca borra**, que es lo correcto
+ * para no perder datos, pero deja un hueco: cuando una línea desaparece del
+ * Sheet (o se mueve a otra etiqueta), su fila queda huérfana en Convex sumando
+ * para siempre. Pasó en julio 2026: el monto de `EXTAS:3` se movió a
+ * `BONOS EXTRAS` dentro de la misma semana, y sin esto se contaría dos veces.
+ *
+ * Acepta llaves externas (filas del Sheet) o ids (captura manual, que no tiene
+ * llave). `dryRun` es el valor por DEFECTO: retirar hay que pedirlo.
+ */
+export const retireEntries = internalMutation({
+  args: {
+    externalKeys: v.optional(v.array(v.string())),
+    ids: v.optional(v.array(v.id("finance_entries"))),
+    reason: v.string(),
+    dryRun: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    dryRun: v.boolean(),
+    retired: v.array(
+      v.object({
+        ref: v.string(),
+        kind: v.string(),
+        category: v.string(),
+        amountCRC: v.number(),
+        yearMonth: v.string(),
+      }),
+    ),
+    yaEstaban: v.number(),
+    noEncontradas: v.array(v.string()),
+  }),
+  handler: async (ctx, { externalKeys, ids, reason, dryRun }) => {
+    const isDry = dryRun !== false;
+    const now = Date.now();
+    const retired: {
+      ref: string;
+      kind: string;
+      category: string;
+      amountCRC: number;
+      yearMonth: string;
+    }[] = [];
+    const noEncontradas: string[] = [];
+    let yaEstaban = 0;
+
+    const targets: { ref: string; doc: Doc<"finance_entries"> | null }[] = [];
+
+    for (const key of externalKeys ?? []) {
+      const doc = await ctx.db
+        .query("finance_entries")
+        .withIndex("by_external_key", (q) => q.eq("externalKey", key))
+        .unique();
+      targets.push({ ref: key, doc });
+    }
+    for (const id of ids ?? []) {
+      targets.push({ ref: id, doc: await ctx.db.get(id) });
+    }
+
+    for (const { ref, doc } of targets) {
+      if (!doc) {
+        noEncontradas.push(ref);
+        continue;
+      }
+      if (doc.isDeleted) {
+        yaEstaban++;
+        continue;
+      }
+      retired.push({
+        ref,
+        kind: doc.kind,
+        category: doc.category,
+        amountCRC: doc.amountCRC,
+        yearMonth: doc.yearMonth,
+      });
+      if (!isDry) {
+        await ctx.db.patch(doc._id, {
+          isDeleted: true,
+          updatedAt: now,
+          note: doc.note ? `${doc.note} — retirada: ${reason}` : `Retirada: ${reason}`,
+        });
+      }
+    }
+
+    return { dryRun: isDry, retired, yaEstaban, noEncontradas };
   },
 });
 
