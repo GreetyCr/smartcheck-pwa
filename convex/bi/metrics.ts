@@ -774,6 +774,15 @@ export const reconciliation = internalQuery({
         gapAbs: v.number(),
         gapPct: v.number(),
         significant: v.boolean(),
+        /**
+         * Mes en curso: la revisión se cuenta cuando se HACE y el ingreso
+         * cuando se ENTREGA el informe (que es cuando se pagó, B27.2). Así que
+         * el mes vivo siempre muestra gap negativo y **no es una anomalía**.
+         * Se rotula en vez de excluirse: el dato se ve, la alarma no salta.
+         */
+        enCurso: v.boolean(),
+        /** Revisiones del mes sin informe entregado — explica el gap del mes en curso. */
+        sinEntregar: v.optional(v.number()),
       }),
     ),
     totals: v.object({
@@ -782,6 +791,8 @@ export const reconciliation = internalQuery({
       gapAbs: v.number(),
       gapPct: v.number(),
       significant: v.boolean(),
+      gapAbsMesesCerrados: v.number(),
+      gapPctMesesCerrados: v.number(),
     }),
     thresholdPct: v.number(),
     financeStartISO: v.string(),
@@ -813,6 +824,17 @@ export const reconciliation = internalQuery({
     const pct = (gap: number, fin: number) =>
       fin > 0 ? Math.round((gap / fin) * 10000) / 100 : gap === 0 ? 0 : 100;
 
+    // Mes vivo: sus revisiones ya están hechas pero muchas aún no se entregan,
+    // así que su ingreso todavía no existe. Se cuenta cuántas faltan para poder
+    // explicarlo con un número en vez de con una excusa.
+    const mesEnCurso = ymFromMs(Date.now());
+    let sinEntregarMesEnCurso = 0;
+    for (const r of await ctx.db.query("inspections").collect()) {
+      const d = r.inspectionStartAt ?? r._creationTime;
+      if (ymFromMs(d) !== mesEnCurso) continue;
+      if (r.status !== "report_delivered") sinEntregarMesEnCurso++;
+    }
+
     const months = [...allMonths]
       .sort((a, b) => a.localeCompare(b))
       .map((ym) => {
@@ -820,6 +842,7 @@ export const reconciliation = internalQuery({
         const fin = finByMonth.get(ym) ?? 0;
         const gapAbs = fin - ins.income;
         const gapPct = pct(gapAbs, fin);
+        const enCurso = ym === mesEnCurso;
         return {
           yearMonth: ym,
           inspectionsIncome: ins.income,
@@ -827,7 +850,11 @@ export const reconciliation = internalQuery({
           financeIncome: fin,
           gapAbs,
           gapPct,
-          significant: Math.abs(gapPct) >= RECON_GAP_PCT_THRESHOLD,
+          // El mes en curso nunca se marca significativo: su gap es el desfase
+          // normal entre hacer el trabajo y cobrarlo, no una inconsistencia.
+          significant: !enCurso && Math.abs(gapPct) >= RECON_GAP_PCT_THRESHOLD,
+          enCurso,
+          sinEntregar: enCurso ? sinEntregarMesEnCurso : undefined,
         };
       });
 
@@ -835,6 +862,14 @@ export const reconciliation = internalQuery({
     const finTot = months.reduce((s, m) => s + m.financeIncome, 0);
     const gapTot = finTot - insTot;
     const gapTotPct = pct(gapTot, finTot);
+
+    // El mes en curso arrastra el agregado (su ingreso todavía no ocurrió), así
+    // que se ofrecen las dos cifras: la total y la comparable. Ninguna se
+    // esconde — el tablero decide cuál titula y cuál pone al lado.
+    const cerrados = months.filter((m) => !m.enCurso);
+    const insCerr = cerrados.reduce((s, m) => s + m.inspectionsIncome, 0);
+    const finCerr = cerrados.reduce((s, m) => s + m.financeIncome, 0);
+    const gapCerr = finCerr - insCerr;
 
     return {
       months,
@@ -844,10 +879,13 @@ export const reconciliation = internalQuery({
         gapAbs: gapTot,
         gapPct: gapTotPct,
         significant: Math.abs(gapTotPct) >= RECON_GAP_PCT_THRESHOLD,
+        /** Mismo cálculo sin el mes en curso: la cifra comparable mes a mes. */
+        gapAbsMesesCerrados: gapCerr,
+        gapPctMesesCerrados: pct(gapCerr, finCerr),
       },
       thresholdPct: RECON_GAP_PCT_THRESHOLD,
       financeStartISO: isoDate(FINANCE_START_MS),
-      note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0 y se cuantifica, no se anula. Cambia de significado según el periodo: hasta jul-2026 mide fuentes independientes (CRM vs Sheet) con desfases de registro; desde la auto-captura (F5-auto) el ingreso de la inspección entregada ya entra solo, así que el gap pasa a medir el ingreso NO explicado por una inspección (venta de reportes, adicionales — A33). Los dos lados se fechan distinto a propósito: la inspección por su fecha de realización y el ingreso por la de entrega/pago, que es cuando el dinero entró (mediana 1,2 días de diferencia; solo cruzan de mes los casos de fin de mes).",
+      note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0 y se cuantifica, no se anula. Cambia de significado según el periodo: hasta jul-2026 mide fuentes independientes (CRM vs Sheet) con desfases de registro; desde la auto-captura (F5-auto) el ingreso de la inspección entregada ya entra solo, así que el gap pasa a medir el ingreso NO explicado por una inspección (venta de reportes, adicionales — A33). Los dos lados se fechan distinto a propósito: la inspección por su fecha de realización y el ingreso por la de entrega/pago, que es cuando el dinero entró (mediana 1,2 días de diferencia; solo cruzan de mes los casos de fin de mes). EL MES EN CURSO (`enCurso:true`) SE ROTULA, NO SE EXCLUYE: sus revisiones ya se hicieron pero muchas aún no se entregan, así que su ingreso todavía no existe y el gap negativo es normal — `sinEntregar` dice cuántas faltan. Nunca se marca `significant` ni genera issue. Para comparar mes a mes, usar `gapPctMesesCerrados`.",
     };
   },
 });
@@ -896,7 +934,12 @@ export const flagReconciliationGap = internalMutation({
 
     let flagged = 0;
     const months: string[] = [];
+    // El mes en curso queda fuera del flag: su gap es el desfase normal entre
+    // hacer la revisión y cobrarla, no una inconsistencia. Sin esto, cada
+    // corrida abriría un issue del mes vivo que se cierra solo al mes siguiente.
+    const mesEnCurso = ymFromMs(Date.now());
     for (const ym of [...allMonths].sort()) {
+      if (ym === mesEnCurso) continue;
       const ins = insByMonth.get(ym) ?? 0;
       const fin = finByMonth.get(ym) ?? 0;
       const gapAbs = fin - ins;
