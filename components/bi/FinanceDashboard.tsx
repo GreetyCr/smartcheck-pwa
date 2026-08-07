@@ -226,14 +226,15 @@ export function FinanceDashboard({
           label="Ingresos"
           tone="income"
           value={formatCompactCRC(view.income)}
+          exact={formatCRC(view.income)}
           delta={current ? delta(current.income, previous?.income) : null}
-          hint={current ? undefined : formatCRC(view.income)}
         />
         <BiKpiCard
           index={1}
           label="Gastos"
           tone="expense"
           value={formatCompactCRC(view.expense)}
+          exact={formatCRC(view.expense)}
           delta={current ? delta(current.expense, previous?.expense) : null}
           hint={
             view.income > 0
@@ -246,8 +247,8 @@ export function FinanceDashboard({
           label="Utilidad"
           tone="utilidad"
           value={formatCompactCRC(view.utilidad)}
+          exact={formatCRC(view.utilidad)}
           delta={current ? delta(current.utilidad, previous?.utilidad) : null}
-          hint={current ? undefined : formatCRC(view.utilidad)}
         />
         <BiKpiCard
           index={3}
@@ -257,7 +258,7 @@ export function FinanceDashboard({
           hint={
             selectedMonth
               ? undefined
-              : `${formatInt(totals.viaticoCount)} viáticos · ${formatCompactCRC(totals.viaticoAmountCRC)}`
+              : `${formatInt(totals.viaticoCount)} viáticos · ${formatCRC(totals.viaticoAmountCRC)}`
           }
         />
       </div>

@@ -21,6 +21,7 @@ const TONE_VAR: Record<KpiTone, string> = {
 export function BiKpiCard({
   label,
   value,
+  exact,
   hint,
   delta,
   tone = "neutral",
@@ -28,6 +29,13 @@ export function BiKpiCard({
 }: {
   label: string;
   value: string;
+  /**
+   * Monto exacto, cuando el valor grande va abreviado (`₡4,55M`). Se muestra
+   * SIEMPRE que se pase: el número corto es para escanear, no para creerle.
+   * Sin esto, `₡4,55M` se lee como 4.555.000 cuando son ₡4.546.000 — pasó de
+   * verdad al comparar contra la hoja de cálculo.
+   */
+  exact?: string;
   hint?: string;
   /** Variación vs. periodo anterior, en puntos porcentuales relativos. */
   delta?: { pct: number; label: string } | null;
@@ -60,9 +68,17 @@ export function BiKpiCard({
       <p className="bi-num text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
         {label}
       </p>
-      <p className="mt-1.5 text-[26px] font-semibold leading-none text-[var(--bi-ink)] sm:text-[30px]">
+      <p
+        className="mt-1.5 text-[26px] font-semibold leading-none text-[var(--bi-ink)] sm:text-[30px]"
+        title={exact}
+      >
         {value}
       </p>
+      {exact ? (
+        <p className="bi-num mt-1 text-[11px] tabular-nums text-[var(--bi-ink-3)]">
+          {exact}
+        </p>
+      ) : null}
       {/* delta y pista en líneas propias: nunca compiten por el ancho */}
       <div className="mt-2 space-y-0.5">
         {delta ? (
