@@ -30,9 +30,26 @@ export function formatCompactCRC(n: number): string {
   return `${sign}₡${NUM.format(abs)}`;
 }
 
-/** Porcentaje con una decimal: `38,7%`. */
-export function formatPct(n: number): string {
-  return `${n.toFixed(1).replace(".", ",")}%`;
+/**
+ * Porcentaje con una decimal: `38,7%`.
+ *
+ * `decimals` sube la precisión donde una décima cambiaría la cifra que se
+ * comunica: la conversión titular es **2,07%** y redondeada a una decimal se
+ * leería 2,1% — un número que no aparece en ningún otro lado del proyecto.
+ */
+export function formatPct(n: number, decimals = 1): string {
+  return `${n.toFixed(decimals).replace(".", ",")}%`;
+}
+
+/** `"89903618"` → `"8990-3618"` (formato local de 8 dígitos). */
+export function formatPhone8(phone8: string): string {
+  return /^\d{8}$/.test(phone8) ? `${phone8.slice(0, 4)}-${phone8.slice(4)}` : phone8;
+}
+
+/** `"2026-08-07"` (ISO de fecha, zona CR) → `"07 ago 2026"`. */
+export function formatIsoDateCR(iso: string): string {
+  const ms = Date.parse(`${iso}T00:00:00-06:00`);
+  return Number.isNaN(ms) ? iso : formatDateCR(ms);
 }
 
 /** Entero con separadores: `8.406`. */
