@@ -237,7 +237,7 @@ export function LeadsDashboard({
           Leads &amp; conversión
         </h1>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
-          {formatInt(leads.total)} leads · {rangeLabel}
+          {formatInt(funnel.leadsTotal)} leads · {rangeLabel}
         </p>
       </header>
 
@@ -250,7 +250,13 @@ export function LeadsDashboard({
           index={0}
           label="Leads recibidos"
           tone="neutral"
-          value={formatInt(leads.total)}
+          /* La base del titular sale del embudo, no de `leadsStats.total`: el
+             embudo descarta los leads con borrado suave y `leadsStats` no. Hoy
+             ambos dan 8.706, pero el día que se retire uno, el denominador de
+             la conversión y la cifra de portada tienen que seguir siendo el
+             mismo número. La cobertura de abajo sí va sobre `leadsStats`, y lo
+             dice en su subtítulo. */
+          value={formatInt(funnel.leadsTotal)}
           hint="Desde WhatsApp"
         />
         <BiKpiCard
