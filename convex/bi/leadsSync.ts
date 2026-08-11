@@ -410,6 +410,18 @@ export const syncLeadsFromAirtable = internalAction({
       message: `${isFull ? "full" : "incremental"}: fetched=${records.length} ins=${totals.inserted} patch=${totals.patched} fail=${totals.failed} issues=${issuesInserted}`,
     });
 
+    // A38 — encadenar el recálculo del embudo. Sin esto, entran leads nuevos y
+    // `bi_matches` se queda con la foto anterior: el tablero de conversión
+    // mostraría números viejos sin avisar que lo son. Se dispara en TODA corrida
+    // exitosa (no solo en las full) porque el rebuild es barato —~4 s sobre 8,7k
+    // leads— y un incremental también trae leads que pueden haber convertido.
+    // Va por scheduler: si el rebuild falla, el sync ya quedó registrado igual.
+    if (status === "ok" && totals.received > 0) {
+      await ctx.scheduler.runAfter(0, internal.bi.matches.rebuildMatches, {
+        runId: `${runId}:matches`,
+      });
+    }
+
     return {
       skipped: false,
       mode: isFull ? "full" : "incremental",
@@ -435,6 +447,31 @@ export const refreshLeadsNow = mutation({
     await requireAdmin(ctx);
     await ctx.scheduler.runAfter(0, internal.bi.leadsSync.syncLeadsFromAirtable, {
       mode: "incremental",
+    });
+    return { scheduled: true };
+  },
+});
+
+/**
+ * A38 · Recalcular el embudo bajo demanda, sin traer leads.
+ *
+ * `refreshLeadsNow` va a buscar leads nuevos a Airtable y **ya encadena** el
+ * rebuild al terminar, así que ese es el botón normal. Esto es para el caso en
+ * que lo que cambió está de **nuestro** lado —una inspección nueva, un monto
+ * corregido, un ajuste del matcher— y no hay nada que traer de Airtable: pedir
+ * un sync completo para eso serían 60 s de espera y una llamada innecesaria a
+ * una API externa.
+ *
+ * Agenda y devuelve: el rebuild borra y reinserta `bi_matches` entero, y no
+ * tiene sentido dejar la UI esperando por eso.
+ */
+export const refreshBiNow = mutation({
+  args: {},
+  returns: v.object({ scheduled: v.boolean() }),
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    await ctx.scheduler.runAfter(0, internal.bi.matches.rebuildMatches, {
+      runId: `refreshBiNow:${Date.now()}`,
     });
     return { scheduled: true };
   },

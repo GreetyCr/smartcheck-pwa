@@ -19,6 +19,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 
 /* -------------------------------------------------------------------------- */
 /* Enums de dominio (idénticos a schema.ts leads_contacts)                     */
@@ -284,9 +285,8 @@ export const setLeadsMeta = internalMutation({
 /* -------------------------------------------------------------------------- */
 
 /** Resumen de validación desde DEV: fill-rates, phoneValid, duplicados, enums, rango, issues. */
-export const leadsStats = internalQuery({
-  args: {},
-  returns: v.object({
+/** Forma de retorno de las stats de leads — la reusa el wrapper público (`bi/public.ts`). */
+export const leadsStatsReturns = v.object({
     total: v.number(),
     isDeleted: v.number(),
     phone8Present: v.number(),
@@ -306,8 +306,16 @@ export const leadsStats = internalQuery({
     issuesByType: v.array(
       v.object({ issueType: v.string(), rows: v.number() }),
     ),
-  }),
-  handler: async (ctx) => {
+});
+
+export const leadsStats = internalQuery({
+  args: {},
+  returns: leadsStatsReturns,
+  handler: async (ctx) => leadsStatsImpl(ctx),
+});
+
+/** Stats de calidad de leads, plano y compartido (ver A41 en `bi/metrics.ts`). */
+export async function leadsStatsImpl(ctx: QueryCtx) {
     const rows = await ctx.db.query("leads_contacts").collect();
     let isDeleted = 0,
       phone8Present = 0,
@@ -402,5 +410,4 @@ export const leadsStats = internalQuery({
         .sort((a, b) => b[1] - a[1])
         .map(([issueType, rows]) => ({ issueType, rows })),
     };
-  },
-});
+}

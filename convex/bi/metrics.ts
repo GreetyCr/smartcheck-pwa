@@ -28,6 +28,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
 
@@ -338,7 +339,7 @@ type FilterArgs = {
   channel?: string;
 };
 
-const filterValidator = {
+export const filterValidator = {
   fromMs: v.optional(v.number()),
   toMs: v.optional(v.number()),
   province: v.optional(v.string()),
@@ -370,7 +371,7 @@ function isJunk(name: string, phoneDigits: string, amount: number | undefined): 
  * junk excluido, solapes deduplicados (era-app autoritativa). Devuelve también las
  * cuentas de diagnóstico.
  */
-async function buildInspectionsAll(ctx: { db: any }): Promise<{
+export async function buildInspectionsAll(ctx: { db: any }): Promise<{
   all: UnifiedRow[];
   diag: {
     legacyRaw: number;
@@ -600,9 +601,8 @@ export const inspectionsAll = internalQuery({
 /* 2. totalRevisiones — conteo + desgloses normalizados (con filtros)          */
 /* -------------------------------------------------------------------------- */
 
-export const totalRevisiones = internalQuery({
-  args: { ...filterValidator },
-  returns: v.object({
+/** Forma de retorno de `totalRevisiones` — la reusa el wrapper público (`bi/public.ts`). */
+export const totalRevisionesReturns = v.object({
     total: v.number(), // con placeholders (todas las revisiones reales)
     totalSinPlaceholder: v.number(), // excluye ₡1000
     placeholderRows: v.number(),
@@ -625,9 +625,25 @@ export const totalRevisiones = internalQuery({
     bySource: v.array(
       v.object({ key: v.string(), rows: v.number(), amountCRC: v.number() }),
     ),
-  }),
-  handler: async (ctx, args) => {
-    const built = await buildInspectionsAll(ctx);
+});
+
+export const totalRevisiones = internalQuery({
+  args: { ...filterValidator },
+  returns: totalRevisionesReturns,
+  handler: async (ctx, args) =>
+    computeTotalRevisiones(await buildInspectionsAll(ctx), args),
+});
+
+/**
+ * Cómputo PURO de `totalRevisiones` (recibe la vista ya construida). Lo comparten
+ * la `internalQuery` de arriba —que usa el CLI, sin auth— y la query pública del
+ * tablero, que gatea con `requireAdmin`: en Convex una `query` no puede
+ * `ctx.runQuery` (A41), así que el cálculo tiene que vivir fuera de ambas.
+ */
+export function computeTotalRevisiones(
+  built: Awaited<ReturnType<typeof buildInspectionsAll>>,
+  args: FilterArgs,
+) {
     const rows = built.all.filter((r) => passesFilters(r, args));
     let placeholderRows = 0;
     for (const r of rows) if (r.isPlaceholderIncome) placeholderRows++;
@@ -646,8 +662,7 @@ export const totalRevisiones = internalQuery({
       byChannel: groupBy(rows, (r) => r.channel ?? "(sin canal)"),
       bySource: groupBy(rows, (r) => r.source),
     };
-  },
-});
+}
 
 /* -------------------------------------------------------------------------- */
 /* 3. financeSummary — ingresos/gastos/utilidad por mes (finance_entries, ₡)   */
@@ -762,9 +777,8 @@ export const financeSummary = internalQuery({
  * se EXCLUYEN (gap espurio: hay inspecciones legacy pero no finanzas). SOLO
  * LECTURA; el flag `reconciliation_gap` lo persiste `flagReconciliationGap`.
  */
-export const reconciliation = internalQuery({
-  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
-  returns: v.object({
+/** Forma de retorno de la conciliación — la reusa el wrapper público (`bi/public.ts`). */
+export const reconciliationReturns = v.object({
     months: v.array(
       v.object({
         yearMonth: v.string(),
@@ -796,9 +810,26 @@ export const reconciliation = internalQuery({
     }),
     thresholdPct: v.number(),
     financeStartISO: v.string(),
-    note: v.string(),
-  }),
-  handler: async (ctx, { fromMs, toMs }) => {
+  note: v.string(),
+});
+
+export const reconciliation = internalQuery({
+  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
+  returns: reconciliationReturns,
+  handler: async (ctx, args) => reconciliationImpl(ctx, args),
+});
+
+/**
+ * Conciliación, como función plana que recibe `ctx`. A diferencia de
+ * `computeTotalRevisiones` no puede ser pura: lee tres tablas (la vista unificada,
+ * `finance_entries` y `inspections` para el mes en curso). Compartida entre la
+ * `internalQuery` y la query pública del tablero — A41 prohíbe `ctx.runQuery`,
+ * no llamar a un helper.
+ */
+export async function reconciliationImpl(
+  ctx: QueryCtx,
+  { fromMs, toMs }: { fromMs?: number; toMs?: number },
+) {
     const from = Math.max(fromMs ?? FINANCE_START_MS, FINANCE_START_MS);
     const built = await buildInspectionsAll(ctx);
     const inRange = (d: number) => d >= from && (toMs == null || d < toMs);
@@ -887,8 +918,7 @@ export const reconciliation = internalQuery({
       financeStartISO: isoDate(FINANCE_START_MS),
       note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0 y se cuantifica, no se anula. Cambia de significado según el periodo: hasta jul-2026 mide fuentes independientes (CRM vs Sheet) con desfases de registro; desde la auto-captura (F5-auto) el ingreso de la inspección entregada ya entra solo, así que el gap pasa a medir el ingreso NO explicado por una inspección (venta de reportes, adicionales — A33). Los dos lados se fechan distinto a propósito: la inspección por su fecha de realización y el ingreso por la de entrega/pago, que es cuando el dinero entró (mediana 1,2 días de diferencia; solo cruzan de mes los casos de fin de mes). EL MES EN CURSO (`enCurso:true`) SE ROTULA, NO SE EXCLUYE: sus revisiones ya se hicieron pero muchas aún no se entregan, así que su ingreso todavía no existe y el gap negativo es normal — `sinEntregar` dice cuántas faltan. Nunca se marca `significant` ni genera issue. Para comparar mes a mes, usar `gapPctMesesCerrados`.",
     };
-  },
-});
+}
 
 /**
  * Persiste (idempotente) el flag `reconciliation_gap` en `bi_quality_issues` para
@@ -967,9 +997,8 @@ export const flagReconciliationGap = internalMutation({
 /* 5. executiveSummary — números titulares del tablero Resumen                 */
 /* -------------------------------------------------------------------------- */
 
-export const executiveSummary = internalQuery({
-  args: { ...filterValidator },
-  returns: v.object({
+/** Forma de retorno del resumen ejecutivo — la reusa el wrapper público (`bi/public.ts`). */
+export const executiveSummaryReturns = v.object({
     totalRevisiones: v.number(), // con placeholders
     totalRevisionesSinPlaceholder: v.number(),
     placeholderRows: v.number(),
@@ -986,8 +1015,20 @@ export const executiveSummary = internalQuery({
     conversionPctOfPhoned: v.number(),
     leadToClientePct: v.number(),
     note: v.string(),
-  }),
-  handler: async (ctx, args) => {
+});
+
+export const executiveSummary = internalQuery({
+  args: { ...filterValidator },
+  returns: executiveSummaryReturns,
+  handler: async (ctx, args) => executiveSummaryImpl(ctx, args),
+});
+
+/**
+ * Resumen ejecutivo, como función plana que recibe `ctx` (lee la vista unificada,
+ * finanzas y matches). Compartida por la `internalQuery` y la query pública del
+ * tablero — ver la nota de `computeTotalRevisiones` sobre A41.
+ */
+export async function executiveSummaryImpl(ctx: QueryCtx, args: FilterArgs) {
     const built = await buildInspectionsAll(ctx);
     const insRows = built.all.filter((r) => passesFilters(r, args));
     let revisionesConMonto = 0;
@@ -1042,8 +1083,7 @@ export const executiveSummary = internalQuery({
       leadToClientePct: pct(convertidos, leadsTotal),
       note: "Revisiones = inspections_all (unión+dedupe, A30). Ingresos titulares = finance_entries (P&L oficial, A16). Conversión titular = bi_matches banda alta+media (A29).",
     };
-  },
-});
+}
 
 /* -------------------------------------------------------------------------- */
 /* 6. cutoverDiagnostic — solape entre era-app y legacy (contexto histórico)   */

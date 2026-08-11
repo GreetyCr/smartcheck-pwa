@@ -26,6 +26,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import { isoDate } from "./lib/dates";
 
 /* -------------------------------------------------------------------------- */
@@ -496,9 +497,8 @@ export const resetMatchesIssues = internalMutation({
 /* Embudo de conversión (B7) — "quiénes convierten"                          */
 /* -------------------------------------------------------------------------- */
 
-export const conversionFunnel = internalQuery({
-  args: { sampleSize: v.optional(v.number()) },
-  returns: v.object({
+/** Forma de retorno del embudo — la reusa el wrapper público (`bi/public.ts`). */
+export const conversionFunnelReturns = v.object({
     leadsTotal: v.number(),
     leadsWithPhone: v.number(),
     leadsMatched: v.number(), // con match (válido o no)
@@ -524,9 +524,19 @@ export const conversionFunnel = internalQuery({
         matchTarget: v.string(),
       }),
     ),
-    note: v.string(),
-  }),
-  handler: async (ctx, { sampleSize }) => {
+  note: v.string(),
+});
+
+/**
+ * Cómputo del embudo, como función plana. Vive fuera del wrapper de Convex para
+ * que la `internalQuery` (CLI/scripts, sin auth) y la query pública del tablero
+ * (con `requireAdmin`) compartan el mismo cálculo: en Convex una `query` no
+ * puede `ctx.runQuery` (A41), pero sí llamar a un helper que recibe `ctx`.
+ */
+export async function conversionFunnelImpl(
+  ctx: QueryCtx,
+  { sampleSize }: { sampleSize?: number },
+) {
     const leads = await ctx.db.query("leads_contacts").collect();
     const leadsTotal = leads.filter((l) => !l.isDeleted).length;
     const leadsWithPhone = leads.filter(
@@ -595,16 +605,20 @@ export const conversionFunnel = internalQuery({
       sampleWhoConverts,
       note: "channel no está disponible en leads (Airtable vacío); sin desglose por canal del lado lead.",
     };
-  },
+}
+
+export const conversionFunnel = internalQuery({
+  args: { sampleSize: v.optional(v.number()) },
+  returns: conversionFunnelReturns,
+  handler: async (ctx, args) => conversionFunnelImpl(ctx, args),
 });
 
 /* -------------------------------------------------------------------------- */
 /* Stats de matching                                                          */
 /* -------------------------------------------------------------------------- */
 
-export const matchesStats = internalQuery({
-  args: {},
-  returns: v.object({
+/** Forma de retorno de las stats de matching — la reusa `bi/public.ts`. */
+export const matchesStatsReturns = v.object({
     totalMatches: v.number(),
     ambiguous: v.number(),
     validIncome: v.number(),
@@ -615,9 +629,11 @@ export const matchesStats = internalQuery({
     byTarget: v.array(v.object({ target: v.string(), rows: v.number() })),
     leadsWithPhone: v.number(),
     leadsWithoutMatch: v.number(),
-    ambiguousMatchIssues: v.number(),
-  }),
-  handler: async (ctx) => {
+  ambiguousMatchIssues: v.number(),
+});
+
+/** Cómputo de las stats de matching, plano y compartido (ver `conversionFunnelImpl`). */
+export async function matchesStatsImpl(ctx: QueryCtx) {
     const matches = await ctx.db.query("bi_matches").collect();
     let ambiguous = 0;
     let validIncome = 0;
@@ -668,5 +684,10 @@ export const matchesStats = internalQuery({
       leadsWithoutMatch,
       ambiguousMatchIssues,
     };
-  },
+}
+
+export const matchesStats = internalQuery({
+  args: {},
+  returns: matchesStatsReturns,
+  handler: async (ctx) => matchesStatsImpl(ctx),
 });
