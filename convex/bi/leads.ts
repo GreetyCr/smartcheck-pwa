@@ -20,6 +20,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
 
 /* -------------------------------------------------------------------------- */
 /* Enums de dominio (idénticos a schema.ts leads_contacts)                     */
@@ -285,6 +286,115 @@ export const setLeadsMeta = internalMutation({
 /* -------------------------------------------------------------------------- */
 
 /** Resumen de validación desde DEV: fill-rates, phoneValid, duplicados, enums, rango, issues. */
+/* -------------------------------------------------------------------------- */
+/* Leads que piden acción (los accionables del tablero de calidad)            */
+/* -------------------------------------------------------------------------- */
+
+/** Motivo canónico por el que un teléfono no se pudo usar como llave. */
+export function motivoTelefono(detail: string | undefined): string {
+  const d = detail ?? "";
+  if (d.includes("PSID")) return "psid";
+  if (d.includes("no-CR")) return "no_cr";
+  if (d.includes("placeholder")) return "placeholder";
+  if (d.includes("primer dígito")) return "primer_digito";
+  // Dos redacciones distintas para el mismo problema de fondo —el número no da
+  // 8 dígitos—: "longitud anómala (N díg)" cuando se truncó, y "no normalizable"
+  // cuando no hubo forma. Para Esteban es lo mismo, así que van juntas.
+  if (d.includes("longitud") || d.includes("normalizable")) return "longitud";
+  return "otro";
+}
+
+/** Forma de retorno de los leads accionables — la reusa `bi/public.ts`. */
+export const leadsPorRevisarReturns = v.object({
+  sinLlave: v.array(
+    v.object({
+      airtableId: v.string(),
+      name: v.optional(v.string()),
+      leadStage: v.string(),
+      sourceCreatedAt: v.optional(v.number()),
+    }),
+  ),
+  telefonoRaro: v.array(
+    v.object({
+      airtableId: v.string(),
+      name: v.optional(v.string()),
+      rawPhone: v.optional(v.string()),
+      /** psid | no_cr | placeholder | primer_digito | longitud | otro */
+      motivo: v.string(),
+      sourceCreatedAt: v.optional(v.number()),
+    }),
+  ),
+});
+
+/**
+ * Los leads que SÍ piden acción, con lo necesario para actuar sobre ellos.
+ *
+ * El tablero mostraba conteos (31 sin llave, 152 con teléfono raro) y ahí se
+ * acababa: Esteban veía el número pero no podía hacer nada con él. Esto devuelve
+ * **quiénes son**, con el `airtableId` para que pueda ir a buscarlos en Airtable,
+ * que es donde los va a corregir mientras Airtable siga siendo la fuente.
+ *
+ * Deliberadamente NO incluye `lead_dup`: son ruido esperado por diseño (A26) y
+ * meterlos acá volvería inútil la lista, que es justo lo que se quiere evitar.
+ */
+export async function leadsPorRevisarImpl(ctx: QueryCtx) {
+  const issues = (await ctx.db.query("bi_quality_issues").collect()).filter(
+    (i) => i.entity === "leads_contacts" && !i.resolved,
+  );
+  const leads = await ctx.db.query("leads_contacts").collect();
+  const porAirtableId = new Map<string, Doc<"leads_contacts">>();
+  for (const l of leads) if (l.airtableId) porAirtableId.set(l.airtableId, l);
+
+  const base = (ref: string) => {
+    const l = porAirtableId.get(ref);
+    return {
+      airtableId: ref,
+      name: l?.name,
+      sourceCreatedAt: l?.sourceCreatedAt,
+      lead: l,
+    };
+  };
+
+  const sinLlave = issues
+    .filter((i) => i.issueType === "lead_no_key")
+    .map((i) => {
+      const b = base(i.entityRef);
+      return {
+        airtableId: b.airtableId,
+        name: b.name,
+        leadStage: b.lead?.leadStage ?? "desconocido",
+        sourceCreatedAt: b.sourceCreatedAt,
+      };
+    });
+
+  const telefonoRaro = issues
+    .filter((i) => i.issueType === "anomalous_phone")
+    .map((i) => {
+      const b = base(i.entityRef);
+      return {
+        airtableId: b.airtableId,
+        name: b.name,
+        rawPhone: b.lead?.rawPhone,
+        motivo: motivoTelefono(i.detail),
+        sourceCreatedAt: b.sourceCreatedAt,
+      };
+    });
+
+  const recientes = <T extends { sourceCreatedAt?: number }>(a: T, b: T) =>
+    (b.sourceCreatedAt ?? 0) - (a.sourceCreatedAt ?? 0);
+
+  return {
+    sinLlave: sinLlave.sort(recientes),
+    telefonoRaro: telefonoRaro.sort(recientes),
+  };
+}
+
+export const leadsPorRevisar = internalQuery({
+  args: {},
+  returns: leadsPorRevisarReturns,
+  handler: async (ctx) => leadsPorRevisarImpl(ctx),
+});
+
 /** Forma de retorno de las stats de leads — la reusa el wrapper público (`bi/public.ts`). */
 export const leadsStatsReturns = v.object({
     total: v.number(),

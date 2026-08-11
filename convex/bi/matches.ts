@@ -617,6 +617,62 @@ export const conversionFunnel = internalQuery({
 /* Stats de matching                                                          */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* Listado completo de quiénes convirtieron                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Forma de retorno del listado de convertidos — la reusa `bi/public.ts`. */
+export const convertedLeadsReturns = v.array(
+  v.object({
+    leadName: v.optional(v.string()),
+    phone8: v.optional(v.string()),
+    /** "YYYY-MM-DD" en zona CR, o ausente si la inspección no trae fecha. */
+    inspectionDate: v.optional(v.string()),
+    amountCRC: v.optional(v.number()),
+    confidenceBand: v.string(),
+    /** "era_app" (revisión hecha en la app) | "legacy" (CRM histórico). */
+    matchTarget: v.string(),
+  }),
+);
+
+/**
+ * TODOS los que convirtieron, no una muestra.
+ *
+ * `conversionFunnel.sampleWhoConverts` devuelve las 25 más recientes, que sirve
+ * para la portada pero no para consultar. Esto devuelve la lista completa —hoy
+ * 180 filas— para que el tablero pagine y filtre del lado del cliente: con ese
+ * volumen, paginar contra el servidor agrega latencia sin ahorrar nada.
+ *
+ * Mismo criterio que la métrica titular (A29): solo `validIncome` y bandas
+ * alta+media. Los emparejamientos por nombre (banda baja) **no entran**, igual
+ * que no entran en el 2,07%.
+ */
+export async function convertedLeadsImpl(ctx: QueryCtx) {
+  const matches = await ctx.db.query("bi_matches").collect();
+  const leads = await ctx.db.query("leads_contacts").collect();
+  const leadName = new Map<string, string | undefined>();
+  for (const l of leads) leadName.set(l._id, l.name);
+
+  return matches
+    .filter((m) => m.validIncome && m.confidenceBand !== "baja")
+    .sort((a, b) => (b.inspectionDate ?? 0) - (a.inspectionDate ?? 0))
+    .map((m) => ({
+      leadName: m.leadId ? leadName.get(m.leadId) : undefined,
+      phone8: m.phone8,
+      inspectionDate:
+        m.inspectionDate != null ? isoDate(m.inspectionDate) : undefined,
+      amountCRC: m.amountCRC,
+      confidenceBand: m.confidenceBand,
+      matchTarget: m.matchTarget,
+    }));
+}
+
+export const convertedLeads = internalQuery({
+  args: {},
+  returns: convertedLeadsReturns,
+  handler: async (ctx) => convertedLeadsImpl(ctx),
+});
+
 /** Forma de retorno de las stats de matching — la reusa `bi/public.ts`. */
 export const matchesStatsReturns = v.object({
     totalMatches: v.number(),
