@@ -14,14 +14,25 @@ import { LeadsDashboard } from "@/components/bi/LeadsDashboard";
  * consola ni a ningún log: acá no se instrumenta nada sobre esta respuesta.
  */
 export default function LeadsPage() {
-  const funnel = useQuery(api.bi.public.conversionFunnel, { sampleSize: 12 });
+  /* `sampleSize: 0` apaga la muestra del embudo: la lista completa la sirve
+     `convertedLeads`, así que traer 25 nombres y teléfonos que nadie va a
+     pintar sería mandar PII al navegador por nada. */
+  const funnel = useQuery(api.bi.public.conversionFunnel, { sampleSize: 0 });
   const matches = useQuery(api.bi.public.matchesStats, {});
   const leads = useQuery(api.bi.public.leadsStats, {});
+  const porRevisar = useQuery(api.bi.public.leadsPorRevisar, {});
+  const converted = useQuery(api.bi.public.convertedLeads, {});
 
-  // Las tres se piden juntas y el tablero cruza sus cifras entre sí (los 238
+  // Se piden juntas y el tablero cruza sus cifras entre sí (los 238
   // emparejamientos, los 180 titulares, los 8.706 leads). Renderizar con una
   // sola cargada mostraría totales que no cuadran por un instante.
-  if (funnel === undefined || matches === undefined || leads === undefined) {
+  if (
+    funnel === undefined ||
+    matches === undefined ||
+    leads === undefined ||
+    porRevisar === undefined ||
+    converted === undefined
+  ) {
     return (
       <div>
         <div className="bi-skeleton h-9 w-64 rounded-lg" />
@@ -38,9 +49,18 @@ export default function LeadsPage() {
           <div className="bi-skeleton h-[260px] rounded-2xl" />
           <div className="bi-skeleton h-[260px] rounded-2xl" />
         </div>
+        <div className="bi-skeleton mt-4 h-[360px] rounded-2xl" />
       </div>
     );
   }
 
-  return <LeadsDashboard funnel={funnel} matches={matches} leads={leads} />;
+  return (
+    <LeadsDashboard
+      funnel={funnel}
+      matches={matches}
+      leads={leads}
+      porRevisar={porRevisar}
+      converted={converted}
+    />
+  );
 }

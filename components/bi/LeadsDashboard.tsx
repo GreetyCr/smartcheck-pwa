@@ -1,26 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  Lock,
-  MinusCircle,
-} from "lucide-react";
-import {
-  formatCRC,
-  formatDateCR,
-  formatInt,
-  formatIsoDateCR,
-  formatPct,
-  formatPhone8,
-} from "@/lib/bi-format";
+import { AlertTriangle, CheckCircle2, Info, MinusCircle } from "lucide-react";
+import { formatDateCR, formatInt, formatPct } from "@/lib/bi-format";
 import { cn } from "@/lib/utils";
 import { BiCard } from "./BiCard";
 import { BiCountBars } from "./BiCountBars";
 import { BiKpiCard } from "./BiKpiCard";
-import type { ConversionFunnel, LeadsStats, MatchesStats } from "./types";
+import { ConvertedLeadsCard } from "./ConvertedLeadsCard";
+import { LeadsPorRevisarCard } from "./LeadsPorRevisarCard";
+import type {
+  ConversionFunnel,
+  ConvertedLead,
+  LeadsPorRevisar,
+  LeadsStats,
+  MatchesStats,
+} from "./types";
 
 /* -------------------------------------------------------------------------- */
 /* Vocabulario                                                                */
@@ -60,12 +55,6 @@ const METHODS = [
 const TARGET_LABELS: Record<string, string> = {
   legacy: "Revisión del histórico (CRM viejo)",
   era_app: "Revisión hecha en la app",
-};
-
-/** Misma distinción, en corto, para caber en una celda de tabla. */
-const TARGET_SHORT: Record<string, string> = {
-  legacy: "histórico",
-  era_app: "app",
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -111,10 +100,14 @@ export function LeadsDashboard({
   funnel,
   matches,
   leads,
+  porRevisar,
+  converted,
 }: {
   funnel: ConversionFunnel;
   matches: MatchesStats;
   leads: LeadsStats;
+  porRevisar: LeadsPorRevisar;
+  converted: ConvertedLead[];
 }) {
   const phonePct = pctOf(leads.phone8Present, leads.total);
 
@@ -214,6 +207,18 @@ export function LeadsDashboard({
       actionableTotal: actionable.reduce((s, i) => s + i.rows, 0),
     };
   }, [leads.issuesByType]);
+
+  /**
+   * Un mismo lead puede disparar los dos avisos accionables (un PSID no sirve
+   * de teléfono Y deja al lead sin llave), así que 183 avisos no son 183
+   * personas. Se dicen los dos números para que nadie los confunda.
+   */
+  const leadsPorRevisarDistintos = useMemo(() => {
+    const ids = new Set<string>();
+    for (const l of porRevisar.sinLlave) ids.add(l.airtableId);
+    for (const l of porRevisar.telefonoRaro) ids.add(l.airtableId);
+    return ids.size;
+  }, [porRevisar]);
 
   /**
    * Leads sin canal. El backend agrupa los vacíos bajo la etiqueta `(vacío)`,
@@ -550,6 +555,9 @@ export function LeadsDashboard({
                 Para revisar ·{" "}
                 <span className="bi-num tabular-nums">
                   {formatInt(actionableTotal)}
+                </span>{" "}
+                <span className="font-normal text-[var(--bi-ink-3)]">
+                  avisos sobre {formatInt(leadsPorRevisarDistintos)} leads
                 </span>
               </p>
               {actionableIssues.length === 0 ? (
@@ -575,6 +583,12 @@ export function LeadsDashboard({
                   ))}
                 </ul>
               )}
+              {actionableIssues.length > 0 ? (
+                <p className="mt-2 text-xs text-[var(--bi-ink-3)]">
+                  Están listados uno por uno más abajo, con el ID para buscarlos
+                  en Airtable.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -620,95 +634,13 @@ export function LeadsDashboard({
         </BiCard>
       </div>
 
-      {/* ---------- quiénes convirtieron ---------- */}
+      {/* ---------- listas consultables ---------- */}
       <div className="mt-4">
-        <BiCard
-          title="Quiénes convirtieron"
-          subtitle={
-            funnel.sampleWhoConverts.length > 0
-              ? `Las ${formatInt(funnel.sampleWhoConverts.length)} más recientes de ${formatInt(funnel.converted)}`
-              : "Sin conversiones registradas"
-          }
-          bodyClassName="pt-0"
-          action={
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--bi-ink-3)]">
-              <Lock className="size-3.5 shrink-0" aria-hidden />
-              Solo administración
-            </span>
-          }
-        >
-          {funnel.sampleWhoConverts.length === 0 ? (
-            <p className="py-10 text-center text-sm text-[var(--bi-ink-2)]">
-              Todavía no hay ningún lead emparejado con una revisión pagada.
-            </p>
-          ) : (
-            <div className="-mx-4 overflow-x-auto pt-4 sm:-mx-5">
-              <table className="w-full min-w-[640px] border-collapse text-left">
-                <caption className="sr-only">
-                  Leads más recientes con una revisión pagada
-                </caption>
-                <thead>
-                  <tr className="border-b border-[var(--bi-ring)]">
-                    {["Cliente", "Teléfono", "Revisión", "Monto", "Confianza"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          scope="col"
-                          className={cn(
-                            "bi-num px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--bi-ink-3)]",
-                            h === "Monto" && "text-right",
-                          )}
-                        >
-                          {h}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {funnel.sampleWhoConverts.map((s, i) => (
-                    <tr
-                      key={`${s.phone8 ?? "s"}-${s.inspectionDate ?? i}`}
-                      className="border-b border-[var(--bi-ring)]/60 transition-colors last:border-0 hover:bg-[var(--bi-surface-2)]"
-                    >
-                      <td className="px-4 py-3 text-[13px] text-[var(--bi-ink)]">
-                        {s.leadName?.trim() || "Sin nombre"}
-                      </td>
-                      <td className="bi-num whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-[var(--bi-ink-2)]">
-                        {s.phone8 ? formatPhone8(s.phone8) : "—"}
-                      </td>
-                      <td className="bi-num whitespace-nowrap px-4 py-3 text-[13px] text-[var(--bi-ink-2)]">
-                        {s.inspectionDate ? formatIsoDateCR(s.inspectionDate) : "—"}
-                        <span className="ml-2 text-[var(--bi-ink-3)]">
-                          {TARGET_SHORT[s.matchTarget] ?? s.matchTarget}
-                        </span>
-                      </td>
-                      <td className="bi-num whitespace-nowrap px-4 py-3 text-right text-[13px] tabular-nums text-[var(--bi-ink)]">
-                        {s.amountCRC != null ? formatCRC(s.amountCRC) : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={cn(
-                            "inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                            s.confidenceBand === "alta"
-                              ? "border-[var(--bi-income)]/60 bg-[var(--bi-income)]/15 text-[var(--bi-ink)]"
-                              : "border-[var(--bi-income)]/60 text-[var(--bi-ink-2)]",
-                          )}
-                        >
-                          {s.confidenceBand === "alta" ? "Alta" : "Media"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="mt-3 text-xs text-[var(--bi-ink-3)]">
-            Solo aparecen los emparejamientos que cuentan en la conversión
-            (teléfono, confianza alta o media).
-          </p>
-        </BiCard>
+        <LeadsPorRevisarCard data={porRevisar} />
+      </div>
+
+      <div className="mt-4">
+        <ConvertedLeadsCard rows={converted} />
       </div>
     </div>
   );

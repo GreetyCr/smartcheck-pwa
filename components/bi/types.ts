@@ -125,6 +125,49 @@ export type LeadsStats = {
   issuesByType: { issueType: string; rows: number }[];
 };
 
+/**
+ * Una fila de `convertedLeads`: la lista COMPLETA de los que convirtieron, no
+ * la muestra de portada. Mismo criterio que la métrica titular (`validIncome`,
+ * bandas alta+media), así que acá nunca aparece un empate por nombre.
+ *
+ * Trae nombre y teléfono: es PII y solo se pinta en el panel de admin.
+ */
+export type ConvertedLead = {
+  leadName?: string;
+  phone8?: string;
+  /** "YYYY-MM-DD" en zona CR. Puede faltar si la revisión no trae fecha. */
+  inspectionDate?: string;
+  amountCRC?: number;
+  confidenceBand: string;
+  /** "era_app" (revisión hecha en la app) | "legacy" (CRM histórico). */
+  matchTarget: string;
+};
+
+/** Lead sin ninguna llave utilizable (ni teléfono ni ManyChat). */
+export type LeadSinLlave = {
+  /** Lo que vuelve accionable la fila: con esto se busca el registro en Airtable. */
+  airtableId: string;
+  name?: string;
+  leadStage: string;
+  sourceCreatedAt?: number;
+};
+
+/** Lead cuyo teléfono no se pudo usar como llave, con el porqué. */
+export type LeadTelefonoRaro = {
+  airtableId: string;
+  name?: string;
+  rawPhone?: string;
+  /** Código estable: psid | no_cr | placeholder | primer_digito | longitud | otro. */
+  motivo: string;
+  sourceCreatedAt?: number;
+};
+
+/** Espejo de `leadsPorRevisarReturns` (`convex/bi/leads.ts`). */
+export type LeadsPorRevisar = {
+  sinLlave: LeadSinLlave[];
+  telefonoRaro: LeadTelefonoRaro[];
+};
+
 /** Payload del formulario (mismo contrato que las mutations F5). */
 export type FinanceEntryInput = {
   kind: "income" | "expense";
