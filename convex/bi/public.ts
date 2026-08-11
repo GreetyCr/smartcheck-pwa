@@ -35,10 +35,17 @@ import {
 import {
   conversionFunnelImpl,
   conversionFunnelReturns,
+  convertedLeadsImpl,
+  convertedLeadsReturns,
   matchesStatsImpl,
   matchesStatsReturns,
 } from "./matches";
-import { leadsStatsImpl, leadsStatsReturns } from "./leads";
+import {
+  leadsPorRevisarImpl,
+  leadsPorRevisarReturns,
+  leadsStatsImpl,
+  leadsStatsReturns,
+} from "./leads";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -143,5 +150,33 @@ export const leadsStats = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return leadsStatsImpl(ctx);
+  },
+});
+
+/**
+ * Todos los que convirtieron —no una muestra—, para paginar y filtrar en el
+ * tablero. Mismo criterio que la métrica titular: `validIncome`, bandas
+ * alta+media. Trae nombre y teléfono, así que es PII: solo-admin, y no debe
+ * salir a logs.
+ */
+export const convertedLeads = query({
+  args: {},
+  returns: convertedLeadsReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return convertedLeadsImpl(ctx);
+  },
+});
+
+/**
+ * Los leads que piden acción, con el `airtableId` para poder ir a corregirlos.
+ * NO incluye `lead_dup`: es ruido esperado por diseño (A26) y ahogaría la lista.
+ */
+export const leadsPorRevisar = query({
+  args: {},
+  returns: leadsPorRevisarReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return leadsPorRevisarImpl(ctx);
   },
 });

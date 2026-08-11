@@ -120,7 +120,7 @@ function mapChannel(fuente: any, origen: any): { channel?: string; issue: any } 
 }
 
 /** Normaliza teléfono (limpia `+`/`+506`/espacios/invisibles → solo dígitos). */
-function normalizePhone(raw: any): {
+export function normalizePhone(raw: any): {
   rawPhone?: string;
   phone8?: string;
   phoneValid: boolean;

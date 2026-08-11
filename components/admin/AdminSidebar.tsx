@@ -8,6 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   Car,
+  Filter,
   LayoutDashboard,
   LineChart,
   LogOut,
@@ -55,7 +56,10 @@ const HOME: NavItem = {
 const GROUPS: NavGroup[] = [
   {
     label: "Negocio",
-    items: [{ href: "/admin/finanzas", label: "Finanzas", Icon: LineChart }],
+    items: [
+      { href: "/admin/finanzas", label: "Finanzas", Icon: LineChart },
+      { href: "/admin/leads", label: "Leads", Icon: Filter },
+    ],
   },
   {
     label: "Operación",
