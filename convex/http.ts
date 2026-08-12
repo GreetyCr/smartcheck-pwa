@@ -1,7 +1,20 @@
+/**
+ * Router HTTP de Convex.
+ *
+ * Dos superficies distintas, con auth distinta:
+ *  - `/clerk-webhook` — altas/bajas de usuarios. Firma svix.
+ *  - `/leads/*` y `/bot/*` — la API para n8n / ManyChat (A37). Token compartido,
+ *    ver `lib/apiAuth.ts`.
+ *
+ * ⚠️ Estos endpoints viven en **`https://<deployment>.convex.site`**, NO en
+ * `.convex.cloud`. Es otro dominio, mismo deployment, y pegarle al equivocado
+ * da un error que se lee como problema de credenciales cuando no lo es.
+ */
 import { httpRouter } from "convex/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { errorResponse, jsonResponse, requireBotToken } from "./lib/apiAuth";
 
 function parseClerkUser(data: Record<string, unknown>) {
   const id = data.id as string;
@@ -82,6 +95,89 @@ const clerkWebhook = httpAction(async (ctx, request) => {
   return new Response(null, { status: 200 });
 });
 
+/* -------------------------------------------------------------------------- */
+/* API para n8n / ManyChat (A37)                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /bot/ping` — verifica la credencial y nada más.
+ *
+ * Existe para que Hans confirme que su credencial funciona **antes** de armar
+ * ningún flujo. Sin esto, el primer intento mezcla auth, URL, forma del cuerpo
+ * y lógica en un solo error difícil de leer.
+ */
+const botPing = httpAction(async (_ctx, request) => {
+  const denied = requireBotToken(request);
+  if (denied) return denied;
+  return jsonResponse(200, { ok: true, service: "smartcheck-convex" });
+});
+
+/**
+ * `GET /bot/onoff` — estado del kill-switch global.
+ *
+ * El bot debería consultarlo antes de escribirle a alguien. De todos modos,
+ * `/leads/due-followups` ya lo aplica por su cuenta: con el bot apagado devuelve
+ * la lista vacía, así que aunque nadie lea este endpoint el switch surte efecto.
+ *
+ * `POST /bot/onoff` queda pendiente: escribir el estado desde n8n necesita la
+ * regla de precedencia que Hans todavía no definió (§5 y §10 del handoff).
+ */
+const botOnOff = httpAction(async (ctx, request) => {
+  const denied = requireBotToken(request);
+  if (denied) return denied;
+  const state = await ctx.runQuery(internal.bots.settings.getGlobal, {});
+  return jsonResponse(200, state);
+});
+
+/**
+ * `GET /leads/due-followups?window=2h|23h|48h[&limit=n]`
+ *
+ * Reemplaza la fórmula `Horas sin responder` + la vista de Airtable.
+ * Devuelve nombre y teléfono porque el bot necesita eso para escribir; es la
+ * única superficie de la API que expone datos personales.
+ */
+const dueFollowups = httpAction(async (ctx, request) => {
+  const denied = requireBotToken(request);
+  if (denied) return denied;
+
+  const url = new URL(request.url);
+  const window = url.searchParams.get("window");
+  if (window !== "2h" && window !== "23h" && window !== "48h") {
+    return errorResponse(
+      400,
+      "bad_request",
+      "Parámetro `window` requerido: 2h, 23h o 48h.",
+    );
+  }
+
+  const rawLimit = url.searchParams.get("limit");
+  let limit: number | undefined;
+  if (rawLimit !== null) {
+    const parsed = Number(rawLimit);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return errorResponse(
+        400,
+        "bad_request",
+        "`limit` debe ser un entero mayor que cero.",
+      );
+    }
+    limit = Math.floor(parsed);
+  }
+
+  const result = await ctx.runQuery(internal.bots.followups.dueFollowups, {
+    window,
+    limit,
+  });
+  return jsonResponse(200, result);
+});
+
 const http = httpRouter();
 http.route({ path: "/clerk-webhook", method: "POST", handler: clerkWebhook });
+http.route({ path: "/bot/ping", method: "GET", handler: botPing });
+http.route({ path: "/bot/onoff", method: "GET", handler: botOnOff });
+http.route({
+  path: "/leads/due-followups",
+  method: "GET",
+  handler: dueFollowups,
+});
 export default http;
