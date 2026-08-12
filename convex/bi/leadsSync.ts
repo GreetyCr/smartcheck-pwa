@@ -386,11 +386,12 @@ export const syncLeadsFromAirtable = internalAction({
     const rows = mapped.map((m) => m.row as LeadRowArg);
     if (isFull) await ctx.runMutation(internal.bi.leads.resetLeadIssues, {});
 
-    const totals = { received: 0, inserted: 0, patched: 0, failed: 0 };
+    const totals = { received: 0, inserted: 0, patched: 0, failed: 0, ownedRespected: 0 };
     for (let i = 0; i < rows.length; i += 250) {
       const res = await ctx.runMutation(internal.bi.leads.loadLeadsBatch, { rows: rows.slice(i, i + 250), runId });
       totals.received += res.received; totals.inserted += res.inserted;
       totals.patched += res.patched; totals.failed += res.failed;
+      totals.ownedRespected += res.ownedRespected;
     }
 
     // 3) Issues — solo recompute global en full (incremental los refresca el full semanal)
@@ -407,7 +408,9 @@ export const syncLeadsFromAirtable = internalAction({
     await ctx.runMutation(internal.bi.leadsSync.writeSyncMeta, {
       status,
       rowsProcessed: totals.received,
-      message: `${isFull ? "full" : "incremental"}: fetched=${records.length} ins=${totals.inserted} patch=${totals.patched} fail=${totals.failed} issues=${issuesInserted}`,
+      // `owned=` solo aparece cuando el interruptor de A66 está encendido: si
+      // saliera siempre en cero, el día que importe nadie lo notaría.
+      message: `${isFull ? "full" : "incremental"}: fetched=${records.length} ins=${totals.inserted} patch=${totals.patched} fail=${totals.failed} issues=${issuesInserted}${totals.ownedRespected > 0 ? ` owned=${totals.ownedRespected}` : ""}`,
     });
 
     // A38 — encadenar el recálculo del embudo. Sin esto, entran leads nuevos y

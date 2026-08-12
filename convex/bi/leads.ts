@@ -95,7 +95,54 @@ const batchResult = v.object({
   inserted: v.number(),
   patched: v.number(),
   failed: v.number(),
+  /** Filas donde el sync respetó campos que Convex ya posee (A66). */
+  ownedRespected: v.number(),
 });
+
+/* -------------------------------------------------------------------------- */
+/* Propiedad por campo — A66                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Campos que Convex pasa a POSEER durante el dual-write.
+ *
+ * El problema que resuelve: el sync semanal hace `patch` de los 27 campos
+ * operativos sobre ~8,6k filas. Mientras eso siga así, **Airtable gana siempre**
+ * y cualquier escritura de n8n (o del tablero) desaparece el lunes siguiente sin
+ * error y sin log. Se ve como si Convex perdiera datos solo.
+ *
+ * La alternativa era apagar el sync entero, pero eso deja al BI sin leads nuevos
+ * y congela el embudo justo después de haberlo puesto en producción. Acá el sync
+ * sigue trayendo todo lo demás —altas, nombre, vehículo, canal— y solo suelta lo
+ * que el otro lado pasa a mandar.
+ *
+ * Hay precedente: el sync ya excluye `createdAt` y `leadStage`. Esta lista es la
+ * misma idea, más larga.
+ *
+ * `lastContactAt` está adentro y es fácil de pasar por alto —de hecho se cayó de
+ * la primera versión de la lista—: es el campo sobre el que se calculan las
+ * ventanas de seguimiento (`GET /leads/due-followups`). Si el lunes se
+ * re-escribiera con el valor de Airtable, los cortes de 2/23/48 h se moverían
+ * solos y el bot escribiría fuera de tiempo.
+ */
+const CONVEX_OWNED_ON_PATCH = [
+  "chatbotActive",
+  "followup2hDone",
+  "followup23hDone",
+  "followup48hDone",
+  "paymentStatus",
+  "lastContactAt",
+] as const;
+
+/**
+ * Apagado por defecto: hoy Airtable **sí** es la fuente de esos campos, y
+ * soltarlos sin que nadie escriba del otro lado solo congelaría datos buenos. Se
+ * enciende con `CONVEX_OWNS_BOT_FIELDS="true"` al arrancar el dual-write, sin
+ * redeploy — mismo patrón que `AIRTABLE_SYNC_DISABLED`.
+ */
+function convexOwnsBotFields(): boolean {
+  return process.env.CONVEX_OWNS_BOT_FIELDS === "true";
+}
 
 /* -------------------------------------------------------------------------- */
 /* Carga idempotente por lotes (import 1:1 por airtableId, A26)               */
@@ -109,6 +156,10 @@ export const loadLeadsBatch = internalMutation({
     let inserted = 0;
     let patched = 0;
     let failed = 0;
+    let ownedRespected = 0;
+    // Se lee una vez por lote, no por fila: que el interruptor cambie a mitad de
+    // una corrida dejaría el lote partido con dos criterios distintos.
+    const respetarPropiedad = convexOwnsBotFields();
 
     for (const r of rows) {
       try {
@@ -166,9 +217,17 @@ export const loadLeadsBatch = internalMutation({
         if (existing) {
           // Import 1:1 idempotente: refresca campos de origen; NO toca
           // `createdAt` (alta en Convex) ni `leadStage` (estado operativo).
-          await ctx.db.patch(existing._id, mapped);
+          // Y, si Convex ya posee los campos del bot, tampoco esos (A66).
+          const patch: Record<string, unknown> = { ...mapped };
+          if (respetarPropiedad) {
+            for (const campo of CONVEX_OWNED_ON_PATCH) delete patch[campo];
+            ownedRespected++;
+          }
+          await ctx.db.patch(existing._id, patch as never);
           patched++;
         } else {
+          // En un alta no hay nada que respetar: la fila todavía no existe en
+          // Convex, así que Airtable es su única fuente posible.
           await ctx.db.insert("leads_contacts", {
             ...mapped,
             leadStage: "nuevo" as const, // default; sin equivalente en Airtable (§3)
@@ -191,7 +250,7 @@ export const loadLeadsBatch = internalMutation({
       }
     }
 
-    return { received: rows.length, inserted, patched, failed };
+    return { received: rows.length, inserted, patched, failed, ownedRespected };
   },
 });
 
