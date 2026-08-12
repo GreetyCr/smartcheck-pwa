@@ -381,6 +381,21 @@ export const syncLeadsFromAirtable = internalAction({
       if (offset) await new Promise((r) => setTimeout(r, 250));
     } while (offset);
 
+    // 1.5) Un full que vuelve con CERO registros es casi con seguridad un fetch
+    // roto, no un Airtable vacío (hay 8,7k filas). Y el paso siguiente borra
+    // todos los avisos de calidad antes de recargar: si dejáramos seguir, un
+    // fetch fallido se llevaría por delante los ~1.900 avisos y volvería con
+    // nada. Se corta acá y se registra; el sync anterior queda intacto.
+    if (isFull && records.length === 0) {
+      await ctx.runMutation(internal.bi.leadsSync.writeSyncMeta, {
+        status: "error",
+        rowsProcessed: 0,
+        message:
+          "full devolvió 0 registros — se aborta sin tocar nada (fetch sospechoso)",
+      });
+      return { ...empty, mode: mode ?? "full", ms: Date.now() - startedAt };
+    }
+
     // 2) Mapear + upsert idempotente por airtableId (reusa loadLeadsBatch)
     const mapped = records.map(mapRecord);
     const rows = mapped.map((m) => m.row as LeadRowArg);
@@ -402,6 +417,22 @@ export const syncLeadsFromAirtable = internalAction({
         const res = await ctx.runMutation(internal.bi.leads.loadLeadIssues, { issues: issues.slice(i, i + 500), runId });
         issuesInserted += res.inserted;
       }
+    }
+
+    // 3.5) RF-16 — reconciliar conteos contra Airtable (A71). Va DESPUÉS de la
+    // carga (necesita ver qué filas se tocaron) y solo en full: en un
+    // incremental "no vino en esta corrida" no significa nada. Si esto fallara,
+    // el sync ya está hecho y no hay que revertirlo — por eso no aborta.
+    try {
+      await ctx.runMutation(internal.bi.leadsReconcile.reconcileLeads, {
+        runId,
+        syncStartedAt: startedAt,
+        airtableCount: records.length,
+        failedRows: totals.failed,
+        isFull,
+      });
+    } catch (err) {
+      console.error("[leads reconcile]", err);
     }
 
     const status = totals.failed === 0 ? "ok" : "error";

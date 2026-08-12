@@ -13,6 +13,7 @@ import type * as bi_finance from "../bi/finance.js";
 import type * as bi_financeAuto from "../bi/financeAuto.js";
 import type * as bi_financeForm from "../bi/financeForm.js";
 import type * as bi_leads from "../bi/leads.js";
+import type * as bi_leadsReconcile from "../bi/leadsReconcile.js";
 import type * as bi_leadsSync from "../bi/leadsSync.js";
 import type * as bi_legacy from "../bi/legacy.js";
 import type * as bi_lib_dates from "../bi/lib/dates.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "bi/financeAuto": typeof bi_financeAuto;
   "bi/financeForm": typeof bi_financeForm;
   "bi/leads": typeof bi_leads;
+  "bi/leadsReconcile": typeof bi_leadsReconcile;
   "bi/leadsSync": typeof bi_leadsSync;
   "bi/legacy": typeof bi_legacy;
   "bi/lib/dates": typeof bi_lib_dates;
