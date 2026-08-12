@@ -14,7 +14,12 @@ import { httpRouter } from "convex/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-import { errorResponse, jsonResponse, requireBotToken } from "./lib/apiAuth";
+import {
+  errorResponse,
+  jsonResponse,
+  parseJsonBody,
+  requireBotToken,
+} from "./lib/apiAuth";
 
 function parseClerkUser(data: Record<string, unknown>) {
   const id = data.id as string;
@@ -171,8 +176,60 @@ const dueFollowups = httpAction(async (ctx, request) => {
   return jsonResponse(200, result);
 });
 
+/**
+ * `POST /leads/upsert` — crear o actualizar un contacto.
+ *
+ * Reemplaza el "crear o actualizar" que el bot hace hoy sobre Airtable. Es
+ * **idempotente por identidad**: repetir la misma llamada actualiza la misma
+ * fila, nunca crea otra. Eso es lo que hace seguro el *Retry on Fail* de n8n.
+ *
+ * Es un upsert **parcial**: solo se escribe lo que venga en el cuerpo. Mandar
+ * `{manychatId, lastContactAt}` no borra el nombre ni el vehículo.
+ */
+const leadsUpsert = httpAction(async (ctx, request) => {
+  const denied = requireBotToken(request);
+  if (denied) return denied;
+
+  const body = await parseJsonBody(request);
+  if (!body) {
+    return errorResponse(
+      400,
+      "bad_request",
+      "Se esperaba un cuerpo JSON con un objeto.",
+    );
+  }
+
+  // Se pasan solo los campos conocidos: el validador de la mutation rechaza
+  // cualquier otra cosa, y así un typo en el flujo de n8n falla de una vez en
+  // lugar de guardarse a medias.
+  const campos = [
+    "manychatId", "phone", "name", "locality", "needsInvoice",
+    "vehicleBrand", "vehicleModel", "vehicleYear", "transmissionType",
+    "engineType", "tractionType", "leadStage", "paymentStatus",
+    "chatbotActive", "lastContactAt", "appointmentAt",
+    "followup2hDone", "followup23hDone", "followup48hDone", "runId",
+  ] as const;
+  const args: Record<string, unknown> = {};
+  for (const c of campos) if (body[c] !== undefined && body[c] !== null) args[c] = body[c];
+
+  try {
+    const res = await ctx.runMutation(
+      internal.bots.leadsIngest.upsertLead,
+      args as never,
+    );
+    // 201 cuando se creó, 200 cuando se actualizó: n8n puede ramificar por
+    // código sin leer el cuerpo.
+    return jsonResponse(res.action === "created" ? 201 : 200, res);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Falta de llave o campo fuera del contrato = problema del que llama.
+    return errorResponse(400, "bad_request", msg.slice(0, 300));
+  }
+});
+
 const http = httpRouter();
 http.route({ path: "/clerk-webhook", method: "POST", handler: clerkWebhook });
+http.route({ path: "/leads/upsert", method: "POST", handler: leadsUpsert });
 http.route({ path: "/bot/ping", method: "GET", handler: botPing });
 http.route({ path: "/bot/onoff", method: "GET", handler: botOnOff });
 http.route({

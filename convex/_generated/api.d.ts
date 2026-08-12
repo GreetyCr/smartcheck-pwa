@@ -23,6 +23,7 @@ import type * as bi_metrics from "../bi/metrics.js";
 import type * as bi_public from "../bi/public.js";
 import type * as bi_reclassify from "../bi/reclassify.js";
 import type * as bots_followups from "../bots/followups.js";
+import type * as bots_leadsIngest from "../bots/leadsIngest.js";
 import type * as bots_settings from "../bots/settings.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "bi/public": typeof bi_public;
   "bi/reclassify": typeof bi_reclassify;
   "bots/followups": typeof bots_followups;
+  "bots/leadsIngest": typeof bots_leadsIngest;
   "bots/settings": typeof bots_settings;
   crons: typeof crons;
   http: typeof http;
