@@ -73,6 +73,8 @@ const upsertResult = v.object({
   candidates: v.number(),
   /** El teléfono llegó pero no se pudo normalizar a 8 dígitos de CR. */
   phoneRejected: v.boolean(),
+  /** Llegó un `manychatId` distinto al guardado: se conservó el existente. */
+  identityConflict: v.boolean(),
 });
 
 export const upsertLead = internalMutation({
@@ -236,6 +238,41 @@ export const upsertLead = internalMutation({
     asignar("followup48hDone", args.followup48hDone);
 
     if (existing) {
+      /**
+       * Un match por teléfono NO puede reasignar la identidad de ManyChat.
+       *
+       * Si la fila ya tiene un `manychatId` y llega otro distinto habiendo
+       * matcheado solo por `phone8`, eso no es una actualización: es un
+       * conflicto. Con 476 grupos de teléfono repetido —familias, negocios,
+       * números reusados— pisarlo en silencio reasigna la conversación de una
+       * persona a otra, y el bot termina contestándole a quien no era.
+       *
+       * Se conserva el que estaba, se aplica el resto del upsert, y queda el
+       * aviso. Resolverlo de verdad es la pregunta H1 (llave autoritativa).
+       */
+      const conflictoDeIdentidad =
+        matchedBy === "phone8" &&
+        !!manychatId &&
+        !!existing.manychatId &&
+        existing.manychatId !== manychatId;
+
+      if (conflictoDeIdentidad) {
+        delete cambios.manychatId;
+        await ctx.db.insert("bi_quality_issues", {
+          issueType: "identity_conflict",
+          severity: "warn",
+          entity: "leads_contacts",
+          entityRef: existing.airtableId ?? String(existing._id),
+          detail:
+            `upsert por teléfono con un manychatId distinto al guardado; ` +
+            `se conservó el existente. Un match por teléfono no reasigna la ` +
+            `identidad de ManyChat.`,
+          runId,
+          detectedAt: now,
+          resolved: false,
+        });
+      }
+
       // `source` NO se toca: si vino de Airtable, sigue siendo de Airtable.
       // Es lo que mantiene honesta la reconciliación de huérfanas (A73).
       await ctx.db.patch(existing._id, cambios as never);
@@ -247,6 +284,7 @@ export const upsertLead = internalMutation({
         ambiguous,
         candidates,
         phoneRejected,
+        identityConflict: conflictoDeIdentidad,
       };
     }
 
@@ -269,6 +307,7 @@ export const upsertLead = internalMutation({
       ambiguous: false,
       candidates: 0,
       phoneRejected,
+      identityConflict: false,
     };
   },
 });

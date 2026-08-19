@@ -259,6 +259,60 @@ describe("ambigüedad — 476 grupos de teléfono repetido", () => {
     expect(aviso!.detail).toContain("2 filas");
   });
 
+  test("un match por teléfono NO reasigna el manychatId de otro", async () => {
+    // Lo encontró una llamada de verificación real contra DEV: le pegamos a un
+    // lead que existía y le pisamos su manychatId sin que nada avisara. Con 476
+    // grupos de teléfono repetido —familias, negocios, números reusados— eso
+    // reasigna la conversación de una persona a otra.
+    const t = convexTest(schema, convexModules);
+    await t.run((ctx) =>
+      ctx.db.insert(
+        "leads_contacts",
+        filaBase({
+          manychatId: "890284200",
+          phone8: "89903618",
+          name: "Cliente real",
+          airtableId: "recReal",
+        }) as never,
+      ),
+    );
+
+    const res = await upsert(t, {
+      phone: "8990-3618",
+      manychatId: "otro-distinto",
+      name: "Nombre corregido",
+    });
+
+    expect(res.matchedBy).toBe("phone8");
+    expect(res.identityConflict).toBe(true);
+
+    const fila = await t.run((ctx) => ctx.db.get(res.leadId));
+    expect(fila!.manychatId).toBe("890284200"); // se conserva el que estaba
+    expect(fila!.name).toBe("Nombre corregido"); // el resto sí se aplica
+
+    const aviso = (
+      await t.run((ctx) => ctx.db.query("bi_quality_issues").collect())
+    ).find((a) => a.issueType === "identity_conflict");
+    expect(aviso).toBeDefined();
+  });
+
+  test("sí completa el manychatId cuando la fila no tenía ninguno", async () => {
+    // Rellenar un hueco no es un conflicto: es justamente lo que se espera
+    // cuando el bot conoce por primera vez la identidad de ManyChat.
+    const t = convexTest(schema, convexModules);
+    await t.run((ctx) =>
+      ctx.db.insert(
+        "leads_contacts",
+        filaBase({ phone8: "89903618", airtableId: "recSinMc" }) as never,
+      ),
+    );
+
+    const res = await upsert(t, { phone: "8990-3618", manychatId: "mc-nuevo" });
+    expect(res.identityConflict).toBe(false);
+    const fila = await t.run((ctx) => ctx.db.get(res.leadId));
+    expect(fila!.manychatId).toBe("mc-nuevo");
+  });
+
   test("el desempate es determinista — dos llamadas caen en la misma fila", async () => {
     // Si no lo fuera, llamadas seguidas escribirían en filas distintas y la
     // conversación quedaría partida entre dos registros.
