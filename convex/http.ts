@@ -227,9 +227,122 @@ const leadsUpsert = httpAction(async (ctx, request) => {
   }
 });
 
+/** Extrae del cuerpo solo los campos del contrato; lo demás lo rechaza la mutation. */
+function tomar(body: Record<string, unknown>, campos: readonly string[]) {
+  const args: Record<string, unknown> = {};
+  for (const c of campos) {
+    if (body[c] !== undefined && body[c] !== null) args[c] = body[c];
+  }
+  return args;
+}
+
+/**
+ * Handler común de los dos endpoints que **patchean un lead existente**.
+ *
+ * Comparten toda la forma: token, cuerpo JSON, campos del contrato, y el 404
+ * cuando la identidad no resuelve. Lo único propio de cada uno es qué mutation
+ * llama y qué campos acepta.
+ */
+function patchDeLead(
+  campos: readonly string[],
+  correr: (
+    ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
+    args: Record<string, unknown>,
+  ) => Promise<{ found: boolean }>,
+) {
+  return httpAction(async (ctx, request) => {
+    const denied = requireBotToken(request);
+    if (denied) return denied;
+
+    const body = await parseJsonBody(request);
+    if (!body) {
+      return errorResponse(400, "bad_request", "Se esperaba un cuerpo JSON con un objeto.");
+    }
+
+    try {
+      const res = await correr(ctx, tomar(body, campos));
+      if (!res.found) {
+        // 404 y no 201: estos endpoints NO crean. Un estado de pago sobre un
+        // contacto inexistente es una señal de que algo viene mal más arriba.
+        return jsonResponse(404, {
+          error: "not_found",
+          message:
+            "No se encontró un lead con esa identidad. Usá /leads/upsert para crearlo.",
+          ...res,
+        });
+      }
+      return jsonResponse(200, res);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return errorResponse(400, "bad_request", msg.slice(0, 300));
+    }
+  });
+}
+
+/** `POST /leads/payment-status` — reemplaza el campo `Estado Pago` de Airtable. */
+const leadsPaymentStatus = patchDeLead(
+  ["manychatId", "phone", "status", "runId"],
+  (ctx, args) =>
+    ctx.runMutation(internal.bots.leadsWrite.setPaymentStatus, args as never),
+);
+
+/**
+ * `POST /leads/mark-followup` — reemplaza los checkboxes `Seguimiento 2h/23h/48h`.
+ *
+ * Contrato de **reclamo**: `claimed` dice si esta llamada fue la que puso la
+ * bandera. Conviene llamarlo ANTES de enviar y mandar solo si `claimed` es
+ * `true` — marcar después deja una ventana donde un reintento le vuelve a
+ * escribir al cliente.
+ */
+const leadsMarkFollowup = patchDeLead(
+  ["manychatId", "phone", "window", "done", "runId"],
+  (ctx, args) =>
+    ctx.runMutation(internal.bots.leadsWrite.markFollowup, args as never),
+);
+
+/**
+ * `POST /bot/onoff` — kill-switch global desde n8n.
+ *
+ * Aplica el cambio y, si con eso revierte algo fijado desde el tablero, deja
+ * el aviso: la precedencia todavía no está definida (H2) y no queremos que un
+ * bot que se vuelve a prender solo pase inadvertido.
+ */
+const botSetOnOff = httpAction(async (ctx, request) => {
+  const denied = requireBotToken(request);
+  if (denied) return denied;
+
+  const body = await parseJsonBody(request);
+  if (!body || typeof body.enabled !== "boolean") {
+    return errorResponse(
+      400,
+      "bad_request",
+      "Se requiere un cuerpo JSON con `enabled` booleano.",
+    );
+  }
+
+  const state = await ctx.runMutation(internal.bots.settings.setGlobal, {
+    enabled: body.enabled,
+    updatedBy: "api",
+    updatedVia: "api",
+    note: typeof body.note === "string" ? body.note : undefined,
+  });
+  return jsonResponse(200, state);
+});
+
 const http = httpRouter();
 http.route({ path: "/clerk-webhook", method: "POST", handler: clerkWebhook });
 http.route({ path: "/leads/upsert", method: "POST", handler: leadsUpsert });
+http.route({
+  path: "/leads/payment-status",
+  method: "POST",
+  handler: leadsPaymentStatus,
+});
+http.route({
+  path: "/leads/mark-followup",
+  method: "POST",
+  handler: leadsMarkFollowup,
+});
+http.route({ path: "/bot/onoff", method: "POST", handler: botSetOnOff });
 http.route({ path: "/bot/ping", method: "GET", handler: botPing });
 http.route({ path: "/bot/onoff", method: "GET", handler: botOnOff });
 http.route({

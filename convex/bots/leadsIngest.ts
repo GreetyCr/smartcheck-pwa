@@ -25,17 +25,12 @@
  */
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import type { Doc, Id } from "../_generated/dataModel";
-import { normalizePhone } from "../bi/leadsSync";
-
-/**
- * Orden en que se resuelve la identidad. **Pendiente de confirmar con Hans (H1).**
- *
- * `manychatId` va primero porque es el identificador que el bot maneja de forma
- * nativa: si viene, es el que él considera "esta conversación". El teléfono es
- * el respaldo, y además es el que empata con las inspecciones (`phone8`).
- */
-const IDENTITY_ORDER = ["manychatId", "phone8"] as const;
+import type { Id } from "../_generated/dataModel";
+import {
+  avisarAmbiguedad,
+  resolverIdentidad,
+  telefonoUtilizable,
+} from "./identity";
 
 const paymentStatus = v.union(
   v.literal("esperando"),
@@ -112,25 +107,9 @@ export const upsertLead = internalMutation({
 
     /* --------------------------- normalización --------------------------- */
     const manychatId = args.manychatId?.trim() || undefined;
-    const tel = args.phone != null ? normalizePhone(args.phone) : null;
-
-    /**
-     * ⚠️ Acá el criterio es MÁS ESTRICTO que el del sync, a propósito.
-     *
-     * `normalizePhone` siempre devuelve algo: ante un número que no es de Costa
-     * Rica se queda con los **últimos 8 dígitos** y marca `phoneValid: false`.
-     * Para el sync está bien —es un espejo fiel de Airtable (A26) y ahí no nos
-     * toca decidir—, pero como llave de entrada es peligroso: `+1 415 555 0100`
-     * se convierte en `55550100`, que es un número tico plausible. Ese lead
-     * quedaría bajo la llave de **otra persona**, y el próximo upsert del
-     * verdadero 5555-0100 escribiría sobre la conversación equivocada.
-     *
-     * Entonces: solo un teléfono **válido** sirve como identidad. Uno inválido
-     * se conserva en `rawPhone` para poder auditarlo, pero NO se guarda como
-     * `phone8` ni se usa para buscar.
-     */
-    const phone8 = tel?.phoneValid ? tel.phone8 : undefined;
-    const phoneRejected = args.phone != null && !phone8;
+    // El criterio de "teléfono utilizable como llave" es compartido y más
+    // estricto que el del sync — ver `identity.ts` (A75).
+    const { tel, phone8, rechazado: phoneRejected } = telefonoUtilizable(args.phone);
 
     if (!manychatId && !phone8) {
       // Sin ninguna llave la fila nace huérfana — ya tenemos 31 así y son
@@ -141,48 +120,15 @@ export const upsertLead = internalMutation({
     }
 
     /* ------------------------ resolución de identidad --------------------- */
-    let existing: Doc<"leads_contacts"> | null = null;
-    let matchedBy = "none";
-    let candidates = 0;
-
-    for (const llave of IDENTITY_ORDER) {
-      const valor = llave === "manychatId" ? manychatId : phone8;
-      if (!valor) continue;
-
-      const encontrados = (
-        await ctx.db
-          .query("leads_contacts")
-          .withIndex(
-            llave === "manychatId" ? "by_manychat" : "by_phone8",
-            (q) => q.eq(llave === "manychatId" ? "manychatId" : "phone8", valor),
-          )
-          .collect()
-      ).filter((r) => !r.isDeleted);
-
-      if (encontrados.length === 0) continue;
-
-      matchedBy = llave;
-      candidates = encontrados.length;
-      existing = elegirCandidato(encontrados);
-      break;
-    }
+    const { existing, matchedBy, candidates } = await resolverIdentidad(ctx, {
+      manychatId,
+      phone8,
+    });
 
     /* ------------------------------ ambigüedad ---------------------------- */
     const ambiguous = candidates > 1;
     if (ambiguous && existing) {
-      await ctx.db.insert("bi_quality_issues", {
-        issueType: "ambiguous_upsert",
-        severity: "warn",
-        entity: "leads_contacts",
-        entityRef: existing.airtableId ?? String(existing._id),
-        detail:
-          `el upsert por ${matchedBy} matcheó ${candidates} filas vivas; ` +
-          `se eligió la de contacto más reciente. Candidatas: ` +
-          `${String(existing._id)} (elegida) — revisar duplicados.`,
-        runId,
-        detectedAt: now,
-        resolved: false,
-      });
+      await avisarAmbiguedad(ctx, { lead: existing, matchedBy, candidates, runId, now });
     }
 
     // Un teléfono descartado se avisa. El upsert sigue —hay `manychatId`, si no
@@ -312,26 +258,3 @@ export const upsertLead = internalMutation({
   },
 });
 
-/**
- * Cuál de las filas repetidas recibe la escritura.
- *
- * La del contacto más reciente: el bot está hablando con alguien **ahora**, y de
- * varias filas con el mismo número la conversación viva es casi siempre la
- * última tocada. Es un desempate determinista —misma entrada, misma salida— para
- * que dos llamadas seguidas no escriban en filas distintas.
- *
- * Es una heurística, no la respuesta: la buena es que Hans defina la llave (H1)
- * y que los duplicados se resuelvan de raíz. Por eso cada vez que se usa queda
- * un aviso.
- */
-function elegirCandidato(
-  filas: Array<Doc<"leads_contacts">>,
-): Doc<"leads_contacts"> {
-  return filas.reduce((mejor, actual) => {
-    const a = actual.lastContactAt ?? actual.updatedAt;
-    const b = mejor.lastContactAt ?? mejor.updatedAt;
-    if (a !== b) return a > b ? actual : mejor;
-    // Empate perfecto: se ordena por id para que el resultado sea estable.
-    return String(actual._id) < String(mejor._id) ? actual : mejor;
-  });
-}

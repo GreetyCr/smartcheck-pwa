@@ -92,6 +92,38 @@ export const setGlobal = internalMutation({
 
     const next = { enabled, updatedAt: now, updatedBy, updatedVia, note };
 
+    /**
+     * Conflicto de precedencia (pregunta H2, sin responder).
+     *
+     * Si el bot revierte por API algo que una persona decidió desde el tablero,
+     * eso **no se resuelve solo**: no sabemos todavía quién debe ganar. Lo que
+     * sí podemos garantizar es que no pase en silencio — si Esteban apaga el bot
+     * y quince minutos después vuelve solo, tiene que quedar rastro de por qué.
+     *
+     * Se aplica el cambio (no inventamos una política de bloqueo que después
+     * haya que deshacer) y se registra el choque.
+     */
+    if (
+      row &&
+      updatedVia === "api" &&
+      row.updatedVia === "dashboard" &&
+      row.enabled !== enabled
+    ) {
+      await ctx.db.insert("bi_quality_issues", {
+        issueType: "onoff_conflict",
+        severity: "warn",
+        entity: "bot_settings",
+        entityRef: GLOBAL_KEY,
+        detail:
+          `la API puso el bot en ${enabled ? "encendido" : "apagado"}, ` +
+          `revirtiendo lo que se había fijado desde el tablero. ` +
+          `Precedencia sin definir (H2).`,
+        runId: `onoff_${now}`,
+        detectedAt: now,
+        resolved: false,
+      });
+    }
+
     if (row) {
       await ctx.db.patch(row._id, next);
     } else {
