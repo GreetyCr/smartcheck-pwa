@@ -132,6 +132,11 @@ const CONVEX_OWNED_ON_PATCH = [
   "followup48hDone",
   "paymentStatus",
   "lastContactAt",
+  // `appointmentAt` se sumó después, revisando el handoff contra el código: el
+  // bot agenda citas por `/leads/upsert`, así que sin esto una cita puesta el
+  // martes volvía al valor de Airtable el lunes. Mismo perfil que
+  // `lastContactAt` — lo escribe el bot y se usa para operar.
+  "appointmentAt",
 ] as const;
 
 /**

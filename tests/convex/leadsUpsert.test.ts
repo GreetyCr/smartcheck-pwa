@@ -408,9 +408,7 @@ describe("el endpoint HTTP", () => {
     expect((await res.json()).message).toContain("manychatId");
   });
 
-  test("un campo fuera del contrato falla de una vez", async () => {
-    // Un typo en el flujo de n8n tiene que romper visiblemente, no guardarse
-    // a medias y descubrirse semanas después.
+  test("un VALOR fuera del vocabulario falla", async () => {
     const t = convexTest(schema, convexModules);
     const res = await t.fetch("/leads/upsert", {
       method: "POST",
@@ -418,5 +416,42 @@ describe("el endpoint HTTP", () => {
       body: JSON.stringify({ manychatId: "mc-1", leadStage: "inventado" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  test("un NOMBRE de campo que no existe también falla, y dice cuál", async () => {
+    // Esta faltaba, y el hueco era caro: la versión anterior filtraba los
+    // campos desconocidos en silencio, así que un typo de `name` devolvía 201
+    // con la fila creada SIN nombre y nadie se enteraba. La prueba de arriba
+    // parecía cubrirlo pero mandaba un valor malo de un campo bueno.
+    const t = convexTest(schema, convexModules);
+    const res = await t.fetch("/leads/upsert", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ manychatId: "mc-1", nombre: "Ana" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain("nombre"); // el nombre exacto que sobró
+    expect(body.message).toContain("name"); // y cuál era el bueno
+
+    // Y sobre todo: no se creó nada a medias.
+    const filas = await t.run((ctx) => ctx.db.query("leads_contacts").collect());
+    expect(filas).toHaveLength(0);
+  });
+
+  test("los tres endpoints de escritura rechazan campos desconocidos", async () => {
+    const t = convexTest(schema, convexModules);
+    for (const [ruta, cuerpo] of [
+      ["/leads/upsert", { manychatId: "mc-1", inventado: 1 }],
+      ["/leads/payment-status", { manychatId: "mc-1", status: "recibido", inventado: 1 }],
+      ["/leads/mark-followup", { manychatId: "mc-1", window: "2h", inventado: 1 }],
+    ] as const) {
+      const res = await t.fetch(ruta, {
+        method: "POST",
+        headers: AUTH,
+        body: JSON.stringify(cuerpo),
+      });
+      expect(res.status, ruta).toBe(400);
+    }
   });
 });

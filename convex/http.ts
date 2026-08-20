@@ -124,8 +124,9 @@ const botPing = httpAction(async (_ctx, request) => {
  * `/leads/due-followups` ya lo aplica por su cuenta: con el bot apagado devuelve
  * la lista vacía, así que aunque nadie lea este endpoint el switch surte efecto.
  *
- * `POST /bot/onoff` queda pendiente: escribir el estado desde n8n necesita la
- * regla de precedencia que Hans todavía no definió (§5 y §10 del handoff).
+ * `POST /bot/onoff` escribe el estado desde n8n. La regla de **precedencia**
+ * sigue sin definir (H2), así que por ahora gana el último cambio y el choque
+ * con el tablero queda registrado — ver `settings.ts`.
  */
 const botOnOff = httpAction(async (ctx, request) => {
   const denied = requireBotToken(request);
@@ -199,9 +200,6 @@ const leadsUpsert = httpAction(async (ctx, request) => {
     );
   }
 
-  // Se pasan solo los campos conocidos: el validador de la mutation rechaza
-  // cualquier otra cosa, y así un typo en el flujo de n8n falla de una vez en
-  // lugar de guardarse a medias.
   const campos = [
     "manychatId", "phone", "name", "locality", "needsInvoice",
     "vehicleBrand", "vehicleModel", "vehicleYear", "transmissionType",
@@ -209,8 +207,8 @@ const leadsUpsert = httpAction(async (ctx, request) => {
     "chatbotActive", "lastContactAt", "appointmentAt",
     "followup2hDone", "followup23hDone", "followup48hDone", "runId",
   ] as const;
-  const args: Record<string, unknown> = {};
-  for (const c of campos) if (body[c] !== undefined && body[c] !== null) args[c] = body[c];
+  const { args, desconocidos } = tomar(body, campos);
+  if (desconocidos.length > 0) return errorDeCamposDesconocidos(desconocidos, campos);
 
   try {
     const res = await ctx.runMutation(
@@ -227,13 +225,41 @@ const leadsUpsert = httpAction(async (ctx, request) => {
   }
 });
 
-/** Extrae del cuerpo solo los campos del contrato; lo demás lo rechaza la mutation. */
+/**
+ * Separa los campos del contrato de los que no lo son.
+ *
+ * Devuelve también los **desconocidos**, y eso no es un detalle: la primera
+ * versión los descartaba en silencio, así que `{"manychatId":"…","nombre":"Ana"}`
+ * —un typo de `name`— respondía 201 con la fila creada **sin nombre**, y quien
+ * armó el flujo no se enteraba. Un campo que no existe es un error del que
+ * llama, y tiene que romper de una vez.
+ */
 function tomar(body: Record<string, unknown>, campos: readonly string[]) {
+  const permitidos = new Set(campos);
   const args: Record<string, unknown> = {};
-  for (const c of campos) {
-    if (body[c] !== undefined && body[c] !== null) args[c] = body[c];
+  const desconocidos: string[] = [];
+  for (const clave of Object.keys(body)) {
+    if (!permitidos.has(clave)) {
+      desconocidos.push(clave);
+      continue;
+    }
+    // `null` se trata como ausente: la API no borra campos, y aceptarlo en
+    // silencio como "poner en nulo" sería otra forma del mismo malentendido.
+    if (body[clave] !== undefined && body[clave] !== null) {
+      args[clave] = body[clave];
+    }
   }
-  return args;
+  return { args, desconocidos };
+}
+
+/** Error 400 con los nombres exactos que sobraron — para no mandar a adivinar. */
+function errorDeCamposDesconocidos(desconocidos: string[], campos: readonly string[]) {
+  return errorResponse(
+    400,
+    "bad_request",
+    `Campos que no existen en el contrato: ${desconocidos.join(", ")}. ` +
+      `Los aceptados son: ${campos.join(", ")}.`,
+  );
 }
 
 /**
@@ -259,8 +285,11 @@ function patchDeLead(
       return errorResponse(400, "bad_request", "Se esperaba un cuerpo JSON con un objeto.");
     }
 
+    const { args, desconocidos } = tomar(body, campos);
+    if (desconocidos.length > 0) return errorDeCamposDesconocidos(desconocidos, campos);
+
     try {
-      const res = await correr(ctx, tomar(body, campos));
+      const res = await correr(ctx, args);
       if (!res.found) {
         // 404 y no 201: estos endpoints NO crean. Un estado de pago sobre un
         // contacto inexistente es una señal de que algo viene mal más arriba.

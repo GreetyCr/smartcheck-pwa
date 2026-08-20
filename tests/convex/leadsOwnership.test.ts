@@ -128,6 +128,30 @@ describe("interruptor encendido (dual-write)", () => {
     expect(fila!.lastContactAt).toBe(HOY);
   });
 
+  test("`appointmentAt` queda protegido — el bot agenda citas por el upsert", async () => {
+    // Se sumó a la lista revisando el handoff contra el código: sin esto, una
+    // cita puesta el martes volvía al valor de Airtable el lunes siguiente.
+    const t = convexTest(schema, convexModules);
+    await conFilaEscritaPorElBot(t);
+    process.env.CONVEX_OWNS_BOT_FIELDS = "true";
+    const CITA = HOY + 3 * 24 * 60 * 60 * 1000;
+    await t.run(async (ctx) => {
+      const fila = await ctx.db
+        .query("leads_contacts")
+        .withIndex("by_airtable_id", (q) => q.eq("airtableId", REC))
+        .unique();
+      await ctx.db.patch(fila!._id, { appointmentAt: CITA });
+    });
+
+    await t.mutation(internal.bi.leads.loadLeadsBatch, {
+      rows: [desdeAirtable({ appointmentAt: AYER })],
+      runId: "sync-semanal",
+    });
+
+    const fila = await leerFila(t);
+    expect(fila!.appointmentAt).toBe(CITA);
+  });
+
   test("los demás campos SÍ se siguen actualizando — el BI no se queda ciego", async () => {
     // Es la razón de haber elegido propiedad por campo en vez de apagar el sync.
     const t = convexTest(schema, convexModules);
