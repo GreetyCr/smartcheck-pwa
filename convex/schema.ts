@@ -648,6 +648,36 @@ export default defineSchema({
     message: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
+  /* ------------------------------------------------------------------------ */
+  /* INTERRUPTORES DEL BOT — kill-switch (A37)                                 */
+  /* ------------------------------------------------------------------------ */
+  /**
+   * Estado del bot. Tabla PROPIA, no `bi_meta` (A65): `bi_meta` responde
+   * "cuándo corrió X y cómo le fue" — no tiene dónde guardar un valor. Meter
+   * acá un booleano lo habría deformado.
+   *
+   * Guarda **quién** y **cómo** lo cambió, que en un kill-switch es justo lo
+   * que uno quiere tener a mano cuando algo salió mal. Es el estado ACTUAL,
+   * no el historial: si durante el cutover hace falta la traza completa, se
+   * agrega una tabla de eventos aparte.
+   *
+   * Hoy la única llave es `chatbot_global` (espeja la tabla "ON/OFF Chatbot"
+   * de Airtable). El on/off **por-lead** vive en `leads_contacts.chatbotActive`
+   * y NO es confiable hasta resolver A66 — el sync semanal lo pisa.
+   */
+  bot_settings: defineTable({
+    key: v.string(), // "chatbot_global" (única por ahora; `v.string()` deja crecer)
+    enabled: v.boolean(),
+    updatedAt: v.number(),
+    updatedBy: v.string(), // clerkId del admin, o "api" cuando lo cambia n8n
+    updatedVia: v.union(
+      v.literal("dashboard"),
+      v.literal("api"),
+      v.literal("system"),
+    ),
+    note: v.optional(v.string()), // por qué se apagó — se agradece a las 2 a.m.
+  }).index("by_key", ["key"]),
+
   /**
    * Leads / contactos — FUENTE DE VERDAD (operativa + BI), reemplaza a Airtable
    * "Vehículos". MODELO-LEADS-CONTACTS-v2. ADITIVO. Carga histórica 1:1 por
@@ -735,6 +765,10 @@ export default defineSchema({
     .index("by_phone8", ["phone8"])
     .index("by_airtable_id", ["airtableId"]) // idempotencia de la carga 1:1 (A26)
     .index("by_stage", ["leadStage"])
+    // Seguimientos vencidos (`GET /leads/due-followups`, A37): el corte es un
+    // rango sobre `lastContactAt`. Sin este índice el endpoint escanea las
+    // 8.706 filas en cada llamada del cron de n8n.
+    .index("by_last_contact", ["lastContactAt"])
     .index("by_source_created", ["sourceCreatedAt"])
     .index("by_created", ["createdAt"]),
 });

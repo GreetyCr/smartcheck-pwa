@@ -381,16 +381,32 @@ export const syncLeadsFromAirtable = internalAction({
       if (offset) await new Promise((r) => setTimeout(r, 250));
     } while (offset);
 
+    // 1.5) Un full que vuelve con CERO registros es casi con seguridad un fetch
+    // roto, no un Airtable vacío (hay 8,7k filas). Y el paso siguiente borra
+    // todos los avisos de calidad antes de recargar: si dejáramos seguir, un
+    // fetch fallido se llevaría por delante los ~1.900 avisos y volvería con
+    // nada. Se corta acá y se registra; el sync anterior queda intacto.
+    if (isFull && records.length === 0) {
+      await ctx.runMutation(internal.bi.leadsSync.writeSyncMeta, {
+        status: "error",
+        rowsProcessed: 0,
+        message:
+          "full devolvió 0 registros — se aborta sin tocar nada (fetch sospechoso)",
+      });
+      return { ...empty, mode: mode ?? "full", ms: Date.now() - startedAt };
+    }
+
     // 2) Mapear + upsert idempotente por airtableId (reusa loadLeadsBatch)
     const mapped = records.map(mapRecord);
     const rows = mapped.map((m) => m.row as LeadRowArg);
     if (isFull) await ctx.runMutation(internal.bi.leads.resetLeadIssues, {});
 
-    const totals = { received: 0, inserted: 0, patched: 0, failed: 0 };
+    const totals = { received: 0, inserted: 0, patched: 0, failed: 0, ownedRespected: 0 };
     for (let i = 0; i < rows.length; i += 250) {
       const res = await ctx.runMutation(internal.bi.leads.loadLeadsBatch, { rows: rows.slice(i, i + 250), runId });
       totals.received += res.received; totals.inserted += res.inserted;
       totals.patched += res.patched; totals.failed += res.failed;
+      totals.ownedRespected += res.ownedRespected;
     }
 
     // 3) Issues — solo recompute global en full (incremental los refresca el full semanal)
@@ -403,11 +419,29 @@ export const syncLeadsFromAirtable = internalAction({
       }
     }
 
+    // 3.5) RF-16 — reconciliar conteos contra Airtable (A71). Va DESPUÉS de la
+    // carga (necesita ver qué filas se tocaron) y solo en full: en un
+    // incremental "no vino en esta corrida" no significa nada. Si esto fallara,
+    // el sync ya está hecho y no hay que revertirlo — por eso no aborta.
+    try {
+      await ctx.runMutation(internal.bi.leadsReconcile.reconcileLeads, {
+        runId,
+        syncStartedAt: startedAt,
+        airtableCount: records.length,
+        failedRows: totals.failed,
+        isFull,
+      });
+    } catch (err) {
+      console.error("[leads reconcile]", err);
+    }
+
     const status = totals.failed === 0 ? "ok" : "error";
     await ctx.runMutation(internal.bi.leadsSync.writeSyncMeta, {
       status,
       rowsProcessed: totals.received,
-      message: `${isFull ? "full" : "incremental"}: fetched=${records.length} ins=${totals.inserted} patch=${totals.patched} fail=${totals.failed} issues=${issuesInserted}`,
+      // `owned=` solo aparece cuando el interruptor de A66 está encendido: si
+      // saliera siempre en cero, el día que importe nadie lo notaría.
+      message: `${isFull ? "full" : "incremental"}: fetched=${records.length} ins=${totals.inserted} patch=${totals.patched} fail=${totals.failed} issues=${issuesInserted}${totals.ownedRespected > 0 ? ` owned=${totals.ownedRespected}` : ""}`,
     });
 
     // A38 — encadenar el recálculo del embudo. Sin esto, entran leads nuevos y
