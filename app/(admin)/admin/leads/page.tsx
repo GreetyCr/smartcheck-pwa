@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { LeadsDashboard } from "@/components/bi/LeadsDashboard";
+import { BotSwitchCard } from "@/components/bi/BotSwitchCard";
 
 /**
  * Tablero de Leads & conversión — lee `bi/public:{conversionFunnel,
@@ -22,6 +23,10 @@ export default function LeadsPage() {
   const leads = useQuery(api.bi.public.leadsStats, {});
   const porRevisar = useQuery(api.bi.public.leadsPorRevisar, {});
   const converted = useQuery(api.bi.public.convertedLeads, {});
+  /* El on/off va aparte del bloqueo de abajo: es un control, no una cifra que
+     tenga que cuadrar con las demás. Si tarda, que no retrase el tablero; y si
+     el tablero tarda, que el interruptor ya esté a mano. */
+  const bot = useQuery(api.bots.public.botStatus, {});
 
   // Se piden juntas y el tablero cruza sus cifras entre sí (los 238
   // emparejamientos, los 180 titulares, los 8.706 leads). Renderizar con una
@@ -55,12 +60,19 @@ export default function LeadsPage() {
   }
 
   return (
-    <LeadsDashboard
-      funnel={funnel}
-      matches={matches}
-      leads={leads}
-      porRevisar={porRevisar}
-      converted={converted}
-    />
+    <>
+      {bot ? (
+        <div className="mb-4">
+          <BotSwitchCard estado={bot} />
+        </div>
+      ) : null}
+      <LeadsDashboard
+        funnel={funnel}
+        matches={matches}
+        leads={leads}
+        porRevisar={porRevisar}
+        converted={converted}
+      />
+    </>
   );
 }
