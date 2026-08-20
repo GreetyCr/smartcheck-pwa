@@ -14,6 +14,7 @@
  */
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 export const GLOBAL_KEY = "chatbot_global";
 
@@ -40,10 +41,14 @@ const botStateReturns = v.object({
   isDefault: v.boolean(),
 });
 
-export const getGlobal = internalQuery({
-  args: {},
-  returns: botStateReturns,
-  handler: async (ctx) => {
+/**
+ * Estado global, como función plana que recibe `ctx`.
+ *
+ * Existe separada de la `internalQuery` porque el wrapper público del tablero
+ * también la necesita, y en Convex una `query` **no puede** llamar a otra
+ * función (A41). Pasarle `ctx` a un helper sí es legítimo.
+ */
+export async function readGlobalState(ctx: QueryCtx | MutationCtx) {
     const row = await ctx.db
       .query("bot_settings")
       .withIndex("by_key", (q) => q.eq("key", GLOBAL_KEY))
@@ -68,22 +73,36 @@ export const getGlobal = internalQuery({
       note: row.note ?? null,
       isDefault: false,
     };
-  },
+}
+
+export const getGlobal = internalQuery({
+  args: {},
+  returns: botStateReturns,
+  handler: async (ctx) => readGlobalState(ctx),
 });
 
-export const setGlobal = internalMutation({
-  args: {
-    enabled: v.boolean(),
-    updatedBy: v.string(),
-    updatedVia: v.union(
-      v.literal("dashboard"),
-      v.literal("api"),
-      v.literal("system"),
-    ),
-    note: v.optional(v.string()),
-  },
-  returns: botStateReturns,
-  handler: async (ctx, { enabled, updatedBy, updatedVia, note }) => {
+export { botStateReturns };
+
+type Via = "dashboard" | "api" | "system";
+
+/**
+ * Escritura del estado global, como función plana.
+ *
+ * La comparte la `internalMutation` (que usa el endpoint de n8n) con el wrapper
+ * público del tablero, para que la **detección de conflicto de precedencia viva
+ * en un solo lugar**. Si cada camino la implementara por su cuenta, tarde o
+ * temprano uno de los dos se olvidaría de registrar el choque — que es justo lo
+ * único que hoy protege al on/off mientras H2 sigue sin respuesta.
+ */
+export async function writeGlobalState(
+  ctx: MutationCtx,
+  {
+    enabled,
+    updatedBy,
+    updatedVia,
+    note,
+  }: { enabled: boolean; updatedBy: string; updatedVia: Via; note?: string },
+) {
     const now = Date.now();
     const row = await ctx.db
       .query("bot_settings")
@@ -138,5 +157,19 @@ export const setGlobal = internalMutation({
       note: note ?? null,
       isDefault: false,
     };
+}
+
+export const setGlobal = internalMutation({
+  args: {
+    enabled: v.boolean(),
+    updatedBy: v.string(),
+    updatedVia: v.union(
+      v.literal("dashboard"),
+      v.literal("api"),
+      v.literal("system"),
+    ),
+    note: v.optional(v.string()),
   },
+  returns: botStateReturns,
+  handler: async (ctx, args) => writeGlobalState(ctx, args),
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { LeadsDashboard } from "@/components/bi/LeadsDashboard";
+import { BotSwitchCard } from "@/components/bi/BotSwitchCard";
 import type {
   ConversionFunnel,
   ConvertedLead,
@@ -213,6 +214,33 @@ export function LeadsPreview() {
       {/* Acá no hay shell de /admin, así que este envoltorio hace su papel:
           aplica el tema grafito y el mismo padding de contenido. */}
       <div className={cn(ADMIN_THEME_CLASS, ADMIN_CONTENT_PADDING, "min-h-dvh")}>
+        {/* Los dos estados del on/off juntos: lo que hay que poder aprobar de
+            un vistazo es que el aviso de "todavía no surte efecto" se lea antes
+            que el interruptor, no después. */}
+        <div className="mb-4 grid gap-4 xl:grid-cols-2">
+          <BotSwitchCard
+            estado={{
+              enabled: true,
+              updatedAt: null,
+              updatedBy: null,
+              updatedVia: null,
+              note: null,
+              isDefault: true,
+              apiConectada: false,
+            }}
+          />
+          <BotSwitchCard
+            estado={{
+              enabled: false,
+              updatedAt: Date.parse("2026-08-19T09:30:00-06:00"),
+              updatedBy: "user_ejemplo",
+              updatedVia: "dashboard",
+              note: "pausa por mantenimiento",
+              isDefault: false,
+              apiConectada: true,
+            }}
+          />
+        </div>
         <LeadsDashboard
           funnel={FUNNEL}
           matches={MATCHES}

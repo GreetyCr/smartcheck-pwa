@@ -26,6 +26,7 @@ import type * as bots_followups from "../bots/followups.js";
 import type * as bots_identity from "../bots/identity.js";
 import type * as bots_leadsIngest from "../bots/leadsIngest.js";
 import type * as bots_leadsWrite from "../bots/leadsWrite.js";
+import type * as bots_public from "../bots/public.js";
 import type * as bots_settings from "../bots/settings.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "bots/identity": typeof bots_identity;
   "bots/leadsIngest": typeof bots_leadsIngest;
   "bots/leadsWrite": typeof bots_leadsWrite;
+  "bots/public": typeof bots_public;
   "bots/settings": typeof bots_settings;
   crons: typeof crons;
   http: typeof http;
