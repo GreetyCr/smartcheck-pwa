@@ -15,7 +15,7 @@ import {
   Menu,
   Settings,
   Users,
-  X,
+  X, Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +58,7 @@ const GROUPS: NavGroup[] = [
     label: "Negocio",
     items: [
       { href: "/admin/finanzas", label: "Finanzas", Icon: LineChart },
+      { href: "/admin/planilla", label: "Planilla", Icon: Calculator },
       { href: "/admin/leads", label: "Leads", Icon: Filter },
     ],
   },

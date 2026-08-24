@@ -11,7 +11,7 @@ import {
   TASAS_POR_DEFECTO,
   calcularPlanilla,
   llaveDeLinea,
-} from "../../convex/bi/payroll";
+} from "../../lib/payroll";
 
 /** Julio de 2026, tal como quedó registrado en producción. */
 const JULIO = {
