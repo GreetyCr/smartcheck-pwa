@@ -2,6 +2,28 @@
 
 import { useState } from "react";
 import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
+
+/**
+ * Desglose de muestra con las magnitudes REALES de producción (19-ago), porque
+ * el punto de esta vista es aprobar el diseño con proporciones de verdad: un
+ * grupo que se lleva el 67% se ve muy distinto a seis parejos.
+ */
+const DESGLOSE_OTROS = {
+  totalCRC: 9_266_030,
+  totalRows: 195,
+  grupos: [
+    { grupo: "servicios_profesionales", rows: 36, amountCRC: 6_182_829, pct: 66.7 },
+    { grupo: "software", rows: 78, amountCRC: 943_299, pct: 10.2 },
+    { grupo: "viaticos_tecnico", rows: 32, amountCRC: 744_556, pct: 8 },
+    { grupo: "equipo", rows: 14, amountCRC: 651_692, pct: 7 },
+    { grupo: "telefonia", rows: 32, amountCRC: 485_298, pct: 5.2 },
+    { grupo: "desarrollo_panel", rows: 2, amountCRC: 208_356, pct: 2.2 },
+    { grupo: "sin_clasificar", rows: 1, amountCRC: 50_000, pct: 0.5 },
+  ],
+  sinClasificar: [
+    { etiqueta: "MANTENIMIENTO CHATBOT", rows: 1, amountCRC: 50_000 },
+  ],
+};
 import type { FinanceEntry, FinanceSummary } from "@/components/bi/types";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
@@ -68,6 +90,7 @@ export function FinanzasPreview() {
             se revisan. Los handlers rechazan con un mensaje claro en vez de
             simular un guardado que no ocurre. */}
         <FinanceDashboard
+          expenseBreakdown={DESGLOSE_OTROS}
           summary={SUMMARY}
           entries={ENTRIES}
           selectedMonth={selectedMonth}

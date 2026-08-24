@@ -17,6 +17,9 @@ export default function FinanzasPage() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const summary = useQuery(api.bi.public.financeSummary, {});
+  /* El desglose de «Otros» va aparte del bloqueo de carga: es un zoom sobre
+     una barra, no una cifra que tenga que cuadrar con las demás. */
+  const breakdown = useQuery(api.bi.public.expenseBreakdown, {});
   const entries = useQuery(
     api.bi.financeForm.listFinanceEntries,
     selectedMonth ? { yearMonth: selectedMonth, limit: 500 } : { limit: 200 },
@@ -53,6 +56,7 @@ export default function FinanzasPage() {
     <FinanceDashboard
       summary={summary}
       entries={rows}
+      expenseBreakdown={breakdown ?? undefined}
       loadingEntries={entries === undefined}
       selectedMonth={selectedMonth}
       onSelectMonth={setSelectedMonth}
