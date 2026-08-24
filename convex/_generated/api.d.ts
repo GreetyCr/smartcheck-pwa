@@ -21,6 +21,7 @@ import type * as bi_lib_dates from "../bi/lib/dates.js";
 import type * as bi_lib_financeRules from "../bi/lib/financeRules.js";
 import type * as bi_matches from "../bi/matches.js";
 import type * as bi_metrics from "../bi/metrics.js";
+import type * as bi_payroll from "../bi/payroll.js";
 import type * as bi_public from "../bi/public.js";
 import type * as bi_reclassify from "../bi/reclassify.js";
 import type * as bots_followups from "../bots/followups.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "bi/lib/financeRules": typeof bi_lib_financeRules;
   "bi/matches": typeof bi_matches;
   "bi/metrics": typeof bi_metrics;
+  "bi/payroll": typeof bi_payroll;
   "bi/public": typeof bi_public;
   "bi/reclassify": typeof bi_reclassify;
   "bots/followups": typeof bots_followups;

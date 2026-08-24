@@ -207,6 +207,7 @@ export const listFinanceEntries = query({
         v.literal("sheet"),
         v.literal("manual"),
         v.literal("inspection"),
+        v.literal("planilla"),
       ),
       // La regla vive en el backend: el cliente no decide qué se puede tocar.
       editable: v.boolean(),

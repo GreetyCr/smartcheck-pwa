@@ -95,7 +95,7 @@ export function isFxMissing(
 /* F5-auto — ingreso derivado de la inspección entregada                       */
 /* -------------------------------------------------------------------------- */
 
-export type FinanceSource = "sheet" | "manual" | "inspection";
+export type FinanceSource = "sheet" | "manual" | "inspection" | "planilla";
 
 /**
  * Una fila `source:"inspection"` la escribe el sistema al entregar el reporte y
@@ -103,7 +103,10 @@ export type FinanceSource = "sheet" | "manual" | "inspection";
  * re-derivación. El formulario (F5) la muestra pero no la deja tocar.
  */
 export function isSystemGenerated(source: FinanceSource): boolean {
-  return source === "inspection";
+  // Las dos se re-derivan de su origen: la de inspección del monto cobrado, la
+  // de planilla de los tres datos del mes. Editarlas a mano se perdería en
+  // silencio en el siguiente recálculo, así que el formulario las bloquea.
+  return source === "inspection" || source === "planilla";
 }
 
 /**

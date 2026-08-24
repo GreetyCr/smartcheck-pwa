@@ -512,10 +512,13 @@ export default defineSchema({
     yearMonth: v.string(), // "2025-09"
     // "inspection" = generada por el sistema al entregar el reporte (F5-auto):
     // NO editable desde el formulario; se re-deriva de la inspección enlazada.
+    // "planilla" = una de las seis líneas derivadas del mes (B28): tampoco se
+    // edita a mano, se re-deriva de `payroll_months`.
     source: v.union(
       v.literal("sheet"),
       v.literal("manual"),
       v.literal("inspection"),
+      v.literal("planilla"),
     ),
     // Idempotencia. Dos vocabularios:
     //   F1 (Sheet):     "sheet:<pestaña>:<etiqueta>:<n>"
@@ -647,6 +650,36 @@ export default defineSchema({
     rowsProcessed: v.optional(v.number()),
     message: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  /* ------------------------------------------------------------------------ */
+  /* PLANILLA DEL MES — los tres datos que Esteban escribe (B28)               */
+  /* ------------------------------------------------------------------------ */
+  /**
+   * Lo que Esteban captura una vez al mes. Las **seis líneas derivadas** viven
+   * en `finance_entries` con `source: "planilla"`; acá quedan sus **insumos**.
+   *
+   * Se guardan aparte a propósito: permite mostrarle qué escribió el mes pasado,
+   * corregir un dato y recalcular las seis, y deja auditable **con qué tasas** se
+   * calculó cada mes — que importa porque las tasas cambian (marzo salió con
+   * otras y resultó ser un error suyo, B30).
+   */
+  payroll_months: defineTable({
+    yearMonth: v.string(), // "2026-07"
+    salarioCRC: v.number(),
+    comisionesCRC: v.number(),
+    /** La base que él decide reportar. La elige él; el sistema no la deduce. */
+    baseImponibleCRC: v.number(),
+    /** Tasas usadas en ESTE mes — congeladas para poder auditar hacia atrás. */
+    tasas: v.object({
+      aportePatronalPct: v.number(),
+      provisionPct: v.number(),
+      vacacionesPct: v.number(),
+      impuestosPct: v.number(),
+    }),
+    createdBy: v.string(), // clerkId
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_year_month", ["yearMonth"]),
 
   /* ------------------------------------------------------------------------ */
   /* INTERRUPTORES DEL BOT — kill-switch (A37)                                 */
