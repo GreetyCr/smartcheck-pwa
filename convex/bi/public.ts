@@ -46,6 +46,7 @@ import {
   leadsStatsImpl,
   leadsStatsReturns,
 } from "./leads";
+import { breakdownReturns, expenseBreakdownImpl } from "./expenseGroups";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -178,5 +179,21 @@ export const leadsPorRevisar = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return leadsPorRevisarImpl(ctx);
+  },
+});
+
+/**
+ * Desglose de «Otros» en los seis grupos que aprobó Esteban (A83).
+ *
+ * No mueve ni un colón de la utilidad: es la misma plata, mejor ordenada. Por
+ * eso se puede cambiar el mapeo sin miedo — lo peor que puede pasar es que un
+ * proveedor aparezca en «sin clasificar», que es visible a propósito.
+ */
+export const expenseBreakdown = query({
+  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
+  returns: breakdownReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return expenseBreakdownImpl(ctx, args);
   },
 });
