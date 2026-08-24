@@ -1,0 +1,243 @@
+/**
+ * Desglose de la categoría «Otros» en grupos con nombre (A61 · A83).
+ *
+ * El problema: `otros` se lleva casi un tercio del gasto y ahí adentro conviven
+ * el contador, los celulares, las suscripciones, el equipo y los viáticos del
+ * técnico. En el tablero, un tercio de la plata aparece en una bolsa sin nombre
+ * y no sirve para decidir nada.
+ *
+ * Esteban confirmó los seis grupos el 19-ago (B30) y que **JRC es una empresa
+ * tributaria**, así que va con el contador e Incorporate.
+ *
+ * ---
+ *
+ * **De dónde sale el proveedor.** La primera versión de esto clasificaba leyendo
+ * `note`, y estaba mal: las notas de la migración son cadenas de procedencia
+ * (`gasto_fijo|raw=$ 800,00|unmapped`) que **no traen el nombre del proveedor**.
+ * El 91,8% caía sin clasificar.
+ *
+ * El proveedor sí sobrevivió, pero en `externalKey`, que la migración armó como
+ * `sheet:<pestaña>:<ETIQUETA>:<n>` — y esa etiqueta es el renglón de la hoja de
+ * Esteban: `INCORPORATE`, `JRC`, `SAFETY CULTURE`, `CELULAR KOLBI`. Es **dato
+ * estructurado**, no prosa, que es exactamente la lección de **A64**: cuando
+ * existe un campo con estructura, se usa ese y no el texto libre.
+ *
+ * Las tres decisiones que lo hacen seguro:
+ *
+ * 1. **Mapeo explícito por etiqueta**, no heurística sobre texto libre. Una
+ *    lista de etiquetas → grupo, visible y editable en un solo lugar.
+ * 2. **«Sin clasificar» es un grupo de primera clase**, no un descarte. Devuelve
+ *    los montos Y las notas, así que un proveedor nuevo **aparece** en vez de
+ *    caer callado en el grupo equivocado. Es lo contrario de A64: acá el hueco
+ *    es ruidoso por construcción.
+ * 3. **Se calcula al leer, no se guarda.** El mapeo va a cambiar cada vez que
+ *    aparezca un proveedor nuevo; si el grupo estuviera guardado en la fila,
+ *    cada cambio obligaría a una migración y las filas viejas quedarían con
+ *    grupos viejos. Además **no toca ni un colón**: es la misma plata, mejor
+ *    ordenada, así que reagrupar nunca puede alterar la utilidad.
+ */
+import { v } from "convex/values";
+import { internalQuery } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+
+/** Los seis grupos que Esteban aprobó, más el que se explica solo. */
+export const GRUPOS = [
+  "servicios_profesionales",
+  "software",
+  "viaticos_tecnico",
+  "equipo",
+  "telefonia",
+  "desarrollo_panel",
+  "sin_clasificar",
+] as const;
+
+export type Grupo = (typeof GRUPOS)[number];
+
+/**
+ * Etiquetas → grupo. **Este es el único lugar donde se decide.**
+ *
+ * Se compara en minúsculas y sin tildes. El orden importa: gana el primero que
+ * calce, así que lo específico va antes que lo general.
+ */
+const MAPEO: Array<{ patrones: string[]; grupo: Grupo }> = [
+  {
+    grupo: "servicios_profesionales",
+    patrones: ["incorporate", "jrc", "contador", "contabilidad", "abogad", "legal"],
+  },
+  {
+    grupo: "software",
+    patrones: [
+      // Los nombres van como aparecen en la hoja: «OPEN AI» lleva espacio y
+      // «openai» no calzaba. Se descubrió porque quedaron sin clasificar.
+      "safety culture", "safetyculture", "open ai", "openai", "gpt",
+      "manychat", "airtable", "contabo", "vercel", "convex", "clerk",
+      "servidor chatbot", "base datos app", "ig verified", "captions",
+      "suscripcion", "software", "licencia", "dominio", "hosting",
+      "canva", "google workspace",
+    ],
+  },
+  {
+    grupo: "telefonia",
+    patrones: ["kolbi", "claro", "movistar", "liberty", "telefon", "celular", "recarga"],
+  },
+  {
+    grupo: "desarrollo_panel",
+    patrones: ["dashboard", "panel", "desarrollo", "costa coders", "bi "],
+  },
+  {
+    grupo: "equipo",
+    patrones: [
+      "equipo", "herramienta", "scanner", "escaner", "laptop", "computadora",
+      "tablet", "impresora", "camara", "bateria", "cargador",
+    ],
+  },
+  {
+    grupo: "viaticos_tecnico",
+    patrones: ["viatico", "viático", "sergio", "tecnico", "técnico"],
+  },
+];
+
+/**
+ * La etiqueta de la hoja, sacada de `externalKey`.
+ *
+ * Formato: `sheet:<pestaña>:<etiqueta>:<n>`. La etiqueta puede traer `:` adentro
+ * (raro pero posible), así que se toma todo lo que va entre la segunda y la
+ * última parte en vez de partir a ciegas por el separador.
+ *
+ * Devuelve `undefined` para los movimientos que no vienen de la hoja —captura
+ * manual de Esteban, o los que genera el sistema al entregar un reporte—, que
+ * caen al texto de la nota.
+ */
+export function etiquetaDeExternalKey(externalKey: string | undefined): string | undefined {
+  if (!externalKey?.startsWith("sheet:")) return undefined;
+  const partes = externalKey.split(":");
+  if (partes.length < 4) return undefined;
+  const etiqueta = partes.slice(2, -1).join(":").trim();
+  return etiqueta.length > 0 ? etiqueta : undefined;
+}
+
+/** Minúsculas y sin tildes: «Viático» y «viatico» son la misma palabra. */
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * A qué grupo pertenece un movimiento.
+ *
+ * Exportada y pura a propósito: es la única regla, y se prueba directo sin
+ * montar una base de datos.
+ */
+export function clasificar(
+  { externalKey, note, isViatico }:
+    { externalKey?: string; note?: string; isViatico: boolean },
+): Grupo {
+  // Un movimiento marcado como viático es viático, diga lo que diga la etiqueta.
+  // El dato estructurado le gana al texto libre siempre que exista.
+  if (isViatico) return "viaticos_tecnico";
+
+  // La etiqueta de la hoja primero; la nota solo como respaldo para lo que no
+  // vino de la hoja.
+  const fuente = etiquetaDeExternalKey(externalKey) ?? note ?? "";
+  const n = normalizar(fuente);
+  if (!n.trim()) return "sin_clasificar";
+
+  for (const { patrones, grupo } of MAPEO) {
+    for (const p of patrones) {
+      if (n.includes(normalizar(p))) return grupo;
+    }
+  }
+  return "sin_clasificar";
+}
+
+const grupoRow = v.object({
+  grupo: v.string(),
+  rows: v.number(),
+  amountCRC: v.number(),
+  /** Porcentaje sobre el total de «otros». */
+  pct: v.number(),
+});
+
+const breakdownReturns = v.object({
+  /** Total de la categoría «otros» — debe cuadrar con la suma de los grupos. */
+  totalCRC: v.number(),
+  totalRows: v.number(),
+  grupos: v.array(grupoRow),
+  /**
+   * Las etiquetas que no calzaron con ninguna regla, con su monto y cuántas
+   * veces aparecen. **Esta lista es el mantenimiento del mapeo**: si crece, es
+   * que entró un proveedor nuevo y hay que decidir dónde va.
+   */
+  sinClasificar: v.array(
+    v.object({
+      etiqueta: v.string(),
+      rows: v.number(),
+      amountCRC: v.number(),
+    }),
+  ),
+});
+
+export async function expenseBreakdownImpl(
+  ctx: QueryCtx,
+  { fromMs, toMs }: { fromMs?: number; toMs?: number },
+) {
+  const porGrupo = new Map<string, { rows: number; amountCRC: number }>();
+  const porNota = new Map<string, { rows: number; amountCRC: number }>();
+  let totalCRC = 0;
+  let totalRows = 0;
+
+  for (const r of await ctx.db.query("finance_entries").collect()) {
+    if (r.isDeleted) continue;
+    if (r.kind !== "expense") continue;
+    if (r.category !== "otros") continue;
+    if (fromMs != null && r.date < fromMs) continue;
+    if (toMs != null && r.date >= toMs) continue;
+
+    totalCRC += r.amountCRC;
+    totalRows++;
+
+    const grupo = clasificar(r);
+    const g = porGrupo.get(grupo) ?? { rows: 0, amountCRC: 0 };
+    g.rows++;
+    g.amountCRC += r.amountCRC;
+    porGrupo.set(grupo, g);
+
+    if (grupo === "sin_clasificar") {
+      // Se agrupa por ETIQUETA, que es lo accionable: dice qué proveedor falta
+      // mapear. La nota cruda no le sirve a nadie para decidir.
+      const clave =
+        etiquetaDeExternalKey(r.externalKey) ??
+        ((r.note ?? "").trim() || "(sin etiqueta)");
+      const n = porNota.get(clave) ?? { rows: 0, amountCRC: 0 };
+      n.rows++;
+      n.amountCRC += r.amountCRC;
+      porNota.set(clave, n);
+    }
+  }
+
+  const grupos = [...porGrupo.entries()]
+    .map(([grupo, v]) => ({
+      grupo,
+      rows: v.rows,
+      amountCRC: v.amountCRC,
+      // Redondeado a una decimal; con 0 movimientos no se divide entre cero.
+      pct: totalCRC > 0 ? Math.round((v.amountCRC / totalCRC) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.amountCRC - a.amountCRC);
+
+  const sinClasificar = [...porNota.entries()]
+    .map(([etiqueta, v]) => ({ etiqueta, rows: v.rows, amountCRC: v.amountCRC }))
+    .sort((a, b) => b.amountCRC - a.amountCRC);
+
+  return { totalCRC, totalRows, grupos, sinClasificar };
+}
+
+export const expenseBreakdown = internalQuery({
+  args: { fromMs: v.optional(v.number()), toMs: v.optional(v.number()) },
+  returns: breakdownReturns,
+  handler: async (ctx, args) => expenseBreakdownImpl(ctx, args),
+});
+
+export { breakdownReturns };
