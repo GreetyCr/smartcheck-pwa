@@ -62,6 +62,55 @@ const filasDePlanilla = (t: ReturnType<typeof convexTest>) =>
     ),
   );
 
+/**
+ * Mete una fila como las que dejó la migración de la hoja de Esteban.
+ *
+ * Se usa para montar el escenario de **B34**: marzo a julio de 2026 ya traen las
+ * seis líneas con llave `sheet:<MES> 2026:<etiqueta>:<n>`.
+ */
+const filaDeLaHoja = (
+  t: ReturnType<typeof convexTest>,
+  {
+    etiqueta,
+    amountCRC,
+    yearMonth = "2026-07",
+    category = "salario",
+    kind = "expense" as "expense" | "income",
+    source = "sheet" as "sheet" | "manual",
+    conLlave = true,
+    isDeleted = false,
+  }: {
+    etiqueta: string;
+    amountCRC: number;
+    yearMonth?: string;
+    category?: string;
+    kind?: "expense" | "income";
+    source?: "sheet" | "manual";
+    /** `false` simula la captura a mano: sin `externalKey`, la etiqueta va en la nota. */
+    conLlave?: boolean;
+    isDeleted?: boolean;
+  },
+) =>
+  t.run(async (ctx) => {
+    const now = Date.now();
+    const mes = yearMonth.replace("-", " ");
+    return ctx.db.insert("finance_entries", {
+      kind,
+      category,
+      isViatico: false,
+      amountCRC,
+      originalCurrency: "CRC",
+      date: now,
+      yearMonth,
+      source,
+      externalKey: conLlave ? `sheet:${mes}:${etiqueta}:1` : undefined,
+      note: conLlave ? undefined : etiqueta,
+      isDeleted,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+
 describe("el gate", () => {
   test("un técnico no puede registrar planilla", async () => {
     const { t } = await setup();
@@ -210,6 +259,214 @@ describe("las seis no se editan a mano", () => {
     await expect(
       admin.mutation(api.bi.financeForm.deleteFinanceEntry, { id: una._id }),
     ).rejects.toThrow();
+  });
+});
+
+/**
+ * **B34** — el mes ya trae estas líneas por otra vía.
+ *
+ * La idempotencia por llave natural cubre confirmar **dos veces el mismo mes**.
+ * No cubre un mes que **ya vino por otro camino**: marzo a julio de 2026 traen
+ * las seis líneas desde la hoja con llave `sheet:…`, y esta pantalla escribe con
+ * llave `planilla:…`. Llaves distintas ⇒ no se pisan ⇒ el gasto queda doble.
+ *
+ * Las dos mitades de la regla pesan lo mismo:
+ *  - **Bloquear** los meses que ya vinieron de la hoja.
+ *  - **NO bloquear** un mes que solo tiene los salarios brutos cargados — que es
+ *    exactamente agosto, el único mes con el que Esteban puede estrenar esto.
+ *    Un guard que se pasa de celoso acá deja la pantalla inservible.
+ */
+describe("B34 · un mes que ya trae la planilla por otra vía", () => {
+  const SEIS_DE_LA_HOJA = [
+    ["APORTE PATRONO CCSS", 115_756],
+    ["PROVISION AGUINALDO", 41_900],
+    ["PROVISION PREAVISO", 41_900],
+    ["PROVISION CESANTIA", 41_900],
+    ["PROVISION VACACIONES", 20_957],
+    ["IMPUESTOS", 130_000],
+  ] as const;
+
+  async function conJulioDeLaHoja() {
+    const s = await setup();
+    for (const [etiqueta, amountCRC] of SEIS_DE_LA_HOJA) {
+      await filaDeLaHoja(s.t, {
+        etiqueta,
+        amountCRC,
+        category: etiqueta === "IMPUESTOS" ? "impuestos" : "salario",
+      });
+    }
+    return s;
+  }
+
+  test("se rechaza, y no deja NADA escrito", async () => {
+    const { t, admin } = await conJulioDeLaHoja();
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, JULIO),
+    ).rejects.toThrow(/ya tiene/i);
+
+    // Ni las seis líneas nuevas…
+    expect(await filasDePlanilla(t)).toHaveLength(0);
+    // …ni los insumos.
+    const guardados = await t.run((ctx) =>
+      ctx.db.query("payroll_months").collect(),
+    );
+    expect(guardados).toHaveLength(0);
+    // Nota honesta sobre qué prueba esto y qué no: la mutation es
+    // transaccional, así que mover el guard debajo del insert **no** rompe este
+    // test —se comprobó—. Lo que sí cubre es que el rechazo no deje residuo,
+    // que es la propiedad que le importa a Esteban.
+  });
+
+  test("el error dice QUÉ encontró, no solo que falló", async () => {
+    // Sin los nombres, Esteban no tiene forma de saber qué dar de baja.
+    const { admin } = await conJulioDeLaHoja();
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, JULIO),
+    ).rejects.toThrow(/APORTE PATRONO CCSS/);
+  });
+
+  test("basta UNA línea preexistente para bloquear el mes", async () => {
+    // Enero y febrero solo traen IMPUESTOS. Registrar el mes escribiría las
+    // seis, y esa una quedaría doble.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "IMPUESTOS",
+      amountCRC: 158_806,
+      yearMonth: "2026-01",
+      category: "impuestos",
+    });
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, {
+        ...JULIO,
+        yearMonth: "2026-01",
+      }),
+    ).rejects.toThrow(/ya tiene/i);
+  });
+
+  test("una provisión que NO generamos también bloquea", async () => {
+    // `PROVISION DESPIDO` está en la hoja y no es una de nuestras seis. Si la
+    // regla fuera una lista cerrada de las seis, esta se colaría.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, { etiqueta: "PROVISION DESPIDO", amountCRC: 40_000 });
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, JULIO),
+    ).rejects.toThrow(/ya tiene/i);
+  });
+
+  test("una línea capturada A MANO también bloquea", async () => {
+    // Sin `externalKey` la etiqueta vive en la nota; duplicaría igual.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "APORTE PATRONO CCSS",
+      amountCRC: 115_756,
+      source: "manual",
+      conLlave: false,
+    });
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, JULIO),
+    ).rejects.toThrow(/ya tiene/i);
+  });
+
+  test("la otra mitad: los SALARIOS BRUTOS no bloquean — es el caso de agosto", async () => {
+    // Agosto solo tiene los dos salarios brutos cargados a mano. Son el
+    // **insumo**, no el resultado. Si esto bloqueara, el único mes registrable
+    // dejaría de serlo y la pantalla no serviría para nada.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "SALARIO BRUTO TECNICO",
+      amountCRC: 430_000,
+      yearMonth: "2026-08",
+      source: "manual",
+      conLlave: false,
+    });
+    await filaDeLaHoja(t, {
+      etiqueta: "SALARIO JEFE OPERACIONES",
+      amountCRC: 800_000,
+      yearMonth: "2026-08",
+      source: "manual",
+      conLlave: false,
+    });
+
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      yearMonth: "2026-08",
+    });
+    expect(res.creadas).toBe(6);
+  });
+
+  test("una línea dada de baja no bloquea", async () => {
+    // Es el camino de salida: se dan de baja las viejas y el mes se libera.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "APORTE PATRONO CCSS",
+      amountCRC: 115_756,
+      isDeleted: true,
+    });
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
+    expect(res.creadas).toBe(6);
+  });
+
+  test("un INGRESO con etiqueta parecida no bloquea", async () => {
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "IMPUESTOS",
+      amountCRC: 50_000,
+      category: "impuestos",
+      kind: "income",
+    });
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
+    expect(res.creadas).toBe(6);
+  });
+
+  test("bloquea el mes con conflicto y deja pasar el de al lado", async () => {
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "APORTE PATRONO CCSS",
+      amountCRC: 115_756,
+      yearMonth: "2026-07",
+    });
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, JULIO),
+    ).rejects.toThrow(/ya tiene/i);
+
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      yearMonth: "2026-08",
+    });
+    expect(res.creadas).toBe(6);
+  });
+
+  test("NO rompe la idempotencia: nuestras propias líneas no son conflicto", async () => {
+    // Lo más fácil de romper de todo esto: si el guard mirara también
+    // `source: "planilla"`, corregir un mes se volvería imposible desde la
+    // segunda vez — que es el flujo normal, no el excepcional.
+    const { t, admin } = await setup();
+    await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
+    const segunda = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      salarioCRC: 500_000,
+    });
+    expect(segunda.actualizadas).toBe(6);
+    expect(await filasDePlanilla(t)).toHaveLength(6);
+  });
+
+  test("la pantalla se entera ANTES: la query devuelve lo que ya está cargado", async () => {
+    const { admin } = await conJulioDeLaHoja();
+    const leido = await admin.query(api.bi.payroll.planillaDelMes, {
+      yearMonth: "2026-07",
+    });
+    expect(leido.lineasYaCargadas).toHaveLength(6);
+    // Ordenadas de mayor a menor: lo que más pesa se lee primero.
+    expect(leido.lineasYaCargadas[0].etiqueta).toBe("IMPUESTOS");
+    expect(leido.lineasYaCargadas[0].amountCRC).toBe(130_000);
+  });
+
+  test("un mes limpio devuelve la lista vacía, no undefined", async () => {
+    const { admin } = await setup();
+    const leido = await admin.query(api.bi.payroll.planillaDelMes, {
+      yearMonth: "2026-08",
+    });
+    expect(leido.lineasYaCargadas).toEqual([]);
   });
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { BiCard } from "@/components/bi/BiCard";
 import {
   formatCRC,
@@ -52,6 +52,8 @@ export type PlanillaGuardada = {
     updatedAt: number;
   } | null;
   tasasPorDefecto: Tasas;
+  /** Líneas que el mes ya trae desde la hoja o capturadas a mano (B34). */
+  lineasYaCargadas: Array<{ etiqueta: string; amountCRC: number; source: string }>;
 };
 
 export function PayrollMonthCard({
@@ -118,6 +120,15 @@ export function PayrollMonthCard({
   const yaRegistrado = !!guardado?.insumos;
   const sinDatos = num(salario) === 0 && num(comisiones) === 0 && num(base) === 0;
 
+  /**
+   * El mes ya trae estas líneas por otra vía (**B34**), así que registrarlo
+   * duplicaría el gasto. El servidor lo rechaza igual; acá se avisa antes para
+   * que no llene el formulario en vano, y se apaga el botón.
+   */
+  const yaCargadas = guardado?.lineasYaCargadas ?? [];
+  const bloqueado = yaCargadas.length > 0;
+  const totalYaCargado = yaCargadas.reduce((a, l) => a + l.amountCRC, 0);
+
   async function confirmar() {
     setGuardando(true);
     setError(null);
@@ -162,6 +173,43 @@ export function PayrollMonthCard({
             className={cn(input, "mt-1 sm:max-w-[220px]")}
           />
         </label>
+
+        {/* El mes ya viene cargado por otra vía: se avisa acá, pegado al
+            selector de mes, porque la causa es el mes elegido y no lo que
+            escriba después. */}
+        {bloqueado ? (
+          <div className="rounded-xl border border-[var(--bi-expense)]/40 bg-[var(--bi-expense)]/10 px-4 py-3">
+            <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[var(--bi-expense)]">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden />
+              {formatMonthLong(mes)} ya tiene la planilla cargada
+            </p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--bi-ink-2)]">
+              Hay {yaCargadas.length}{" "}
+              {yaCargadas.length === 1 ? "línea" : "líneas"} por{" "}
+              <b>{formatCRC(totalYaCargado)}</b> que vinieron de la hoja o se
+              escribieron a mano. Registrar el mes acá{" "}
+              <b className="text-[var(--bi-expense)]">las duplicaría</b> en vez de
+              corregirlas, porque son registros distintos.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {yaCargadas.map((l, i) => (
+                <li
+                  key={`${l.etiqueta}-${i}`}
+                  className="flex items-baseline justify-between gap-3 text-[12.5px] text-[var(--bi-ink-3)]"
+                >
+                  <span className="min-w-0 truncate">{l.etiqueta}</span>
+                  <span className="bi-num shrink-0 tabular-nums">
+                    {formatCRC(l.amountCRC)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2.5 text-[12.5px] text-[var(--bi-ink-3)]">
+              Elegí otro mes. Si de verdad querés reemplazarlas, escribinos: hay
+              que dar de baja primero las que ya están.
+            </p>
+          </div>
+        ) : null}
 
         {/* Los tres datos */}
         <div className="grid gap-3 sm:grid-cols-3">
@@ -245,7 +293,7 @@ export function PayrollMonthCard({
         <button
           type="button"
           onClick={confirmar}
-          disabled={guardando || sinDatos}
+          disabled={guardando || sinDatos || bloqueado}
           className={cn(
             "inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--bi-income)]/40 bg-[var(--bi-income)]/10 px-4 text-sm font-semibold text-[var(--bi-income)] transition-colors",
             "hover:bg-[var(--bi-income)]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]",

@@ -116,8 +116,14 @@ export function etiquetaDeExternalKey(externalKey: string | undefined): string |
   return etiqueta.length > 0 ? etiqueta : undefined;
 }
 
-/** Minúsculas y sin tildes: «Viático» y «viatico» son la misma palabra. */
-function normalizar(texto: string): string {
+/**
+ * Minúsculas y sin tildes: «Viático» y «viatico» son la misma palabra.
+ *
+ * Exportada porque el guard de la planilla (B34) compara las mismas etiquetas de
+ * hoja que este módulo, y duplicar la normalización sería la vía más corta a que
+ * un día «PROVISIÓN» con tilde calce acá y no allá.
+ */
+export function normalizar(texto: string): string {
   return texto
     .toLowerCase()
     .normalize("NFD")
