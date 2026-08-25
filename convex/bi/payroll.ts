@@ -12,9 +12,10 @@ import { requireAdmin } from "../lib/auth";
 import { crMidnightMs } from "./lib/dates";
 import { etiquetaDeExternalKey, normalizar } from "./expenseGroups";
 import {
-  TASAS_POR_DEFECTO,
   calcularPlanilla,
   llaveDeLinea,
+  tasasDelMes,
+  vigenciaDelMes,
 } from "@/lib/payroll";
 
 export const tasasValidator = v.object({
@@ -72,6 +73,45 @@ export function esLineaDerivadaDePlanilla(etiqueta: string): boolean {
     t.includes("aporte patron") || // «APORTE PATRONO CCSS»
     t === "impuestos"
   );
+}
+
+/**
+ * ¿Este movimiento es la póliza del INS?
+ *
+ * Se compara la palabra suelta «ins», no un `includes`: «seguro carro» —el otro
+ * habitante de la categoría `seguro`— no la contiene, y un `includes("ins")`
+ * calzaría con cualquier cosa que traiga esas tres letras adentro.
+ */
+export function esPolizaINS(etiqueta: string): boolean {
+  return /(^|[^a-z])ins([^a-z]|$)/.test(normalizar(etiqueta));
+}
+
+/**
+ * La póliza del INS anotada aparte en un mes cuya tasa **ya la incluye**.
+ *
+ * Desde agosto el aporte patronal es 28,28%, que trae adentro el 2,45% del INS.
+ * Si además existe la línea suelta de la póliza, el INS se cuenta dos veces.
+ *
+ * Devuelve el dato para **avisar, no para bloquear**: la póliza es información
+ * suya y podría cubrir otra cosa. Lo que no puede es pasar inadvertida.
+ */
+export async function polizaINSDuplicada(
+  ctx: QueryCtx,
+  yearMonth: string,
+): Promise<{ etiqueta: string; amountCRC: number } | null> {
+  if (!vigenciaDelMes(yearMonth).incluyeINS) return null;
+
+  const filas = await ctx.db
+    .query("finance_entries")
+    .withIndex("by_year_month", (q) => q.eq("yearMonth", yearMonth))
+    .collect();
+
+  for (const f of filas) {
+    if (f.isDeleted || f.kind !== "expense" || f.category !== "seguro") continue;
+    const etiqueta = etiquetaDeExternalKey(f.externalKey) ?? (f.note ?? "").trim();
+    if (esPolizaINS(etiqueta)) return { etiqueta, amountCRC: f.amountCRC };
+  }
+  return null;
 }
 
 const lineaPreexistenteValidator = v.object({
@@ -187,7 +227,7 @@ export const registrarPlanilla = mutation({
       );
     }
 
-    const tasas = args.tasas ?? TASAS_POR_DEFECTO;
+    const tasas = args.tasas ?? tasasDelMes(args.yearMonth);
     const now = Date.now();
     const date = crMidnightMs(ultimoDiaDelMes(args.yearMonth));
 
@@ -294,6 +334,17 @@ export const planillaDelMes = query({
      * pulsar el botón es un guard peor.
      */
     lineasYaCargadas: v.array(lineaPreexistenteValidator),
+    /** La vigencia que rige este mes, para poder mostrar de dónde sale la tasa. */
+    vigencia: v.object({
+      desde: v.string(),
+      incluyeINS: v.boolean(),
+      nota: v.string(),
+    }),
+    /** Póliza del INS anotada aparte en un mes cuya tasa ya la incluye. */
+    avisoPolizaINS: v.union(
+      v.object({ etiqueta: v.string(), amountCRC: v.number() }),
+      v.null(),
+    ),
   }),
   handler: async (ctx, { yearMonth: ym }) => {
     await requireAdmin(ctx);
@@ -302,6 +353,7 @@ export const planillaDelMes = query({
       .withIndex("by_year_month", (q) => q.eq("yearMonth", ym))
       .unique();
 
+    const vig = vigenciaDelMes(ym);
     const insumos = fila
       ? {
           salarioCRC: fila.salarioCRC,
@@ -319,10 +371,16 @@ export const planillaDelMes = query({
     return {
       yearMonth: ym,
       insumos,
-      tasasPorDefecto: TASAS_POR_DEFECTO,
+      tasasPorDefecto: vig.tasas,
       lineas,
       totalCRC: lineas.reduce((a, l) => a + l.amountCRC, 0),
       lineasYaCargadas: await lineasDePlanillaYaCargadas(ctx, ym),
+      vigencia: {
+        desde: vig.desde,
+        incluyeINS: vig.incluyeINS,
+        nota: vig.nota,
+      },
+      avisoPolizaINS: await polizaINSDuplicada(ctx, ym),
     };
   },
 });

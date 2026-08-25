@@ -470,6 +470,123 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
   });
 });
 
+/**
+ * **B36** — la tasa cambia con el mes, y desde agosto trae el INS adentro.
+ *
+ * Dos riesgos distintos:
+ *  1. Registrar agosto con la tasa de julio le anota ₡5.848 de menos.
+ *  2. Registrar agosto con la tasa nueva **y además** dejar la póliza del INS
+ *     suelta cuenta el INS dos veces.
+ */
+describe("B36 · la tasa que rige cada mes", () => {
+  test("agosto se registra al 28,28% sin que nadie lo pida", async () => {
+    const { admin } = await setup();
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      yearMonth: "2026-08",
+    });
+    expect(res.lineas[0].amountCRC).toBe(Math.round(430_000 * 0.2828)); // 121.604
+    expect(res.lineas[0].formula).toContain("28,28");
+  });
+
+  test("un mes viejo NO se contamina con la tasa nueva", async () => {
+    // Se usa junio, que el guard de B34 no bloquea en una base vacía.
+    const { admin } = await setup();
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      yearMonth: "2026-06",
+    });
+    expect(res.lineas[0].amountCRC).toBe(115_756);
+  });
+
+  test("la query dice qué vigencia rige y de dónde sale", async () => {
+    const { admin } = await setup();
+    const jul = await admin.query(api.bi.payroll.planillaDelMes, { yearMonth: "2026-07" });
+    const ago = await admin.query(api.bi.payroll.planillaDelMes, { yearMonth: "2026-08" });
+
+    expect(jul.tasasPorDefecto.aportePatronalPct).toBe(26.92);
+    expect(jul.vigencia.incluyeINS).toBe(false);
+    expect(ago.tasasPorDefecto.aportePatronalPct).toBe(28.28);
+    expect(ago.vigencia.incluyeINS).toBe(true);
+    expect(ago.vigencia.nota).toMatch(/INS/);
+  });
+});
+
+describe("B36 · la póliza del INS contada dos veces", () => {
+  const poliza = (over: Record<string, unknown> = {}) => ({
+    etiqueta: "POLIZA INS",
+    amountCRC: 8_000,
+    yearMonth: "2026-08",
+    category: "seguro",
+    ...over,
+  });
+
+  test("en agosto avisa: la tasa ya lo incluye y además está suelto", async () => {
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, poliza());
+    const res = await admin.query(api.bi.payroll.planillaDelMes, { yearMonth: "2026-08" });
+    expect(res.avisoPolizaINS).toEqual({ etiqueta: "POLIZA INS", amountCRC: 8_000 });
+  });
+
+  test("en julio NO avisa: ahí la póliza aparte era lo correcto", async () => {
+    // El mismo dato, distinto mes, distinto veredicto. Si avisara siempre,
+    // el aviso sería ruido y se aprendería a ignorarlo.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, poliza({ yearMonth: "2026-07" }));
+    const res = await admin.query(api.bi.payroll.planillaDelMes, { yearMonth: "2026-07" });
+    expect(res.avisoPolizaINS).toBeNull();
+  });
+
+  test("otros seguros no disparan el aviso — ni los que llevan «ins» adentro", async () => {
+    // `SEGURO CARRO` es el vecino obvio, pero no prueba gran cosa: tampoco
+    // contiene «ins» como substring, así que un `includes("ins")` mal hecho
+    // pasaría igual. El caso que de verdad discrimina es una etiqueta que SÍ
+    // trae esas tres letras sin ser la póliza.
+    for (const etiqueta of [
+      "SEGURO CARRO",
+      "SEGURO INSTALACIONES",
+      "SEGURO DE INSPECCIONES",
+    ]) {
+      const { t, admin } = await setup();
+      await filaDeLaHoja(t, poliza({ etiqueta, amountCRC: 75_000 }));
+      const res = await admin.query(api.bi.payroll.planillaDelMes, {
+        yearMonth: "2026-08",
+      });
+      expect(res.avisoPolizaINS, etiqueta).toBeNull();
+    }
+  });
+
+  test("sí reconoce las formas reales de la póliza", async () => {
+    for (const etiqueta of ["POLIZA INS", "INS RIESGOS DEL TRABAJO", "Póliza del INS"]) {
+      const { t, admin } = await setup();
+      await filaDeLaHoja(t, poliza({ etiqueta }));
+      const res = await admin.query(api.bi.payroll.planillaDelMes, {
+        yearMonth: "2026-08",
+      });
+      expect(res.avisoPolizaINS?.etiqueta, etiqueta).toBe(etiqueta);
+    }
+  });
+
+  test("avisar no bloquea: el mes se registra igual", async () => {
+    // La póliza es dato suyo y puede cubrir otra cosa. Lo que no puede es
+    // pasar inadvertida.
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, poliza());
+    const res = await admin.mutation(api.bi.payroll.registrarPlanilla, {
+      ...JULIO,
+      yearMonth: "2026-08",
+    });
+    expect(res.creadas).toBe(6);
+  });
+
+  test("una póliza dada de baja no avisa", async () => {
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, poliza({ isDeleted: true }));
+    const res = await admin.query(api.bi.payroll.planillaDelMes, { yearMonth: "2026-08" });
+    expect(res.avisoPolizaINS).toBeNull();
+  });
+});
+
 describe("validación de entradas", () => {
   test("un mes con formato inválido se rechaza", async () => {
     const { t, admin } = await setup();

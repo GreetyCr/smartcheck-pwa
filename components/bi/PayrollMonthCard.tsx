@@ -54,6 +54,10 @@ export type PlanillaGuardada = {
   tasasPorDefecto: Tasas;
   /** Líneas que el mes ya trae desde la hoja o capturadas a mano (B34). */
   lineasYaCargadas: Array<{ etiqueta: string; amountCRC: number; source: string }>;
+  /** Qué vigencia de tasas rige este mes y de dónde sale (B36). */
+  vigencia: { desde: string; incluyeINS: boolean; nota: string };
+  /** Póliza del INS suelta en un mes cuya tasa ya la incluye (B36). */
+  avisoPolizaINS: { etiqueta: string; amountCRC: number } | null;
 };
 
 export function PayrollMonthCard({
@@ -128,6 +132,15 @@ export function PayrollMonthCard({
   const yaCargadas = guardado?.lineasYaCargadas ?? [];
   const bloqueado = yaCargadas.length > 0;
   const totalYaCargado = yaCargadas.reduce((a, l) => a + l.amountCRC, 0);
+
+  /**
+   * El aporte patronal cambió de 26,92% a 28,28% en agosto (**B36**). Se muestra
+   * cuál rige y por qué: si el mes que sale en pantalla usa un porcentaje
+   * distinto al del mes pasado, eso tiene que ser una explicación visible y no
+   * una sorpresa.
+   */
+  const vigencia = guardado?.vigencia;
+  const avisoINS = guardado?.avisoPolizaINS ?? null;
 
   async function confirmar() {
     setGuardando(true);
@@ -207,6 +220,45 @@ export function PayrollMonthCard({
             <p className="mt-2.5 text-[12.5px] text-[var(--bi-ink-3)]">
               Elegí otro mes. Si de verdad querés reemplazarlas, escribinos: hay
               que dar de baja primero las que ya están.
+            </p>
+          </div>
+        ) : null}
+
+        {/* Qué tasa rige este mes, y por qué */}
+        {vigencia ? (
+          <p className="text-[12px] leading-relaxed text-[var(--bi-ink-3)]">
+            Aporte patronal de este mes:{" "}
+            {/* Sin `tabular-nums`: acá el porcentaje es prosa, no una columna
+                que deba alinearse, y las cifras tabulares le dan a la coma el
+                ancho de un dígito — «28,28%» se lee «28 , 28%». */}
+            <b className="text-[var(--bi-ink-2)]">
+              {`${String(
+                guardado?.insumos?.tasas.aportePatronalPct ??
+                  guardado?.tasasPorDefecto.aportePatronalPct ??
+                  "",
+              ).replace(".", ",")}%`}
+            </b>{" "}
+            — {vigencia.nota}
+          </p>
+        ) : null}
+
+        {/* La póliza del INS contada dos veces */}
+        {avisoINS ? (
+          <div className="rounded-xl border border-[var(--bi-warn)]/40 bg-[var(--bi-warn)]/10 px-4 py-3">
+            <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[var(--bi-warn)]">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden />
+              El INS podría estar contado dos veces
+            </p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--bi-ink-2)]">
+              Desde agosto el aporte patronal es 28,28% y{" "}
+              <b>ya trae adentro el 2,45% del INS</b>. Pero este mes también tiene
+              una línea suelta de{" "}
+              <b>{avisoINS.etiqueta} por {formatCRC(avisoINS.amountCRC)}</b> en
+              «seguro».
+            </p>
+            <p className="mt-1.5 text-[12.5px] text-[var(--bi-ink-3)]">
+              Si es la misma póliza, sobra una de las dos. No te bloqueamos el
+              mes: puede que cubra otra cosa y eso lo sabés vos.
             </p>
           </div>
         ) : null}

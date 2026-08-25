@@ -16,51 +16,38 @@
  *
  * ## Sobre el porcentaje del aporte patronal
  *
- * Acá hay una decisión que **no tomamos nosotros**, y conviene entender por qué.
+ * **La tasa cambia con el tiempo, así que no es una constante: es una tabla de
+ * vigencias.** Esteban lo confirmó el 24-ago (B36):
  *
- * Su hoja viene aplicando **26,92%** sobre el salario, y eso reproduce sus
- * números al colón: 430.000 × 26,92% = ₡115.756, que es exactamente lo que
- * registró en abril, mayo, junio y julio.
+ * | Vigencia | Aporte patronal | Composición |
+ * |---|---|---|
+ * | abril–julio 2026 | **26,92%** | 25,83% de CCSS + **1,09%** |
+ * | agosto 2026 en adelante | **28,28%** | 25,83% de CCSS + **2,45% de INS** |
  *
- * Después nos mandó la tabla oficial de cargas patronales 2026, que suma
- * **28,28%** — pero incluye **2,45% de INS Riesgos del Trabajo**, y esa póliza
- * **ya la paga aparte**: son ₡8.000 al mes registrados como `POLIZA INS` en la
- * categoría `seguro`. Meter ese 2,45% en esta fórmula lo **contaría dos veces** y
- * le bajaría la utilidad sin que nada haya cambiado.
+ * Los 26,92% reproducen su hoja al colón —430.000 × 26,92% = ₡115.756, sus
+ * números exactos de abril a julio— y los 28,28% son su tabla oficial completa.
  *
- * Sacándole el INS, su tabla da **25,83%**, que tampoco es 26,92%: quedan 1,09
- * puntos sin explicar (~₡4.687 al mes).
+ * **Y ahí se explica solo el misterio del 1,09%.** Estuvimos semanas preguntando
+ * de dónde salía ese punto y pico que sobraba sobre el 25,83% de la CCSS. La
+ * respuesta es que **ocupaba exactamente el lugar del INS**: al pasar a 28,28% se
+ * reemplazó por el 2,45% real. Era una tasa de INS vieja o incompleta, y se
+ * corrigió sola. No hacía falta buscarla en ningún lado.
  *
- * Por eso el valor por defecto es **26,92%: el que reproduce su realidad**.
- * Cambiarlo por iniciativa nuestra alteraría su P&L histórico basándonos en una
- * tabla que no cuadra con sus propios registros. Las tasas son **configurables**
- * justamente para que él las mueva cuando resolvamos esos 1,09 puntos.
+ * ## Por qué importa `incluyeINS`
+ *
+ * Hasta julio, la póliza del INS iba **aparte**: ₡8.000/mes como `POLIZA INS` en
+ * la categoría `seguro`. Desde agosto va **adentro** del 28,28% — verificado
+ * contra PROD: agosto **no tiene** esa línea.
+ *
+ * Si algún mes tuviera las dos cosas, el INS se contaría **dos veces**. Por eso
+ * cada vigencia declara si su tasa ya lo trae adentro, y la pantalla avisa cuando
+ * detecta el choque. No lo bloquea: la póliza es dato suyo y puede cubrir otra
+ * cosa; lo que no puede es pasar inadvertido.
  */
 
 
 /**
- * Tasas por defecto — las que **reproducen la hoja de Esteban**, verificadas en
- * abril, mayo, junio y julio de 2026.
- *
- * *(Marzo da 31,57% / 8,50% / 3,54%. Él confirmó que fue un error de la hoja, no
- * un ajuste real, así que no se arrastra — B30.)*
- */
-export const TASAS_POR_DEFECTO = {
-  /** Sobre el salario bruto. NO incluye el INS: esa póliza va aparte. */
-  aportePatronalPct: 26.92,
-  /** Aguinaldo, preaviso y cesantía comparten tasa y base. */
-  provisionPct: 8.33,
-  /** Vacaciones usa OTRA base — ver abajo. */
-  vacacionesPct: 3.84,
-  /** Sobre la base que Esteban decide reportar, no sobre sus ingresos. */
-  impuestosPct: 13,
-} as const;
-
-/**
- * La FORMA de las tasas, no los valores del default. Con `typeof
- * TASAS_POR_DEFECTO` (que va con `as const`) el tipo sería `26.92` literal, y no
- * se podría pasar ninguna otra tasa — que es justo lo contrario de lo que se
- * quiere: son configurables.
+ * La FORMA de las tasas. Se declara antes que las vigencias porque las tipa.
  */
 export type Tasas = {
   aportePatronalPct: number;
@@ -68,6 +55,75 @@ export type Tasas = {
   vacacionesPct: number;
   impuestosPct: number;
 };
+
+export type Vigencia = {
+  /** Primer mes en que aplica, `AAAA-MM`. Aplica hasta que empiece la siguiente. */
+  desde: string;
+  tasas: Tasas;
+  /** ¿El aporte patronal ya trae adentro el 2,45% del INS Riesgos del Trabajo? */
+  incluyeINS: boolean;
+  /** De dónde sale la tasa, para que el número no haya que creerlo a ciegas. */
+  nota: string;
+};
+
+/**
+ * Las vigencias, **de la más vieja a la más nueva**. `vigenciaDelMes` recorre de
+ * atrás hacia adelante y toma la primera que ya empezó, así que agregar una
+ * vigencia futura es añadir una fila acá y nada más.
+ */
+export const VIGENCIAS: readonly Vigencia[] = [
+  {
+    desde: "2026-04",
+    tasas: {
+      aportePatronalPct: 26.92,
+      provisionPct: 8.33,
+      vacacionesPct: 3.84,
+      impuestosPct: 13,
+    },
+    incluyeINS: false,
+    nota: "25,83% de la CCSS + 1,09%. Ese 1,09% ocupaba el lugar del INS y resultó ser una tasa vieja. La póliza se pagaba aparte (₡8.000/mes en «seguro»). Verificado en abril, mayo, junio y julio de 2026.",
+  },
+  {
+    desde: "2026-08",
+    tasas: {
+      aportePatronalPct: 28.28,
+      provisionPct: 8.33,
+      vacacionesPct: 3.84,
+      impuestosPct: 13,
+    },
+    incluyeINS: true,
+    nota: "25,83% de la CCSS + 2,45% de INS Riesgos del Trabajo. Desde agosto el INS va DENTRO de la planilla y ya no se anota como póliza aparte.",
+  },
+] as const;
+
+/**
+ * La vigencia que aplica a un mes.
+ *
+ * Para un mes anterior a la primera vigencia devuelve **la primera**, no un
+ * error: los meses viejos (marzo hacia atrás) están bloqueados por otra vía
+ * (B34) y no vale la pena reventar acá una pantalla por un mes que igual no se
+ * puede registrar.
+ */
+export function vigenciaDelMes(yearMonth: string): Vigencia {
+  for (let i = VIGENCIAS.length - 1; i >= 0; i--) {
+    if (yearMonth >= VIGENCIAS[i].desde) return VIGENCIAS[i];
+  }
+  return VIGENCIAS[0];
+}
+
+/** Atajo: solo las tasas de ese mes. */
+export function tasasDelMes(yearMonth: string): Tasas {
+  return vigenciaDelMes(yearMonth).tasas;
+}
+
+/**
+ * Tasas por defecto **de la vigencia más nueva**.
+ *
+ * Se conserva por compatibilidad, pero casi siempre lo correcto es
+ * `tasasDelMes(mes)`: usar esta constante para un mes viejo le aplicaría la tasa
+ * de hoy y le movería el histórico.
+ */
+export const TASAS_POR_DEFECTO: Tasas = VIGENCIAS[VIGENCIAS.length - 1].tasas;
 
 /** Las seis líneas derivadas, en el orden en que se muestran. */
 export const LINEAS = [

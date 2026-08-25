@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PayrollMonthCard } from "@/components/bi/PayrollMonthCard";
-import { TASAS_POR_DEFECTO } from "@/lib/payroll";
+import { tasasDelMes, vigenciaDelMes } from "@/lib/payroll";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +52,18 @@ export function PlanillaPreview() {
                 salarioCRC: 430_000,
                 comisionesCRC: 73_000,
                 baseImponibleCRC: 1_000_000,
-                tasas: TASAS_POR_DEFECTO,
+                tasas: tasasDelMes(mes),
                 updatedAt: Date.parse("2026-08-24T09:00:00-06:00"),
               },
-              tasasPorDefecto: TASAS_POR_DEFECTO,
+              tasasPorDefecto: tasasDelMes(mes),
               lineasYaCargadas: bloqueado ? JULIO_YA_EN_LA_HOJA : [],
+              // Sale de la MISMA función que usa el servidor. Escribirla a mano
+              // acá ya produjo una revisión con la tasa de agosto y la nota de
+              // julio en la misma línea.
+              vigencia: vigenciaDelMes(mes),
+              // Se fuerza el choque en agosto para poder revisar el aviso.
+              avisoPolizaINS:
+                mes >= "2026-08" ? { etiqueta: "POLIZA INS", amountCRC: 8000 } : null,
             }}
             onRegistrar={async () => ({ creadas: 0, actualizadas: 6 })}
           />
