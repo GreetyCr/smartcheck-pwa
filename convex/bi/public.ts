@@ -47,6 +47,11 @@ import {
   leadsStatsReturns,
 } from "./leads";
 import { breakdownReturns, expenseBreakdownImpl } from "./expenseGroups";
+import {
+  channelFilterValidator,
+  channelRevenueImpl,
+  channelRevenueReturns,
+} from "./channels";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -195,5 +200,18 @@ export const expenseBreakdown = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     return expenseBreakdownImpl(ctx, args);
+  },
+});
+
+/**
+ * Ingresos por canal (F3). Los ingresos de acá salen de las **revisiones**, no
+ * de `finance_entries`: no cuadran con el P&L y la nota del retorno lo dice.
+ */
+export const channelRevenue = query({
+  args: { ...channelFilterValidator },
+  returns: channelRevenueReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return channelRevenueImpl(ctx, args);
   },
 });
