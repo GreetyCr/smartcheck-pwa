@@ -53,9 +53,12 @@ export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
     <div>
       {/* ---------- encabezado ---------- */}
       <header className="mb-6">
-        <h1 className="bi-display text-[28px] font-bold uppercase leading-none text-[var(--bi-ink)] sm:text-[34px]">
-          Resumen general
-        </h1>
+        {/* h2, no h1: desde RF-03 esto es la mitad de abajo de la portada y el
+            h1 lo pone el resumen ejecutivo. Dos h1 en una página rompen el
+            recorrido de un lector de pantalla. */}
+        <h2 className="bi-display text-[24px] font-bold uppercase leading-none text-[var(--bi-ink)] sm:text-[28px]">
+          Operación de las revisiones
+        </h2>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
           {formatInt(totalInspections)} inspecciones en sistema ·{" "}
           {formatInt(techniciansCount)} técnicos registrados

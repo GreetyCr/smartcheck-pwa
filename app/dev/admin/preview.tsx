@@ -1,9 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import {
   AdminDashboard,
   type AdminMetrics,
 } from "@/components/admin/AdminDashboard";
+import { ResumenEjecutivo } from "@/components/bi/ResumenEjecutivo";
+import type { PeriodoKey } from "@/components/bi/ExpenseGroupsCard";
+import type {
+  ChannelMixRow,
+  ExecutiveSummary,
+  FinanceMonth,
+} from "@/components/bi/types";
 import { DevAdminShell } from "./shell";
 
 /**
@@ -46,10 +54,96 @@ const METRICS: AdminMetrics = {
   },
 };
 
+/* -------------------------------------------------------------------------- */
+/* Resumen ejecutivo — datos REALES de producción, 25-ago-2026                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A diferencia de `METRICS`, esto **no es inventado**: es la respuesta literal
+ * de producción. Se hace así por una razón concreta —una muestra escrita a mano
+ * ya mostró una vez la tasa de agosto con la nota de julio, y otra vez las
+ * semanas cambiadas—, y porque las proporciones reales son las que ponen a
+ * prueba el diseño: un canal con 72% y otro con 0,6% en la misma barra apilada.
+ *
+ * Para regenerarlo:
+ *
+ *   npx convex run --prod bi/metrics:executiveSummary '{}'
+ *   npx convex run --prod bi/metrics:financeSummary '{}'
+ *   npx convex run --prod bi/channels:channelRevenue '{}'
+ */
+const RESUMEN: ExecutiveSummary = {
+  totalRevisiones: 887,
+  totalRevisionesSinPlaceholder: 887,
+  placeholderRows: 0,
+  revisionesConMonto: 887,
+  ingresosInspeccionesCRC: 52_794_284,
+  ingresosFinancierosCRC: 51_094_410,
+  gastosCRC: 30_344_054,
+  utilidadCRC: 20_750_356,
+  marginPct: 40.61,
+  leadsTotal: 9_096,
+  leadsWithPhone: 9_025,
+  convertidos: 217,
+  conversionPct: 2.39,
+  conversionPctOfPhoned: 2.4,
+  leadToClientePct: 2.39,
+  note: "Revisiones = inspections_all (unión+dedupe, A30). Ingresos titulares = finance_entries (P&L oficial, A16). Conversión titular = bi_matches banda alta+media (A29).",
+};
+
+const MESES: FinanceMonth[] = [
+  { yearMonth: "2025-07", rows: 40, income: 4_011_000, expense: 1_927_710, utilidad: 2_083_290, marginPct: 51.94 },
+  { yearMonth: "2025-08", rows: 33, income: 2_219_373, expense: 1_517_100, utilidad: 702_273, marginPct: 31.64 },
+  { yearMonth: "2025-09", rows: 40, income: 3_673_650, expense: 1_977_539, utilidad: 1_696_111, marginPct: 46.17 },
+  { yearMonth: "2025-10", rows: 35, income: 2_448_215, expense: 1_645_709, utilidad: 802_506, marginPct: 32.78 },
+  { yearMonth: "2025-11", rows: 34, income: 3_328_975, expense: 1_648_420, utilidad: 1_680_555, marginPct: 50.48 },
+  // Diciembre en rojo: el único mes negativo, y el caso que prueba que la
+  // barra de utilidad no asuma signo positivo.
+  { yearMonth: "2025-12", rows: 23, income: 1_431_537, expense: 1_445_833, utilidad: -14_296, marginPct: -1 },
+  { yearMonth: "2026-01", rows: 41, income: 3_913_872, expense: 2_003_327, utilidad: 1_910_545, marginPct: 48.81 },
+  { yearMonth: "2026-02", rows: 41, income: 3_737_538, expense: 1_791_344, utilidad: 1_946_194, marginPct: 52.07 },
+  { yearMonth: "2026-03", rows: 43, income: 3_227_500, expense: 2_786_017, utilidad: 441_483, marginPct: 13.68 },
+  { yearMonth: "2026-04", rows: 48, income: 3_971_750, expense: 3_072_113, utilidad: 899_637, marginPct: 22.65 },
+  { yearMonth: "2026-05", rows: 43, income: 4_376_000, expense: 2_676_086, utilidad: 1_699_914, marginPct: 38.85 },
+  { yearMonth: "2026-06", rows: 45, income: 5_618_000, expense: 2_858_037, utilidad: 2_759_963, marginPct: 49.13 },
+  { yearMonth: "2026-07", rows: 46, income: 4_546_000, expense: 3_035_269, utilidad: 1_510_731, marginPct: 33.23 },
+  { yearMonth: "2026-08", rows: 107, income: 4_591_000, expense: 1_959_550, utilidad: 2_631_450, marginPct: 57.32 },
+];
+
+const CANALES: ChannelMixRow[] = [
+  { canal: "Mercadeo", rows: 642, rowsConMonto: 642, ingresosCRC: 39_025_209, pctIngresos: 73.9, pctRows: 72.4, ticketPromedioCRC: 60_787, ultimaRevisionISO: "2026-08-25", mesesSinRevision: 0 },
+  { canal: "Recompra", rows: 110, rowsConMonto: 110, ingresosCRC: 6_290_140, pctIngresos: 11.9, pctRows: 12.4, ticketPromedioCRC: 57_183, ultimaRevisionISO: "2026-08-25", mesesSinRevision: 0 },
+  { canal: "Referido", rows: 74, rowsConMonto: 74, ingresosCRC: 4_227_971, pctIngresos: 8, pctRows: 8.3, ticketPromedioCRC: 57_135, ultimaRevisionISO: "2026-08-25", mesesSinRevision: 0 },
+  // TikTok lleva 3 meses sin una revisión: el caso que pinta el aviso ámbar.
+  { canal: "TikTok", rows: 39, rowsConMonto: 39, ingresosCRC: 1_990_419, pctIngresos: 3.8, pctRows: 4.4, ticketPromedioCRC: 51_036, ultimaRevisionISO: "2026-05-27", mesesSinRevision: 3 },
+  { canal: "Buscador", rows: 17, rowsConMonto: 17, ingresosCRC: 959_449, pctIngresos: 1.8, pctRows: 1.9, ticketPromedioCRC: 56_438, ultimaRevisionISO: "2026-08-24", mesesSinRevision: 0 },
+  // 0,6%: el segmento más flaco que la barra apilada tiene que seguir mostrando.
+  { canal: "(sin canal)", rows: 5, rowsConMonto: 5, ingresosCRC: 301_096, pctIngresos: 0.6, pctRows: 0.6, ticketPromedioCRC: 60_219, ultimaRevisionISO: "2026-03-02", mesesSinRevision: 5 },
+];
+
+/**
+ * El selector de periodo **sí cambia de estado** en la vista de revisión, pero
+ * los datos no se recalculan: no hay backend acá. Sirve para aprobar el control
+ * y, sobre todo, para ver el bloque explicativo que solo aparece con un periodo
+ * activo — que es justo la parte del diseño que hay que juzgar.
+ */
 export function AdminShellPreview() {
+  const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
+
   return (
     <DevAdminShell activePath="/admin">
-      <AdminDashboard metrics={METRICS} />
+      <div>
+        <ResumenEjecutivo
+          periodo={RESUMEN}
+          historico={RESUMEN}
+          meses={MESES}
+          canales={CANALES}
+          periodoKey={periodo}
+          onPeriodo={setPeriodo}
+        />
+        <div className="mt-10 border-t border-[var(--bi-ring)] pt-8">
+          <AdminDashboard metrics={METRICS} />
+        </div>
+      </div>
     </DevAdminShell>
   );
 }

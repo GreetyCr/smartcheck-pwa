@@ -35,6 +35,17 @@ export function BiMonthlyBars({
   const max = Math.max(1, ...months.map((m) => Math.max(m.income, m.expense)));
   const mid = max / 2;
 
+  /**
+   * Cada cuántos meses se rotula **en pantalla angosta**.
+   *
+   * Con 14 meses en 375px cada barra tiene 13px y «AGO» mide 19: los rótulos se
+   * pisan entre sí y el eje se vuelve ilegible. Medido, no supuesto. Rotular uno
+   * de cada dos les da 26px y vuelven a leerse; los meses saltados siguen
+   * teniendo su barra, su tooltip y su `aria-label`, así que no se pierde nada
+   * — solo deja de escribirse lo que no cabía.
+   */
+  const pasoAngosto = months.length > 8 ? 2 : 1;
+
   return (
     <div>
       {/* leyenda */}
@@ -145,7 +156,7 @@ export function BiMonthlyBars({
                 >
                   {/* en angosto solo el mes: con el año no cabe y se truncaba */}
                   <span className="sm:hidden">
-                    {formatMonthAbbr(m.yearMonth)}
+                    {i % pasoAngosto === 0 ? formatMonthAbbr(m.yearMonth) : ""}
                   </span>
                   <span className="hidden sm:inline">
                     {formatMonthShort(m.yearMonth)}

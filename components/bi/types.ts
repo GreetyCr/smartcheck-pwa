@@ -29,6 +29,61 @@ export type FinanceSummary = {
   totals: FinanceTotals;
 };
 
+/**
+ * Espejo de `executiveSummaryReturns` (`convex/bi/metrics.ts`).
+ *
+ * **Cuidado al leerlo: no todos los campos respetan `fromMs`/`toMs`.** El
+ * impl filtra las revisiones y `finance_entries` por el rango, pero
+ * `leads_contacts` y `bi_matches` los lee enteros. O sea que
+ * `leadsTotal`, `convertidos` y los tres porcentajes de conversión son
+ * **siempre históricos**, sin importar el periodo que se le pase.
+ *
+ * No es un descuido que haya que tapar en la pantalla: una tasa de conversión
+ * acotada a un periodo mezcla cohortes (un lead de marzo que compra en agosto)
+ * y puede pasar del 100%. Por eso el tablero los agrupa **aparte**, bajo un
+ * rótulo que dice que son del histórico completo, en vez de dejarlos entre los
+ * que sí se mueven.
+ */
+export type ExecutiveSummary = {
+  /** Con placeholders (₡0 / ₡1.000). Respeta el periodo. */
+  totalRevisiones: number;
+  totalRevisionesSinPlaceholder: number;
+  placeholderRows: number;
+  revisionesConMonto: number;
+  /** Ingresos según las REVISIONES. No es el titular — ver A16. */
+  ingresosInspeccionesCRC: number;
+  /** Ingresos del P&L (`finance_entries`). Este es el titular. */
+  ingresosFinancierosCRC: number;
+  gastosCRC: number;
+  utilidadCRC: number;
+  marginPct: number;
+  /** Histórico: NO respeta el periodo. */
+  leadsTotal: number;
+  /** Histórico: NO respeta el periodo. */
+  leadsWithPhone: number;
+  /** Histórico: NO respeta el periodo. */
+  convertidos: number;
+  /** Histórico: NO respeta el periodo. */
+  conversionPct: number;
+  /** Histórico: NO respeta el periodo. */
+  conversionPctOfPhoned: number;
+  leadToClientePct: number;
+  note: string;
+};
+
+/** Una fila de `channelRevenue.canales` (`convex/bi/channels.ts`). */
+export type ChannelMixRow = {
+  canal: string;
+  rows: number;
+  rowsConMonto: number;
+  ingresosCRC: number;
+  pctIngresos: number;
+  pctRows: number;
+  ticketPromedioCRC: number;
+  ultimaRevisionISO: string | null;
+  mesesSinRevision: number;
+};
+
 export type FinanceEntry = {
   id: string;
   kind: "income" | "expense";
