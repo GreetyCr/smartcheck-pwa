@@ -54,6 +54,7 @@ import {
 } from "./channels";
 import { pagosTecnicoImpl, pagosTecnicoReturns } from "./pagosTecnico";
 import { calidadImpl, calidadReturns } from "./calidad";
+import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -247,5 +248,18 @@ export const calidad = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return calidadImpl(ctx);
+  },
+});
+
+/**
+ * Frescura y estado de cada proceso (**RF-09** · **RF-16**). El dato vivía en
+ * `bi_meta` desde el principio; lo que faltaba era quién lo leyera.
+ */
+export const estadoDatos = query({
+  args: {},
+  returns: estadoDatosReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return estadoDatosImpl(ctx);
   },
 });

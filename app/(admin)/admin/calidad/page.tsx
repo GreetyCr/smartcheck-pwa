@@ -1,9 +1,10 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { CalidadDashboard } from "@/components/bi/CalidadDashboard";
+import { EstadoDatosCard } from "@/components/bi/EstadoDatosCard";
 
 /**
  * Calidad de los datos (F3).
@@ -13,6 +14,9 @@ import { CalidadDashboard } from "@/components/bi/CalidadDashboard";
  */
 export default function AdminCalidadPage() {
   const data = useQuery(api.bi.public.calidad, {});
+  const estado = useQuery(api.bi.public.estadoDatos, {});
+  const actualizarLeads = useMutation(api.bi.leadsSync.refreshLeadsNow);
+  const recalcular = useMutation(api.bi.leadsSync.refreshBiNow);
 
   return (
     <div>
@@ -24,6 +28,16 @@ export default function AdminCalidadPage() {
           Qué pide acción y qué es ruido esperado
         </p>
       </header>
+
+      {estado ? (
+        <div className="mb-5">
+          <EstadoDatosCard
+            data={estado}
+            onActualizarLeads={() => actualizarLeads({})}
+            onRecalcular={() => recalcular({})}
+          />
+        </div>
+      ) : null}
 
       {data === undefined ? (
         <div className="flex items-center gap-2 text-sm text-[var(--bi-ink-3)]">
