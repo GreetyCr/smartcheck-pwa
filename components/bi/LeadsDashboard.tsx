@@ -94,7 +94,7 @@ const pctOf = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
  * La regla que ordena todo el tablero: **la conversión son 180 (2,07%)** y los
  * 58 empates débiles por nombre viven aparte, rotulados como estimación. Cada
  * bloque dice sobre qué universo habla, porque acá conviven dos: los 180
- * titulares y los 238 emparejamientos totales.
+ * titulares y los 275 emparejamientos con ingreso válido.
  */
 export function LeadsDashboard({
   funnel,
@@ -257,7 +257,7 @@ export function LeadsDashboard({
           tone="neutral"
           /* La base del titular sale del embudo, no de `leadsStats.total`: el
              embudo descarta los leads con borrado suave y `leadsStats` no. Hoy
-             ambos dan 8.706, pero el día que se retire uno, el denominador de
+             ambos dan 9.096, pero el día que se retire uno, el denominador de
              la conversión y la cifra de portada tienen que seguir siendo el
              mismo número. La cobertura de abajo sí va sobre `leadsStats`, y lo
              dice en su subtítulo. */
@@ -286,7 +286,7 @@ export function LeadsDashboard({
           value={formatPct(funnel.convertedRatePct, 2)}
           /* `exact` lleva la base del porcentaje por la misma razón por la que
              en Finanzas lleva el monto sin abreviar: un número solo no se puede
-             verificar. 2,07% de nada no significa lo mismo que 2,07% de 8.706. */
+             verificar. 2,39% de nada no significa lo mismo que 2,39% de 9.096. */
           exact={`${formatInt(funnel.converted)} de ${formatInt(funnel.leadsTotal)} leads`}
           hint="Por teléfono"
         />

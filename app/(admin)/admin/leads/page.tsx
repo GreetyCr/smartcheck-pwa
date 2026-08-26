@@ -29,7 +29,7 @@ export default function LeadsPage() {
   const bot = useQuery(api.bots.public.botStatus, {});
 
   // Se piden juntas y el tablero cruza sus cifras entre sí (los 238
-  // emparejamientos, los 180 titulares, los 8.706 leads). Renderizar con una
+  // emparejamientos, los 217 titulares, los 9.096 leads). Renderizar con una
   // sola cargada mostraría totales que no cuadran por un instante.
   if (
     funnel === undefined ||

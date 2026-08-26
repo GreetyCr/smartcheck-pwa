@@ -17,11 +17,15 @@ import { cn } from "@/lib/utils";
 /**
  * Datos de MUESTRA (no salen de Convex).
  *
- * Los agregados sí copian los de producción —8.706 leads, 180 conversiones,
- * 2,07%, 31 sin llave, 152 teléfonos inservibles— porque el punto de esta vista
- * es revisar el diseño con las magnitudes reales: una conversión del 2% se ve
- * muy distinta a una del 30%, y una lista de 152 filas se pagina distinto que
- * una de 5.
+ * Los agregados sí copian los de producción —**al 24-ago-2026**: 9.096 leads,
+ * 217 conversiones, 2,39%, 31 sin llave, 176 teléfonos inservibles— porque el
+ * punto de esta vista es revisar el diseño con las magnitudes reales: una
+ * conversión del 2% se ve muy distinta a una del 30%, y una lista de 176 filas
+ * se pagina distinto que una de 5.
+ *
+ * Llevan la fecha a propósito: son una foto, y sin fecha se leen como si fueran
+ * de hoy. Se regeneran con `npx convex run --prod bi/matches:conversionFunnel`
+ * y `bi/leads:leadsStats`.
  *
  * Los nombres, teléfonos e IDs, en cambio, son **inventados**: esta vista no
  * pide sesión y las tablas muestran datos de clientes.
@@ -131,15 +135,15 @@ const POR_REVISAR: LeadsPorRevisar = (() => {
 })();
 
 const FUNNEL: ConversionFunnel = {
-  leadsTotal: 8706,
-  leadsWithPhone: 8639,
-  leadsMatched: 238,
-  converted: 180,
-  convertedRatePct: 2.07,
-  convertedRateOfPhonedPct: 2.08,
+  leadsTotal: 9096,
+  leadsWithPhone: 9025,
+  leadsMatched: 276,
+  converted: 217,
+  convertedRatePct: 2.39,
+  convertedRateOfPhonedPct: 2.4,
   possibleAdditionalByName: 58,
   possibleAdditionalByNameRatePct: 0.67,
-  convertedIncludingName: 238,
+  convertedIncludingName: 275,
   placeholderMatches: 0,
   byBand: [
     { band: "alta", rows: 152 },
@@ -161,9 +165,9 @@ const FUNNEL: ConversionFunnel = {
 };
 
 const MATCHES: MatchesStats = {
-  totalMatches: 238,
+  totalMatches: 276,
   ambiguous: 28,
-  validIncome: 238,
+  validIncome: 275,
   invalidIncome: 0,
   byMatchKeyKind: [
     { kind: "phone", rows: 180 },
@@ -172,31 +176,31 @@ const MATCHES: MatchesStats = {
   byMethod: FUNNEL.byMethod,
   byBand: FUNNEL.byBand,
   byTarget: FUNNEL.byTarget,
-  leadsWithPhone: 8639,
+  leadsWithPhone: 9025,
   leadsWithoutMatch: 8468,
   ambiguousMatchIssues: 28,
 };
 
 const LEADS: LeadsStats = {
-  total: 8706,
+  total: 9096,
   isDeleted: 0,
-  phone8Present: 8639,
-  manychatPresent: 8232,
-  namePresent: 8527,
-  phoneValidTrue: 8541,
-  phoneValidFalse: 165,
-  dupPhone8Groups: 476,
-  dupPhone8ExcessRows: 507,
-  dupManychatGroups: 371,
-  dupManychatExcessRows: 391,
+  phone8Present: 9025,
+  manychatPresent: 8622,
+  namePresent: 8904,
+  phoneValidTrue: 8920,
+  phoneValidFalse: 176,
+  dupPhone8Groups: 506,
+  dupPhone8ExcessRows: 539,
+  dupManychatGroups: 401,
+  dupManychatExcessRows: 423,
   minSourceCreatedAt: D("2025-11-20"),
   maxSourceCreatedAt: D("2026-08-08"),
-  sourceCreatedPresent: 8706,
+  sourceCreatedPresent: 9096,
   byStage: [
     { stage: "nuevo", rows: 8526 },
     { stage: "convertido", rows: 180 },
   ],
-  byChannel: [{ channel: "(vacío)", rows: 8706 }],
+  byChannel: [{ channel: "(vacío)", rows: 9096 }],
   issuesByType: [
     { issueType: "lead_dup", rows: 1745 },
     { issueType: "anomalous_phone", rows: 152 },
