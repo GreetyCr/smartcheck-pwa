@@ -31,8 +31,15 @@ export function BiCard({
       )}
     >
       {title ? (
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--bi-ring)] px-4 py-3 sm:px-5">
-          <div className="min-w-0">
+        <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-[var(--bi-ring)] px-4 py-3 sm:px-5">
+          {/* `flex-wrap` + `basis-40`: sin eso el título y la acción se reparten
+              una sola línea a la fuerza, y una acción ancha —el selector de
+              periodo del desglose de gastos son cuatro botones— dejaba al
+              título **en 20 px**, con «En qué se va el gasto» en una columna de
+              una letra por renglón dentro de una tarjeta de 343. Medido a
+              375 px, no supuesto. Con una base de 160 px el título se planta y
+              la acción baja sola al renglón siguiente cuando no cabe. */}
+          <div className="min-w-0 flex-1 basis-40">
             <h2 className="text-[15px] font-semibold text-[var(--bi-ink)]">
               {title}
             </h2>

@@ -797,6 +797,19 @@ export const reconciliationReturns = v.object({
         enCurso: v.boolean(),
         /** Revisiones del mes sin informe entregado — explica el gap del mes en curso. */
         sinEntregar: v.optional(v.number()),
+        /**
+         * El mes tiene al menos un ingreso capturado **por el sistema** al
+         * entregar el informe (`source: "inspection"`).
+         *
+         * Sin esto el tablero no puede decir lo único que hace útil a esta
+         * conciliación: **el gap de un mes capturado a mano y el de uno
+         * capturado solo no significan lo mismo**. En el primero mide el
+         * desfase entre dos registros independientes (CRM contra hoja de
+         * cálculo); en el segundo, el ingreso que de verdad no viene de una
+         * revisión. Comparar los dos como si fueran el mismo indicador es
+         * exactamente el error que este tablero existe para evitar.
+         */
+        autoCaptura: v.boolean(),
       }),
     ),
     totals: v.object({
@@ -810,6 +823,11 @@ export const reconciliationReturns = v.object({
     }),
     thresholdPct: v.number(),
     financeStartISO: v.string(),
+    /**
+     * Primer mes con ingreso capturado por el sistema, o `null` si todavía no
+     * hay ninguno. Es la línea que parte la serie en dos regímenes de lectura.
+     */
+    primerMesAutoCaptura: v.union(v.string(), v.null()),
   note: v.string(),
 });
 
@@ -845,10 +863,20 @@ export async function reconciliationImpl(
     }
 
     const finByMonth = new Map<string, number>();
+    /**
+     * Meses con al menos un ingreso capturado por el sistema.
+     *
+     * Se marca el mes **si tiene aunque sea uno**, no si son mayoría: el corte
+     * de F5-auto fue por fecha de entrega y sin backfill (B27.1), así que el
+     * mes del cambio viene mezclado. Un umbral de mayoría dejaría ese mes
+     * rotulado como manual y borraría justo la frontera que interesa ver.
+     */
+    const mesesAutoCaptura = new Set<string>();
     for (const r of await ctx.db.query("finance_entries").collect()) {
       if (r.isDeleted || r.kind !== "income") continue;
       if (!inRange(r.date)) continue;
       finByMonth.set(r.yearMonth, (finByMonth.get(r.yearMonth) ?? 0) + r.amountCRC);
+      if (r.source === "inspection") mesesAutoCaptura.add(r.yearMonth);
     }
 
     const allMonths = new Set([...insByMonth.keys(), ...finByMonth.keys()]);
@@ -886,6 +914,7 @@ export async function reconciliationImpl(
           significant: !enCurso && Math.abs(gapPct) >= RECON_GAP_PCT_THRESHOLD,
           enCurso,
           sinEntregar: enCurso ? sinEntregarMesEnCurso : undefined,
+          autoCaptura: mesesAutoCaptura.has(ym),
         };
       });
 
@@ -916,6 +945,8 @@ export async function reconciliationImpl(
       },
       thresholdPct: RECON_GAP_PCT_THRESHOLD,
       financeStartISO: isoDate(FINANCE_START_MS),
+      primerMesAutoCaptura:
+        months.find((m) => m.autoCaptura)?.yearMonth ?? null,
       note: "Solo periodo ≥ jul-2025 (cobertura del Sheet financiero). inspectionsIncome = Σ amountCRC de inspections_all (unión+dedupe). financeIncome = finance_entries kind=income. Gap esperado ≠ 0 y se cuantifica, no se anula. Cambia de significado según el periodo: hasta jul-2026 mide fuentes independientes (CRM vs Sheet) con desfases de registro; desde la auto-captura (F5-auto) el ingreso de la inspección entregada ya entra solo, así que el gap pasa a medir el ingreso NO explicado por una inspección (venta de reportes, adicionales — A33). Los dos lados se fechan distinto a propósito: la inspección por su fecha de realización y el ingreso por la de entrega/pago, que es cuando el dinero entró (mediana 1,2 días de diferencia; solo cruzan de mes los casos de fin de mes). EL MES EN CURSO (`enCurso:true`) SE ROTULA, NO SE EXCLUYE: sus revisiones ya se hicieron pero muchas aún no se entregan, así que su ingreso todavía no existe y el gap negativo es normal — `sinEntregar` dice cuántas faltan. Nunca se marca `significant` ni genera issue. Para comparar mes a mes, usar `gapPctMesesCerrados`.",
     };
 }

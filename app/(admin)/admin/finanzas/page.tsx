@@ -21,6 +21,9 @@ export default function FinanzasPage() {
   const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
   const summary = useQuery(api.bi.public.financeSummary, {});
+  /* La conciliación va sin filtro: su gracia es la SERIE completa mes a mes,
+     y acotarla escondería justo los meses que se salen del margen. */
+  const conciliacion = useQuery(api.bi.public.reconciliation, {});
   /* El desglose de «Otros» va aparte del bloqueo de carga: es un zoom sobre
      una barra, no una cifra que tenga que cuadrar con las demás. */
   const breakdown = useQuery(api.bi.public.expenseBreakdown, rangoDelPeriodo(periodo));
@@ -61,6 +64,7 @@ export default function FinanzasPage() {
       summary={summary}
       entries={rows}
       expenseBreakdown={breakdown ?? undefined}
+      conciliacion={conciliacion ?? undefined}
       periodoGastos={periodo}
       onPeriodoGastos={setPeriodo}
       loadingEntries={entries === undefined}

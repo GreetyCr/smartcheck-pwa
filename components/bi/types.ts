@@ -71,6 +71,50 @@ export type ExecutiveSummary = {
   note: string;
 };
 
+/**
+ * Espejo de `reconciliationReturns` (`convex/bi/metrics.ts`).
+ *
+ * **El signo del gap importa más que su tamaño.** `gapAbs = ingresos − revisiones`:
+ *  - **Positivo** → entró plata que ninguna revisión explica (venta de informes,
+ *    adicionales, o una revisión anotada en otro mes).
+ *  - **Negativo** → hay revisiones cobradas que no aparecen en la contabilidad.
+ *    Ese es el lado que puede significar plata perdida.
+ *
+ * Un tablero que muestre solo `|gapPct|` mete las dos cosas en la misma bolsa.
+ */
+export type Reconciliation = {
+  months: Array<{
+    yearMonth: string;
+    inspectionsIncome: number;
+    inspectionsCount: number;
+    financeIncome: number;
+    /** `financeIncome − inspectionsIncome`. Ver la nota de arriba sobre el signo. */
+    gapAbs: number;
+    gapPct: number;
+    significant: boolean;
+    /** Mes vivo: gap negativo normal, nunca `significant` (A59). */
+    enCurso: boolean;
+    /** Revisiones del mes sin informe entregado. Solo en el mes en curso. */
+    sinEntregar?: number;
+    /** El mes tiene al menos un ingreso capturado por el sistema. */
+    autoCaptura: boolean;
+  }>;
+  totals: {
+    inspectionsIncome: number;
+    financeIncome: number;
+    gapAbs: number;
+    gapPct: number;
+    significant: boolean;
+    gapAbsMesesCerrados: number;
+    /** La cifra comparable: la misma sin el mes en curso. */
+    gapPctMesesCerrados: number;
+  };
+  thresholdPct: number;
+  financeStartISO: string;
+  primerMesAutoCaptura: string | null;
+  note: string;
+};
+
 /** Una fila de `channelRevenue.canales` (`convex/bi/channels.ts`). */
 export type ChannelMixRow = {
   canal: string;

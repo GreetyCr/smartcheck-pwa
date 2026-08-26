@@ -411,4 +411,111 @@ describe("la conciliación", () => {
     expect(enCurso).toHaveLength(1);
     expect(enCurso[0].significant).toBe(false);
   });
+
+  /**
+   * Qué mes se capturó solo y cuál a mano.
+   *
+   * Es la marca que hace legible al tablero: **el gap de un mes capturado a
+   * mano y el de uno capturado solo no significan lo mismo**, y sin distinguirlos
+   * la tabla invita a compararlos como si fueran el mismo indicador.
+   */
+  const ingreso = (over: Record<string, unknown> = {}) => ({
+    kind: "income" as const,
+    category: "revision",
+    isViatico: false,
+    amountCRC: 100_000,
+    originalCurrency: "CRC" as const,
+    date: dia("2026-02-10"),
+    yearMonth: "2026-02",
+    source: "sheet" as const,
+    isDeleted: false,
+    createdAt: dia("2026-02-10"),
+    updatedAt: dia("2026-02-10"),
+    ...over,
+  });
+
+  const mes = (res: { months: { yearMonth: string; autoCaptura: boolean }[] }, ym: string) =>
+    res.months.find((m) => m.yearMonth === ym);
+
+  test("un mes con ingreso de la hoja NO se marca como capturado solo", async () => {
+    const t = await conRevisiones([]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", ingreso() as never);
+    });
+    const res = await t.query(internal.bi.metrics.reconciliation, {});
+
+    expect(mes(res, "2026-02")?.autoCaptura).toBe(false);
+    expect(res.primerMesAutoCaptura).toBeNull();
+  });
+
+  test("basta UN ingreso del sistema para marcar el mes, aunque los demás sean a mano", async () => {
+    // El corte de F5-auto fue por fecha de entrega y sin backfill (B27.1), así
+    // que el mes del cambio viene mezclado. Con un umbral de mayoría ese mes
+    // quedaría rotulado como manual y se borraría justo la frontera que el
+    // tablero existe para mostrar.
+    const t = await conRevisiones([]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", ingreso({ source: "inspection" }) as never);
+      for (let i = 0; i < 5; i++) {
+        await ctx.db.insert("finance_entries", ingreso() as never);
+      }
+    });
+    const res = await t.query(internal.bi.metrics.reconciliation, {});
+
+    expect(mes(res, "2026-02")?.autoCaptura).toBe(true);
+  });
+
+  test("una COMISIÓN del sistema no marca el mes: es un gasto, no un ingreso", async () => {
+    // El caso que discrimina, y es el mismo de A97: `source: "inspection"`
+    // también lo llevan las comisiones, que son *gastos*. Marcar el mes por
+    // ellas diría que un mes se capturó solo cuando su ingreso sigue siendo
+    // todo manual. Una prueba con un ingreso normal no distingue nada acá.
+    const t = await conRevisiones([]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", ingreso() as never);
+      await ctx.db.insert(
+        "finance_entries",
+        ingreso({ kind: "expense", category: "otros", source: "inspection" }) as never,
+      );
+    });
+    const res = await t.query(internal.bi.metrics.reconciliation, {});
+
+    expect(mes(res, "2026-02")?.autoCaptura).toBe(false);
+    expect(res.primerMesAutoCaptura).toBeNull();
+  });
+
+  test("`primerMesAutoCaptura` es el mes MÁS VIEJO, no el último ni el primero que se encuentre", async () => {
+    // Se insertan al revés a propósito: si la búsqueda tomara el orden de
+    // inserción en vez del orden cronológico, esto devolvería mayo.
+    const t = await conRevisiones([]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert(
+        "finance_entries",
+        ingreso({ source: "inspection", date: dia("2026-05-10"), yearMonth: "2026-05" }) as never,
+      );
+      await ctx.db.insert(
+        "finance_entries",
+        ingreso({ source: "inspection", date: dia("2026-03-10"), yearMonth: "2026-03" }) as never,
+      );
+    });
+    const res = await t.query(internal.bi.metrics.reconciliation, {});
+
+    expect(res.primerMesAutoCaptura).toBe("2026-03");
+    expect(mes(res, "2026-03")?.autoCaptura).toBe(true);
+    expect(mes(res, "2026-05")?.autoCaptura).toBe(true);
+  });
+
+  test("un ingreso del sistema dado de baja no marca el mes", async () => {
+    const t = await conRevisiones([]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", ingreso() as never);
+      await ctx.db.insert(
+        "finance_entries",
+        ingreso({ source: "inspection", isDeleted: true }) as never,
+      );
+    });
+    const res = await t.query(internal.bi.metrics.reconciliation, {});
+
+    expect(mes(res, "2026-02")?.autoCaptura).toBe(false);
+  });
 });

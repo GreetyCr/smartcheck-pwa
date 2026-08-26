@@ -21,10 +21,12 @@ import { BiEntriesTable } from "./BiEntriesTable";
 import { BiEntryDrawer } from "./BiEntryDrawer";
 import { BiKpiCard } from "./BiKpiCard";
 import { BiMonthlyBars } from "./BiMonthlyBars";
+import { ConciliacionCard } from "./ConciliacionCard";
 import type {
   FinanceEntry,
   FinanceEntryInput,
   FinanceSummary,
+  Reconciliation,
 } from "./types";
 
 /**
@@ -44,6 +46,7 @@ export function FinanceDashboard({
   expenseBreakdown,
   periodoGastos,
   onPeriodoGastos,
+  conciliacion,
 }: {
   summary: FinanceSummary;
   entries: FinanceEntry[];
@@ -59,6 +62,8 @@ export function FinanceDashboard({
   /** Periodo del desglose. Sin estas dos, la tarjeta no muestra el filtro. */
   periodoGastos?: PeriodoKey;
   onPeriodoGastos?: (p: PeriodoKey) => void;
+  /** Conciliación finanzas ↔ revisiones (mitad de RF-05). Si no llega, no se pinta. */
+  conciliacion?: Reconciliation;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<FinanceEntry | null>(null);
@@ -330,6 +335,16 @@ export function FinanceDashboard({
           />
         ) : null}
       </div>
+
+      {/* ---------- conciliación ----------
+          Va DESPUÉS de los gráficos y ANTES de la tabla a propósito: contesta
+          «¿me puedo creer los números de arriba?», así que no sirve encima de
+          ellos —no habría qué dudar todavía— ni al final, donde nadie llega. */}
+      {conciliacion ? (
+        <div className="mt-4">
+          <ConciliacionCard data={conciliacion} />
+        </div>
+      ) : null}
 
       {/* ---------- tabla ---------- */}
       <div className="mt-4">

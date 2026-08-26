@@ -166,7 +166,11 @@ const DESGLOSE_CRUDO = {
     ],
     "sinClasificar": []
   };
-import type { FinanceEntry, FinanceSummary } from "@/components/bi/types";
+import type {
+  FinanceEntry,
+  FinanceSummary,
+  Reconciliation,
+} from "@/components/bi/types";
 import type { PeriodoKey } from "@/components/bi/ExpenseGroupsCard";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
@@ -234,6 +238,52 @@ const ENTRIES: FinanceEntry[] = [
   { id: "s10", kind: "expense", category: "seguro", amountCRC: 78_000, originalAmount: 78_000, originalCurrency: "CRC", date: D("2026-07-05"), yearMonth: "2026-07", isViatico: false, source: "sheet", editable: true, createdAt: D("2026-07-05") },
 ];
 
+/* -------------------------------------------------------------------------- */
+/* Conciliación — respuesta LITERAL de producción, 25-ago-2026                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * No inventado: es lo que devuelve la query en PROD. Se pega tal cual por la
+ * misma razón de siempre (A95) —una muestra escrita a mano ya nos mostró una
+ * vez la tasa de agosto con la nota de julio— y porque los casos reales son
+ * justo los que ponen a prueba el diseño: un mes con **+49,3%**, dos con gap
+ * **negativo** (que es la dirección preocupante) y el mes en curso, que además
+ * es el único con captura automática.
+ *
+ * Regenerar con:  npx convex run --prod bi/metrics:reconciliation '{}'
+ */
+const CONCILIACION: Reconciliation = {
+  months: [
+    { yearMonth: "2025-07", inspectionsIncome: 3_651_000, inspectionsCount: 74, financeIncome: 4_011_000, gapAbs: 360_000, gapPct: 8.98, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2025-08", inspectionsIncome: 2_086_162, inspectionsCount: 41, financeIncome: 2_219_373, gapAbs: 133_211, gapPct: 6, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2025-09", inspectionsIncome: 1_860_910, inspectionsCount: 31, financeIncome: 3_673_650, gapAbs: 1_812_740, gapPct: 49.34, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2025-10", inspectionsIncome: 2_335_014, inspectionsCount: 36, financeIncome: 2_448_215, gapAbs: 113_201, gapPct: 4.62, significant: false, enCurso: false, autoCaptura: false },
+    { yearMonth: "2025-11", inspectionsIncome: 2_957_919, inspectionsCount: 47, financeIncome: 3_328_975, gapAbs: 371_056, gapPct: 11.15, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2025-12", inspectionsIncome: 1_427_692, inspectionsCount: 23, financeIncome: 1_431_537, gapAbs: 3_845, gapPct: 0.27, significant: false, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-01", inspectionsIncome: 3_178_412, inspectionsCount: 51, financeIncome: 3_913_872, gapAbs: 735_460, gapPct: 18.79, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-02", inspectionsIncome: 2_776_817, inspectionsCount: 45, financeIncome: 3_737_538, gapAbs: 960_721, gapPct: 25.7, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-03", inspectionsIncome: 3_422_600, inspectionsCount: 53, financeIncome: 3_227_500, gapAbs: -195_100, gapPct: -6.04, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-04", inspectionsIncome: 3_163_000, inspectionsCount: 50, financeIncome: 3_971_750, gapAbs: 808_750, gapPct: 20.36, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-05", inspectionsIncome: 4_130_617, inspectionsCount: 64, financeIncome: 4_376_000, gapAbs: 245_383, gapPct: 5.61, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-06", inspectionsIncome: 5_515_000, inspectionsCount: 85, financeIncome: 5_618_000, gapAbs: 103_000, gapPct: 1.83, significant: false, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-07", inspectionsIncome: 4_937_141, inspectionsCount: 76, financeIncome: 4_546_000, gapAbs: -391_141, gapPct: -8.6, significant: true, enCurso: false, autoCaptura: false },
+    { yearMonth: "2026-08", inspectionsIncome: 4_519_000, inspectionsCount: 72, financeIncome: 4_591_000, gapAbs: 72_000, gapPct: 1.57, significant: false, enCurso: true, autoCaptura: true, sinEntregar: 1 },
+  ],
+  totals: {
+    inspectionsIncome: 45_961_284,
+    financeIncome: 51_094_410,
+    gapAbs: 5_133_126,
+    gapPct: 10.05,
+    significant: true,
+    gapAbsMesesCerrados: 5_061_126,
+    gapPctMesesCerrados: 10.88,
+  },
+  thresholdPct: 5,
+  financeStartISO: "2025-07-01",
+  primerMesAutoCaptura: "2026-08",
+  note: "Ver `reconciliationImpl` en convex/bi/metrics.ts.",
+};
+
 export function FinanzasPreview() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>("2026-07");
   /* El filtro cambia de pestaña pero NO refiltra: la muestra es estática. Se
@@ -255,6 +305,7 @@ export function FinanzasPreview() {
             simular un guardado que no ocurre. */}
         <FinanceDashboard
           expenseBreakdown={DESGLOSE_OTROS}
+          conciliacion={CONCILIACION}
           periodoGastos={periodo}
           onPeriodoGastos={setPeriodo}
           summary={SUMMARY}
