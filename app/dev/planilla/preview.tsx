@@ -31,39 +31,58 @@ const JULIO_YA_EN_LA_HOJA = [
  * ningún interruptor de mentira que haya que recordar apagar.
  */
 /**
- * Agosto de 2026 leído de producción el 24-ago: Sergio 52 revisiones repartidas
- * en cuatro semanas, Esteban 21. Son los números reales para poder aprobar la
- * tarjeta con las magnitudes de verdad.
+ * La respuesta literal de `bi/pagosTecnico:pagosTecnico` contra producción para
+ * agosto de 2026. No se escribe a mano: la primera versión la armé yo y ya
+ * traía las semanas cambiadas respecto de las reales.
+ *
+ * Se regenera con
+ * `npx convex run --prod bi/pagosTecnico:pagosTecnico '{"yearMonth":"2026-08"}'`.
  */
 const PAGOS_AGOSTO = {
-  yearMonth: "2026-08",
-  tecnicos: [
-    {
-      clerkId: "user_sergio",
-      nombre: "Sergio Smartcheck",
-      revisiones: 52,
-      revisionesConComision: 7,
-      viaticosCRC: 104_000,
-      comisionCRC: 26_600,
-      semanas: [
-        { lunes: "2026-08-03", revisiones: 18, viaticosCRC: 36_000 },
-        { lunes: "2026-08-10", revisiones: 13, viaticosCRC: 26_000 },
-        { lunes: "2026-08-17", revisiones: 18, viaticosCRC: 36_000 },
-        { lunes: "2026-08-24", revisiones: 3, viaticosCRC: 6_000 },
-      ],
+    "aviso": null,
+    "comisionTotalCRC": 26600,
+    "confiable": true,
+    "revisionesDeOtros": 21,
+    "tarifas": {
+      "comisionPorRevision": 3800,
+      "revisionesSinComision": 45,
+      "viaticoPorRevision": 2000
     },
-  ],
-  comisionTotalCRC: 26_600,
-  viaticosTotalCRC: 104_000,
-  revisionesDeOtros: 21,
-  tarifas: {
-    viaticoPorRevision: 2_000,
-    comisionPorRevision: 3_800,
-    revisionesSinComision: 45,
-  },
-  confiable: true,
-  aviso: null,
-};
+    "tecnicos": [
+      {
+        "clerkId": "user_3GYaescpEF0U177qKsdUJvE7Nof",
+        "comisionCRC": 26600,
+        "nombre": "Sergio Smartcheck",
+        "revisiones": 52,
+        "revisionesConComision": 7,
+        "semanas": [
+          {
+            "lunes": "2026-08-03",
+            "revisiones": 19,
+            "viaticosCRC": 38000
+          },
+          {
+            "lunes": "2026-08-10",
+            "revisiones": 14,
+            "viaticosCRC": 28000
+          },
+          {
+            "lunes": "2026-08-17",
+            "revisiones": 13,
+            "viaticosCRC": 26000
+          },
+          {
+            "lunes": "2026-08-24",
+            "revisiones": 6,
+            "viaticosCRC": 12000
+          }
+        ],
+        "viaticosCRC": 104000
+      }
+    ],
+    "viaticosTotalCRC": 104000,
+    "yearMonth": "2026-08"
+  };
 
 export function PlanillaPreview() {
   const [mes, setMes] = useState("2026-07");
