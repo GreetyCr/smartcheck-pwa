@@ -17,6 +17,7 @@ import {
   Users,
   X, Calculator,
   Radio,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,7 @@ const GROUPS: NavGroup[] = [
       { href: "/admin/planilla", label: "Planilla", Icon: Calculator },
       { href: "/admin/leads", label: "Leads", Icon: Filter },
       { href: "/admin/canales", label: "Canales", Icon: Radio },
+      { href: "/admin/calidad", label: "Calidad", Icon: ShieldCheck },
     ],
   },
   {

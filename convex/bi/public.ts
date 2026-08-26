@@ -53,6 +53,7 @@ import {
   channelRevenueReturns,
 } from "./channels";
 import { pagosTecnicoImpl, pagosTecnicoReturns } from "./pagosTecnico";
+import { calidadImpl, calidadReturns } from "./calidad";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -230,5 +231,21 @@ export const pagosTecnico = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     return pagosTecnicoImpl(ctx, args);
+  },
+});
+
+/**
+ * Calidad de los datos (F3).
+ *
+ * Devuelve los avisos **clasificados por un catálogo escrito**, no por su
+ * severidad: en producción hay 2.158 y 1.869 son duplicados que se marcan a
+ * propósito (A26). Sin esa separación el tablero enseña a ignorarse.
+ */
+export const calidad = query({
+  args: {},
+  returns: calidadReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return calidadImpl(ctx);
   },
 });
