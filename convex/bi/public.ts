@@ -56,6 +56,7 @@ import { pagosTecnicoImpl, pagosTecnicoReturns } from "./pagosTecnico";
 import { calidadImpl, calidadReturns } from "./calidad";
 import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
 import { operacionImpl, operacionReturns } from "./operacion";
+import { filterOptionsImpl, filterOptionsReturns } from "./filtros";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -274,11 +275,25 @@ export const estadoDatos = query({
  * respuesta es **no**. Y el SLA se calcula solo sobre las entregadas que tienen
  * las dos fechas; `sinFechaInicio` dice cuántas quedaron fuera.
  */
-export const operacion = query({
+/**
+ * Opciones de la barra de filtros global (**RF-02**), derivadas de los datos y
+ * **con la cuenta de cada una**. También devuelve qué dimensiones del
+ * requerimiento no se pueden servir hoy y por qué, para que la barra lo diga.
+ */
+export const filterOptions = query({
   args: {},
-  returns: operacionReturns,
+  returns: filterOptionsReturns,
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    return operacionImpl(ctx);
+    return filterOptionsImpl(ctx);
+  },
+});
+
+export const operacion = query({
+  args: { ...filterValidator },
+  returns: operacionReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return operacionImpl(ctx, args);
   },
 });

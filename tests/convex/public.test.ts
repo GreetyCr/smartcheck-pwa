@@ -63,6 +63,17 @@ async function setup() {
 }
 
 /** Las siete puertas públicas, con sus argumentos mínimos. */
+/**
+ * **Todas** las queries públicas del BI, no una muestra.
+ *
+ * La lista se había quedado en 7 mientras el BI crecía a 15, así que ocho
+ * quedaron sin nadie que verificara su gate — entre ellas `convertedLeads`, que
+ * devuelve **nombre y teléfono** de los clientes de Esteban, y `leadsPorRevisar`,
+ * que devuelve nombres y teléfonos crudos. Una lista incompleta de cosas que hay
+ * que blindar se lee como completa, que es peor que no tenerla.
+ *
+ * Al agregar una query a `convex/bi/public.ts`, agregarla acá.
+ */
 const PUBLICAS = [
   ["financeSummary", api.bi.public.financeSummary, {}],
   ["totalRevisiones", api.bi.public.totalRevisiones, {}],
@@ -71,6 +82,16 @@ const PUBLICAS = [
   ["conversionFunnel", api.bi.public.conversionFunnel, {}],
   ["matchesStats", api.bi.public.matchesStats, {}],
   ["leadsStats", api.bi.public.leadsStats, {}],
+  // PII: nombre y teléfono de los clientes.
+  ["convertedLeads", api.bi.public.convertedLeads, {}],
+  ["leadsPorRevisar", api.bi.public.leadsPorRevisar, {}],
+  ["expenseBreakdown", api.bi.public.expenseBreakdown, {}],
+  ["channelRevenue", api.bi.public.channelRevenue, {}],
+  ["pagosTecnico", api.bi.public.pagosTecnico, { yearMonth: "2026-08" }],
+  ["calidad", api.bi.public.calidad, {}],
+  ["estadoDatos", api.bi.public.estadoDatos, {}],
+  ["operacion", api.bi.public.operacion, {}],
+  ["filterOptions", api.bi.public.filterOptions, {}],
 ] as const;
 
 describe("bi/public — el gate de admin", () => {

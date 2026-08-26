@@ -4,6 +4,28 @@ import { useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { ChannelDashboard } from "@/components/bi/ChannelDashboard";
+import {
+  FiltrosGlobales,
+  useFiltrosBi,
+} from "@/components/bi/FiltrosGlobales";
+
+/**
+ * Todo menos `channel`.
+ *
+ * Filtrar por canal el tablero **de canales** dejaría una sola barra en
+ * pantalla y el reparto —que es lo único que este tablero muestra— perdería
+ * sentido. La barra lo pinta apagado con «No aplica en esta pantalla» en vez de
+ * aceptarlo y no hacer nada (A64).
+ */
+const SOPORTA = [
+  "periodo",
+  "province",
+  "engineType",
+  "agency",
+  "brand",
+  "sellerType",
+  "currency",
+] as const;
 
 /**
  * Ingresos por canal (F3).
@@ -13,10 +35,13 @@ import { ChannelDashboard } from "@/components/bi/ChannelDashboard";
  * (A91).
  */
 export default function AdminCanalesPage() {
-  const data = useQuery(api.bi.public.channelRevenue, {});
+  const { args } = useFiltrosBi(SOPORTA);
+  const data = useQuery(api.bi.public.channelRevenue, args);
 
   return (
     <div>
+      <FiltrosGlobales soporta={SOPORTA} />
+
       <header className="mb-6">
         <h1 className="bi-display text-[28px] font-bold uppercase leading-none text-[var(--bi-ink)] sm:text-[34px]">
           Ingresos por canal

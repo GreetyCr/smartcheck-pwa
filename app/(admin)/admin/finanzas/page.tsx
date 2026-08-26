@@ -6,6 +6,20 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
 import { rangoDelPeriodo, type PeriodoKey } from "@/components/bi/ExpenseGroupsCard";
+import {
+  FiltrosGlobales,
+  useFiltrosBi,
+} from "@/components/bi/FiltrosGlobales";
+
+/**
+ * Finanzas solo entiende de **periodo**.
+ *
+ * Un gasto no tiene provincia, ni marca, ni tipo de motor: son movimientos de
+ * la contabilidad, no revisiones. Las otras siete dimensiones de la barra se
+ * pintan apagadas acá — que es la única alternativa honesta a aceptarlas y no
+ * aplicarlas (A64).
+ */
+const SOPORTA = ["periodo"] as const;
 import type { FinanceEntry, FinanceEntryInput } from "@/components/bi/types";
 
 /**
@@ -20,9 +34,11 @@ export default function FinanzasPage() {
       es «¿cambió el reparto?», que se contesta con meses, no con un mes. */
   const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
-  const summary = useQuery(api.bi.public.financeSummary, {});
-  /* La conciliación va sin filtro: su gracia es la SERIE completa mes a mes,
-     y acotarla escondería justo los meses que se salen del margen. */
+  const { args: rangoGlobal } = useFiltrosBi(SOPORTA);
+  const summary = useQuery(api.bi.public.financeSummary, rangoGlobal);
+  /* La conciliación va SIN el periodo global, y es la única excepción: su
+     gracia es la serie completa mes a mes, y acotarla escondería justo los
+     meses que se salen del margen. */
   const conciliacion = useQuery(api.bi.public.reconciliation, {});
   /* El desglose de «Otros» va aparte del bloqueo de carga: es un zoom sobre
      una barra, no una cifra que tenga que cuadrar con las demás. */
@@ -60,6 +76,8 @@ export default function FinanzasPage() {
   }
 
   return (
+    <div>
+      <FiltrosGlobales soporta={SOPORTA} />
     <FinanceDashboard
       summary={summary}
       entries={rows}
@@ -83,6 +101,7 @@ export default function FinanzasPage() {
       onDeleteEntry={async (id: string) => {
         await deleteEntry({ id: id as Id<"finance_entries"> });
       }}
-    />
+      />
+    </div>
   );
 }

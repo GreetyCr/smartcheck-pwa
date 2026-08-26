@@ -336,6 +336,114 @@ describe("los filtros", () => {
     expect(res.counts.unifiedTotal).toBe(1);
     expect(res.counts.unifiedTotalNoFilter).toBe(2);
   });
+
+  /* ---- las cuatro dimensiones que agregó RF-02 ---- */
+
+  test("filtrar por MARCA cruza las dos fuentes pese al texto libre del CRM", async () => {
+    // La app guarda «Hyundai» y el CRM «Hyundai Tucson 2017». Si el filtro
+    // comparara el texto crudo, elegir Hyundai devolvería una sola.
+    const t = await conRevisiones(
+      [{ clientPhone: "1111-1112", vehicleBrand: "Hyundai" }],
+      [
+        { phone8: "33221100", clientName: "Otro Uno", vehicleBrand: "Hyundai Tucson 2017" },
+        { phone8: "33221101", clientName: "Otro Dos", vehicleBrand: "Toyota Rav4" },
+      ],
+    );
+    const res = await t.query(internal.bi.metrics.inspectionsAll, {
+      brand: "Hyundai",
+    });
+
+    expect(res.counts.unifiedTotalNoFilter).toBe(3);
+    expect(res.counts.unifiedTotal).toBe(2);
+  });
+
+  test("canonicalizar la marca NO fusiona revisiones que antes contaban aparte", async () => {
+    // **La regresión que hay que evitar.** El dedupe débil compara nombre +
+    // fecha + vehículo. Si usara la marca canónica, «Hyundai» de la app y
+    // «Hyundai Tucson 2017» del CRM pasarían a ser iguales y estas dos filas
+    // se fundirían en una: las 887 revisiones de producción se moverían solas.
+    // Por eso el dedupe sigue usando el texto crudo y la marca canónica vive
+    // en un campo aparte.
+    const mismaFecha = dia("2026-07-10");
+    const t = await conRevisiones(
+      [
+        {
+          clientName: "Ana León",
+          clientPhone: undefined,
+          vehicleBrand: "Hyundai",
+          inspectionStartAt: mismaFecha,
+        },
+      ],
+      [
+        {
+          clientName: "Ana León",
+          phone8: undefined,
+          vehicleBrand: "Hyundai Tucson 2017",
+          inspectionDate: mismaFecha,
+        },
+      ],
+    );
+    const res = await t.query(internal.bi.metrics.inspectionsAll, {});
+
+    expect(res.counts.unifiedTotal).toBe(2);
+    expect(res.counts.dupSuperseded).toBe(0);
+  });
+
+  test("filtrar por TIPO DE VENDEDOR deja fuera las del CRM, que no lo traen", async () => {
+    // El caso que discrimina. Si una fila sin dato pasara el filtro, elegir
+    // «particular» devolvería también las legacy —que no dicen nada al
+    // respecto— y el resultado sería mayor que las revisiones que tienen el
+    // dato. La pantalla avisa de esta pérdida; el backend no la disimula.
+    const t = await conRevisiones(
+      [
+        { clientPhone: "1111-1112", sellerType: "particular" },
+        { clientPhone: "1111-1113", sellerType: "concesionaria" },
+      ],
+      [{ phone8: "33221100", clientName: "Sin Vendedor" }],
+    );
+    const res = await t.query(internal.bi.metrics.inspectionsAll, {
+      sellerType: "particular",
+    });
+
+    expect(res.counts.unifiedTotalNoFilter).toBe(3);
+    expect(res.counts.unifiedTotal).toBe(1);
+  });
+
+  test("filtrar por MONEDA separa lo cobrado en dólares", async () => {
+    // La app cobra siempre en colones; el CRM tiene las dos.
+    const t = await conRevisiones(
+      [{ clientPhone: "1111-1112" }],
+      [
+        { phone8: "33221100", clientName: "Uno", originalCurrency: "USD" },
+        { phone8: "33221101", clientName: "Dos", originalCurrency: "CRC" },
+      ],
+    );
+    const usd = await t.query(internal.bi.metrics.inspectionsAll, { currency: "USD" });
+    const crc = await t.query(internal.bi.metrics.inspectionsAll, { currency: "CRC" });
+
+    expect(usd.counts.unifiedTotal).toBe(1);
+    expect(crc.counts.unifiedTotal).toBe(2); // la de la app entra acá
+  });
+
+  test("filtrar por LOCALIDAD usa la agencia canonicalizada", async () => {
+    const t = await conRevisiones(
+      [],
+      [
+        { phone8: "33221100", clientName: "Uno", province: "VEINSA Curridabat usados" },
+        { phone8: "33221101", clientName: "Dos", province: "Heredia" },
+      ],
+    );
+    // La agencia canónica la decide el backend (A32/B26: «Garaje»→«Garage»),
+    // así que se toma de su propio desglose en vez de escribirla a mano.
+    const res = await t.query(internal.bi.metrics.totalRevisiones, {});
+    const agencia = res.byAgency[0]?.key;
+    expect(agencia).toBeTruthy();
+
+    const filtrado = await t.query(internal.bi.metrics.totalRevisiones, {
+      agency: agencia,
+    });
+    expect(filtrado.total).toBe(1);
+  });
 });
 
 /* ========================================================================== */

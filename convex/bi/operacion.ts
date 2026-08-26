@@ -38,6 +38,12 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
+import {
+  dimensionesDeInspeccion,
+  filterValidator,
+  pasaFiltros,
+  type FilterArgs,
+} from "./metrics";
 import { SECTIONS_CONFIG } from "@/lib/constants/sectionItems";
 import { findingsByItemForSectionDoc } from "@/lib/inspection-findings";
 import { yearMonth as ymFromMs } from "./lib/dates";
@@ -150,9 +156,9 @@ export const operacionReturns = v.object({
 });
 
 export const operacion = internalQuery({
-  args: {},
+  args: { ...filterValidator },
   returns: operacionReturns,
-  handler: async (ctx) => operacionImpl(ctx),
+  handler: async (ctx, args) => operacionImpl(ctx, args),
 });
 
 /** Mediana. Con lista vacía devuelve 0, no NaN. */
@@ -186,8 +192,18 @@ const pct = (x: number, d: number) => (d > 0 ? redondear((x / d) * 100, 1) : 0);
  * y ~1.900 documentos en total. Si la app llegara a decenas de miles habría que
  * materializar por revisión al guardar la sección, no al leer.
  */
-export async function operacionImpl(ctx: QueryCtx) {
-  const inspecciones = await ctx.db.query("inspections").collect();
+export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
+  /**
+   * La barra global (RF-02) se aplica acá **con el mismo predicado y los mismos
+   * normalizadores** que la vista unificada, no con una copia. Nótese que este
+   * tablero solo ve revisiones de la app: el checklist y las fechas de entrega
+   * no existen en el CRM viejo. Eso ya era cierto antes de la barra.
+   */
+  const todas = await ctx.db.query("inspections").collect();
+  const inspecciones = todas.filter((r) =>
+    pasaFiltros(dimensionesDeInspeccion(r), filtros),
+  );
+  const permitidas = new Set(inspecciones.map((r) => String(r._id)));
   const entregadas = inspecciones.filter((r) => r.reportDeliveredAt != null);
 
   /* ---------------------------- condición ---------------------------------- */
@@ -226,6 +242,8 @@ export async function operacionImpl(ctx: QueryCtx) {
     const docs = await ctx.db.query(cfg.table).collect();
     for (const doc of docs) {
       const id = String((doc as { inspectionId: unknown }).inspectionId);
+      // Una sección cuya revisión quedó fuera del filtro no aporta hallazgos.
+      if (!permitidas.has(id)) continue;
       const r = findingsByItemForSectionDoc(
         cfg.table,
         doc as unknown as Record<string, unknown>,

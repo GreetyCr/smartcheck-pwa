@@ -59,6 +59,7 @@ export function ResumenEjecutivo({
   canales,
   periodoKey,
   onPeriodo,
+  filtrosGlobales = 0,
 }: {
   /** Cifras acotadas al periodo elegido. */
   periodo: ExecutiveSummary;
@@ -70,8 +71,19 @@ export function ResumenEjecutivo({
   canales: ChannelMixRow[];
   periodoKey: PeriodoKey;
   onPeriodo: (p: PeriodoKey) => void;
+  /**
+   * Cuántos filtros de la barra global hay puestos.
+   *
+   * Importa porque **los números de contactos y conversión no respetan ningún
+   * filtro**, ni el periodo ni los de la barra: el backend lee `leads_contacts`
+   * y `bi_matches` enteros. Con un filtro de marca puesto, la fila de arriba se
+   * angosta y la de abajo no — y sin decirlo, eso se lee como un error.
+   */
+  filtrosGlobales?: number;
 }) {
-  const hayFiltro = periodoKey !== "todo";
+  const hayPeriodo = periodoKey !== "todo";
+  const hayDimension = (filtrosGlobales ?? 0) > 0;
+  const hayFiltro = hayPeriodo || hayDimension;
   const etiquetaPeriodo =
     PERIODOS.find((p) => p.key === periodoKey)?.label ?? "Todo";
 
@@ -121,7 +133,7 @@ export function ResumenEjecutivo({
       <Rotulo
         texto="El negocio"
         detalle={
-          hayFiltro
+          hayPeriodo
             ? `Últimos ${etiquetaPeriodo.toLowerCase()}`
             : "Todo el histórico"
         }
@@ -167,8 +179,8 @@ export function ResumenEjecutivo({
         texto="Contactos y conversión"
         detalle={
           hayFiltro
-            ? "Siempre sobre todo el histórico — abajo se explica por qué"
-            : "Siempre sobre todo el histórico"
+            ? "Sin recorte de periodo — abajo se explica qué respeta cada una"
+            : "Sobre todo el histórico, sin recorte de periodo"
         }
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -211,13 +223,18 @@ export function ResumenEjecutivo({
       {hayFiltro ? (
         <p className="mt-3 rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-surface)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--bi-ink-3)]">
           <span className="font-semibold text-[var(--bi-ink-2)]">
-            Por qué la conversión no se filtra:
+            Qué respeta cada una de estas cuatro:
           </span>{" "}
-          un contacto puede llegar en marzo y comprar en agosto. Recortar la
-          cuenta a {etiquetaPeriodo.toLowerCase()} dejaría compras sin su
-          contacto —y contactos sin su compra— en los dos bordes del rango, y el
-          porcentaje saldría inflado o hundido según por dónde caiga el corte.
-          Se muestra sobre todo el histórico, que es la única base que no miente.
+          <b className="text-[var(--bi-ink-2)]">Revisiones totales</b> sí hace
+          caso a los filtros de arriba, pero nunca al periodo — para eso está la
+          tarjeta de «El negocio». Las otras tres —contactos, convertidos y
+          conversión— <b className="text-[var(--bi-ink-2)]">no cambian con nada</b>:
+          los contactos vienen de Airtable y no traen marca, provincia ni canal,
+          así que no hay por dónde filtrarlos. Y recortarlos por periodo sería
+          peor que no hacerlo: un contacto puede llegar en marzo y comprar en
+          agosto, así que el corte dejaría compras sin su contacto —y contactos
+          sin su compra— en los dos bordes, y el porcentaje saldría inflado o
+          hundido según dónde caiga.
         </p>
       ) : null}
 

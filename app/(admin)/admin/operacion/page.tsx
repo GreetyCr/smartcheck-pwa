@@ -3,6 +3,28 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { OperacionDashboard } from "@/components/bi/OperacionDashboard";
+import {
+  FiltrosGlobales,
+  useFiltrosBi,
+} from "@/components/bi/FiltrosGlobales";
+
+/**
+ * Las ocho dimensiones, todas.
+ *
+ * Este tablero solo ve revisiones **de la app** —el checklist y las fechas de
+ * entrega no existen en el CRM viejo—, así que `sellerType`, que también es
+ * solo de la app, acá no pierde nada extra.
+ */
+const SOPORTA = [
+  "periodo",
+  "channel",
+  "province",
+  "engineType",
+  "agency",
+  "brand",
+  "sellerType",
+  "currency",
+] as const;
 
 /**
  * Hallazgos, condición y tiempos de respuesta — **RF-07**.
@@ -12,11 +34,13 @@ import { OperacionDashboard } from "@/components/bi/OperacionDashboard";
  * de muestra.
  */
 export default function OperacionPage() {
-  const data = useQuery(api.bi.public.operacion, {});
+  const { args } = useFiltrosBi(SOPORTA);
+  const data = useQuery(api.bi.public.operacion, args);
 
   if (data === undefined) {
     return (
       <div>
+        <FiltrosGlobales soporta={SOPORTA} />
         <div className="bi-skeleton h-9 w-64 rounded-lg" />
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
@@ -31,5 +55,10 @@ export default function OperacionPage() {
     );
   }
 
-  return <OperacionDashboard data={data} />;
+  return (
+    <div>
+      <FiltrosGlobales soporta={SOPORTA} />
+      <OperacionDashboard data={data} />
+    </div>
+  );
 }

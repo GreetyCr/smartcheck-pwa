@@ -31,6 +31,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
+import { canonicalBrand, SIN_MARCA } from "./lib/marcas";
 
 /* -------------------------------------------------------------------------- */
 /* Constantes                                                                 */
@@ -321,6 +322,19 @@ type UnifiedRow = {
   agency: string | undefined; // nombre de agencia si la ubicación era un comercio (A32)
   engineType: string | undefined; // NORMALIZADO (canónico) o undefined si sin dato
   channel: string | undefined; // CANAL unificado title-case (A34)
+  /**
+   * Marca canónica (`convex/bi/lib/marcas.ts`) o `(sin marca)`. **No es el
+   * mismo campo que `RichRow.brand`**, y esa separación es deliberada: `brand`
+   * es el texto crudo normalizado y lo usa el dedupe débil (nombre + fecha +
+   * vehículo). Canonicalizarlo ahí haría que «Hyundai» de la app y «Hyundai
+   * Tucson 2017» del CRM pasen a ser iguales, y **fusionaría revisiones que hoy
+   * cuentan aparte** — o sea movería las 887. Este campo es solo para filtrar.
+   */
+  brand: string;
+  /** `particular` | `concesionaria`. Solo la app lo tiene; en legacy es undefined. */
+  sellerType: string | undefined;
+  /** Moneda en que se cobró (`CRC` | `USD`). La app cobra siempre en colones. */
+  currency: string;
   source: "legacy" | "era_app";
 };
 
@@ -328,7 +342,9 @@ type UnifiedRow = {
 type RichRow = UnifiedRow & {
   name: string; // normalizado
   phone8: string | null;
-  brand: string; // normalizado
+  /** Texto CRUDO normalizado del vehículo. Es la llave del dedupe débil; NO
+      confundir con `UnifiedRow.brand`, que es la marca canónica para filtrar. */
+  rawVehicle: string;
 };
 
 type FilterArgs = {
@@ -337,14 +353,39 @@ type FilterArgs = {
   province?: string;
   engineType?: string;
   channel?: string;
+  agency?: string;
+  brand?: string;
+  sellerType?: string;
+  currency?: string;
 };
 
+/**
+ * Las dimensiones de la barra global (**RF-02**) que las revisiones pueden
+ * honrar. Son **ocho de las nueve** que pide el requerimiento.
+ *
+ * **La novena, «estado de pago», no está y es a propósito.** Se verificó contra
+ * producción: de las 887 revisiones, **ninguna** tiene monto ₡0 ni ₡1.000 — o
+ * sea que hoy *todas* están cobradas y el filtro tendría un solo valor. Un
+ * control que no puede separar nada es peor que no tenerlo (A64), así que en
+ * vez de un desplegable inútil la barra dice por qué falta. El día que aparezca
+ * una revisión sin cobrar, la dimensión se agrega acá y ya.
+ *
+ * **`sellerType` solo existe en la app**: el CRM viejo no registraba si el
+ * vendedor era particular o agencia. Filtrar por él deja fuera las 742
+ * revisiones legacy, y por eso la barra lo advierte en vez de dejar que el
+ * total caiga de 887 a 146 sin explicación.
+ */
 export const filterValidator = {
   fromMs: v.optional(v.number()),
   toMs: v.optional(v.number()),
   province: v.optional(v.string()),
   engineType: v.optional(v.string()),
   channel: v.optional(v.string()),
+  /** Localidad: el nombre de la agencia cuando la revisión fue en un comercio (A32). */
+  agency: v.optional(v.string()),
+  brand: v.optional(v.string()),
+  sellerType: v.optional(v.string()),
+  currency: v.optional(v.string()),
 };
 
 /** ¿la fila pasa los filtros? (periodo semiabierto [from, to); dims normalizadas). */
@@ -355,8 +396,63 @@ function passesFilters(r: UnifiedRow, f: FilterArgs): boolean {
   if (f.engineType != null && norm(r.engineType) !== norm(f.engineType))
     return false;
   if (f.channel != null && norm(r.channel) !== norm(f.channel)) return false;
+  if (f.agency != null && norm(r.agency) !== norm(f.agency)) return false;
+  if (f.brand != null && norm(r.brand) !== norm(f.brand)) return false;
+  // `sellerType` ausente NO pasa el filtro: si pasara, filtrar por
+  // «particular» incluiría las 742 legacy —que no dicen nada al respecto— y el
+  // resultado sería mayor que el universo de revisiones que tienen el dato.
+  if (f.sellerType != null && norm(r.sellerType) !== norm(f.sellerType))
+    return false;
+  if (f.currency != null && norm(r.currency) !== norm(f.currency)) return false;
   return true;
 }
+
+/**
+ * Las dimensiones filtrables de **una fila de `inspections`** (era-app), sacadas
+ * con exactamente los mismos normalizadores que usa la vista unificada.
+ *
+ * Existe para que el tablero de operación (RF-07) —que lee `inspections` y sus
+ * secciones, no la vista unificada— pueda honrar la barra global **sin una
+ * segunda copia de las reglas**. Si el canal o la provincia se normalizaran de
+ * dos formas distintas, el mismo filtro daría dos totales según la pantalla.
+ */
+export function dimensionesDeInspeccion(r: {
+  province?: string | null;
+  engineType?: string | null;
+  captureSource?: string | null;
+  vehicleBrand?: string | null;
+  sellerType?: string | null;
+  inspectionStartAt?: number | null;
+  _creationTime: number;
+}): Pick<
+  UnifiedRow,
+  "date" | "province" | "agency" | "engineType" | "channel" | "brand" | "sellerType" | "currency"
+> {
+  const loc = classifyLocation(r.province ?? undefined);
+  return {
+    date: r.inspectionStartAt ?? r._creationTime,
+    province: loc.province,
+    agency: loc.agency,
+    engineType: normalizeEngine(r.engineType),
+    channel: normalizeChannel(r.captureSource),
+    brand: canonicalBrand(r.vehicleBrand),
+    sellerType: r.sellerType ?? undefined,
+    currency: "CRC",
+  };
+}
+
+/** El predicado de la barra global, para quien no lea la vista unificada. */
+export function pasaFiltros(
+  r: Pick<
+    UnifiedRow,
+    "date" | "province" | "agency" | "engineType" | "channel" | "brand" | "sellerType" | "currency"
+  >,
+  f: FilterArgs,
+): boolean {
+  return passesFilters(r as UnifiedRow, f);
+}
+
+export type { FilterArgs };
 
 /** ¿fila de prueba/junk? (nombre "Test", teléfono 55555555, monto ₡0). */
 function isJunk(name: string, phoneDigits: string, amount: number | undefined): boolean {
@@ -403,10 +499,14 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
       agency: eraLoc.agency,
       engineType: normalizeEngine(r.engineType),
       channel: normalizeChannel(r.captureSource),
+      brand: canonicalBrand(r.vehicleBrand),
+      sellerType: r.sellerType ?? undefined,
+      // La app cobra siempre en colones: no guarda moneda de origen.
+      currency: "CRC",
       source: "era_app",
       name: norm(r.clientName),
       phone8: last8(r.clientPhone),
-      brand: norm(r.vehicleBrand),
+      rawVehicle: norm(r.vehicleBrand),
     });
   }
 
@@ -431,10 +531,14 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
       agency: legLoc.agency,
       engineType: normalizeEngine(r.engineType),
       channel: normalizeChannel(r.channel),
+      brand: canonicalBrand(r.vehicleBrand),
+      // El CRM viejo no registraba si el vendedor era particular o agencia.
+      sellerType: undefined,
+      currency: r.originalCurrency ?? "CRC",
       source: "legacy",
       name: norm(r.clientName),
       phone8: last8(r.phone8),
-      brand: norm(r.vehicleBrand),
+      rawVehicle: norm(r.vehicleBrand),
     });
   }
 
@@ -455,7 +559,7 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
         e.name &&
         e.name === l.name &&
         Math.abs(e.date - l.date) <= DEDUPE_WINDOW_MS &&
-        (!e.brand || !l.brand || e.brand === l.brand)
+        (!e.rawVehicle || !l.rawVehicle || e.rawVehicle === l.rawVehicle)
       ) {
         matchIdx = i;
         break;
@@ -472,6 +576,9 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
     agency: r.agency,
     engineType: r.engineType,
     channel: r.channel,
+    brand: r.brand,
+    sellerType: r.sellerType,
+    currency: r.currency,
     source: r.source,
   });
 

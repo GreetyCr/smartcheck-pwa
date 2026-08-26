@@ -27,17 +27,29 @@ import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
-import { buildInspectionsAll } from "./metrics";
+import { buildInspectionsAll, pasaFiltros, type FilterArgs } from "./metrics";
 
 /**
- * Solo periodo. **No se acepta `channel`** aunque el resto del BI lo tenga en su
- * validador común: filtrar por canal el tablero *de canales* sería un argumento
- * que no hace nada visible, y un filtro que se ignora en silencio es peor que no
- * tenerlo (A64). Province y engineType tampoco: nada en esta pantalla los ofrece.
+ * Todas las dimensiones de la barra global **menos `channel`**.
+ *
+ * Esa exclusión se mantiene y ahora importa más: filtrar por canal el tablero
+ * *de canales* dejaría una sola barra en pantalla y el reparto —que es lo que
+ * este tablero existe para mostrar— perdería sentido. La barra global lo marca
+ * como «no aplica acá» en vez de aceptarlo y no hacer nada, que es lo que A64
+ * prohíbe.
+ *
+ * Las demás sí entran: preguntar «¿de dónde vienen los clientes **de Hyundai**
+ * en Heredia?» es exactamente para lo que sirve RF-02.
  */
 export const channelFilterValidator = {
   fromMs: v.optional(v.number()),
   toMs: v.optional(v.number()),
+  province: v.optional(v.string()),
+  engineType: v.optional(v.string()),
+  agency: v.optional(v.string()),
+  brand: v.optional(v.string()),
+  sellerType: v.optional(v.string()),
+  currency: v.optional(v.string()),
 };
 
 /**
@@ -134,16 +146,15 @@ const redondear = (x: number, decimales = 1) => {
  */
 export async function channelRevenueImpl(
   ctx: QueryCtx,
-  args: { fromMs?: number; toMs?: number },
+  args: Omit<FilterArgs, "channel">,
 ) {
   const built = await buildInspectionsAll(ctx);
-  // Periodo semiabierto [from, to), igual que el resto del BI: así dos periodos
-  // contiguos nunca se comen la misma revisión dos veces.
-  const rows = built.all.filter((r) => {
-    if (args.fromMs != null && r.date < args.fromMs) return false;
-    if (args.toMs != null && r.date >= args.toMs) return false;
-    return true;
-  });
+  // El periodo es semiabierto [from, to) y lo aplica `pasaFiltros`, igual que el
+  // resto del BI: así dos periodos contiguos nunca se comen la misma revisión
+  // dos veces, y las demás dimensiones se comparan con los MISMOS
+  // normalizadores que el resumen ejecutivo. Sin eso, «Heredia» podría
+  // significar cosas distintas en dos pantallas.
+  const rows = built.all.filter((r) => pasaFiltros(r, args));
 
   /* ---------------------------------------------------------------------- */
   /* Por canal                                                              */

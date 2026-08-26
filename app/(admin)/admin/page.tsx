@@ -9,6 +9,28 @@ import {
   rangoDelPeriodo,
   type PeriodoKey,
 } from "@/components/bi/ExpenseGroupsCard";
+import {
+  FiltrosGlobales,
+  useFiltrosBi,
+} from "@/components/bi/FiltrosGlobales";
+
+/**
+ * Dimensiones que esta portada honra de verdad.
+ *
+ * El periodo NO está: el resumen ya trae su propio selector, que además maneja
+ * los **dos alcances** de la pantalla (lo que se mueve y lo que no). Meter el
+ * periodo también en la barra global daría dos controles del mismo eje, y el
+ * que perdiera se leería como roto.
+ */
+const SOPORTA = [
+  "channel",
+  "province",
+  "engineType",
+  "agency",
+  "brand",
+  "sellerType",
+  "currency",
+] as const;
 
 /**
  * Portada del panel admin — **RF-03 arriba, operativo abajo**.
@@ -32,11 +54,16 @@ import {
 export default function AdminDashboardPage() {
   const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
   const rango = useMemo(() => rangoDelPeriodo(periodo), [periodo]);
+  const { args: dims } = useFiltrosBi(SOPORTA);
 
-  const historico = useQuery(api.bi.public.executiveSummary, {});
-  const delPeriodo = useQuery(api.bi.public.executiveSummary, rango);
+  const historico = useQuery(api.bi.public.executiveSummary, dims);
+  const delPeriodo = useQuery(api.bi.public.executiveSummary, {
+    ...dims,
+    ...rango,
+  });
+  // Finanzas solo entiende de periodo: un gasto no tiene provincia ni marca.
   const finanzas = useQuery(api.bi.public.financeSummary, rango);
-  const canales = useQuery(api.bi.public.channelRevenue, rango);
+  const canales = useQuery(api.bi.public.channelRevenue, { ...dims, ...rango });
   const metrics = useQuery(api.admin.getDashboardMetrics, {});
 
   const resumenListo =
@@ -47,6 +74,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
+      <FiltrosGlobales soporta={SOPORTA} />
+
       {resumenListo ? (
         <ResumenEjecutivo
           periodo={delPeriodo}
@@ -55,6 +84,7 @@ export default function AdminDashboardPage() {
           canales={canales.canales}
           periodoKey={periodo}
           onPeriodo={setPeriodo}
+          filtrosGlobales={Object.keys(dims).length}
         />
       ) : (
         <ResumenSkeleton />
