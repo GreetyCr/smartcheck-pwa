@@ -65,6 +65,7 @@ export function PayrollMonthCard({
   onMes,
   guardado,
   onRegistrar,
+  onListoParaSugerencias,
 }: {
   mes: string;
   onMes: (ym: string) => void;
@@ -76,6 +77,15 @@ export function PayrollMonthCard({
     comisionesCRC: number;
     baseImponibleCRC: number;
   }) => Promise<{ creadas: number; actualizadas: number }>;
+  /**
+   * Le entrega al padre la forma de escribir en el campo de comisiones, para
+   * que la tarjeta de pagos del técnico pueda pasarle su número.
+   *
+   * Va así, y no al revés (una prop `comisionSugerida` que se autocompletara),
+   * porque **rellenar solo un campo que Esteban ya llenó sería pisarle el dato
+   * sin preguntar**. Con esto, el valor entra solo cuando él pulsa.
+   */
+  onListoParaSugerencias?: (aplicar: (montoCRC: number) => void) => void;
 }) {
 
   const [salario, setSalario] = useState("");
@@ -141,6 +151,11 @@ export function PayrollMonthCard({
    */
   const vigencia = guardado?.vigencia;
   const avisoINS = guardado?.avisoPolizaINS ?? null;
+
+  // Se publica una vez el setter del campo de comisiones (ver la prop).
+  useEffect(() => {
+    onListoParaSugerencias?.((montoCRC: number) => setComisiones(String(montoCRC)));
+  }, [onListoParaSugerencias]);
 
   async function confirmar() {
     setGuardando(true);

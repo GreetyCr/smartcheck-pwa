@@ -52,6 +52,7 @@ import {
   channelRevenueImpl,
   channelRevenueReturns,
 } from "./channels";
+import { pagosTecnicoImpl, pagosTecnicoReturns } from "./pagosTecnico";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -213,5 +214,21 @@ export const channelRevenue = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     return channelRevenueImpl(ctx, args);
+  },
+});
+
+/**
+ * Viáticos y comisión del técnico para un mes (B36).
+ *
+ * Cuenta **solo las revisiones del técnico** y corta por **semanas de lunes a
+ * domingo**, asignadas al mes en que arrancaron. Los dos detalles vienen de
+ * Esteban y son los que hacían que su conteo no fuera el nuestro.
+ */
+export const pagosTecnico = query({
+  args: { yearMonth: v.string() },
+  returns: pagosTecnicoReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return pagosTecnicoImpl(ctx, args);
   },
 });

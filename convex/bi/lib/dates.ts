@@ -75,3 +75,35 @@ export function crMidnightMs(isoDay: string): number {
 export function nowMs(): number {
   return Date.now();
 }
+
+/**
+ * Lunes de la semana a la que pertenece un día, como ISO "YYYY-MM-DD" en CR.
+ *
+ * La semana de Esteban va de **lunes a domingo** (B36). Se calcula sobre las
+ * partes CR y no sobre el epoch: `new Date(ms).getDay()` da el día de la semana
+ * de la zona del servidor, que en Convex es UTC — y una revisión de las 7 de la
+ * noche del domingo en Costa Rica ya es lunes en UTC. Ese error correría la
+ * revisión a la semana siguiente y, si el domingo es fin de mes, al mes
+ * siguiente.
+ */
+export function lunesDeLaSemana(epochMs: number): string {
+  const { year, month, day } = crDateParts(epochMs);
+  // Mediodía UTC del día CR: lejos de cualquier borde, así que `getUTCDay` da el
+  // día de la semana correcto sin depender de la zona del proceso.
+  const d = new Date(Date.UTC(year, month - 1, day, 12));
+  const dow = (d.getUTCDay() + 6) % 7; // 0 = lunes … 6 = domingo
+  d.setUTCDate(d.getUTCDate() - dow);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * El mes al que se le carga una fecha para efectos de pago al técnico: **el mes
+ * en que ARRANCÓ su semana**.
+ *
+ * Es la regla de Esteban, y la razón por la que su conteo de julio no era el
+ * nuestro: los días 1, 2 y 3 de julio cayeron en una semana que empezó el lunes
+ * 29 de junio, así que para él fueron de junio (B36).
+ */
+export function mesDePagoSemanal(epochMs: number): YearMonth {
+  return lunesDeLaSemana(epochMs).slice(0, 7);
+}

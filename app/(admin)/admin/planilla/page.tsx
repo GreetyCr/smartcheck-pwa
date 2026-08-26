@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { PayrollMonthCard } from "@/components/bi/PayrollMonthCard";
+import { TecnicoPagosCard } from "@/components/bi/TecnicoPagosCard";
 import { toDateInputValue } from "@/lib/bi-format";
 
 /**
@@ -17,7 +18,15 @@ import { toDateInputValue } from "@/lib/bi-format";
 export default function AdminPlanillaPage() {
   const [mes, setMes] = useState(() => toDateInputValue(Date.now()).slice(0, 7));
   const guardado = useQuery(api.bi.payroll.planillaDelMes, { yearMonth: mes });
+  const pagos = useQuery(api.bi.public.pagosTecnico, { yearMonth: mes });
   const registrar = useMutation(api.bi.payroll.registrarPlanilla);
+
+  // El puente entre las dos tarjetas: la de pagos calcula la comisión y la de
+  // planilla la recibe, pero solo cuando Esteban pulsa el botón.
+  const aplicarComision = useRef<((montoCRC: number) => void) | null>(null);
+  const publicar = useCallback((fn: (montoCRC: number) => void) => {
+    aplicarComision.current = fn;
+  }, []);
 
   return (
     <div>
@@ -36,7 +45,17 @@ export default function AdminPlanillaPage() {
           onMes={setMes}
           guardado={guardado}
           onRegistrar={registrar}
+          onListoParaSugerencias={publicar}
         />
+
+        {pagos ? (
+          <div className="mt-5">
+            <TecnicoPagosCard
+              data={pagos}
+              onUsarComision={(monto) => aplicarComision.current?.(monto)}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

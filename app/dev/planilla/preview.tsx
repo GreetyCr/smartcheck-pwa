@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { PayrollMonthCard } from "@/components/bi/PayrollMonthCard";
+import { TecnicoPagosCard } from "@/components/bi/TecnicoPagosCard";
 import { tasasDelMes, vigenciaDelMes } from "@/lib/payroll";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
@@ -29,8 +30,47 @@ const JULIO_YA_EN_LA_HOJA = [
  * bloqueado y agosto no**. Cambiando el mes en el selector se ven los dos, sin
  * ningún interruptor de mentira que haya que recordar apagar.
  */
+/**
+ * Agosto de 2026 leído de producción el 24-ago: Sergio 52 revisiones repartidas
+ * en cuatro semanas, Esteban 21. Son los números reales para poder aprobar la
+ * tarjeta con las magnitudes de verdad.
+ */
+const PAGOS_AGOSTO = {
+  yearMonth: "2026-08",
+  tecnicos: [
+    {
+      clerkId: "user_sergio",
+      nombre: "Sergio Smartcheck",
+      revisiones: 52,
+      revisionesConComision: 7,
+      viaticosCRC: 104_000,
+      comisionCRC: 26_600,
+      semanas: [
+        { lunes: "2026-08-03", revisiones: 18, viaticosCRC: 36_000 },
+        { lunes: "2026-08-10", revisiones: 13, viaticosCRC: 26_000 },
+        { lunes: "2026-08-17", revisiones: 18, viaticosCRC: 36_000 },
+        { lunes: "2026-08-24", revisiones: 3, viaticosCRC: 6_000 },
+      ],
+    },
+  ],
+  comisionTotalCRC: 26_600,
+  viaticosTotalCRC: 104_000,
+  revisionesDeOtros: 21,
+  tarifas: {
+    viaticoPorRevision: 2_000,
+    comisionPorRevision: 3_800,
+    revisionesSinComision: 45,
+  },
+  confiable: true,
+  aviso: null,
+};
+
 export function PlanillaPreview() {
   const [mes, setMes] = useState("2026-07");
+  const aplicar = useRef<((n: number) => void) | null>(null);
+  const publicar = useCallback((fn: (n: number) => void) => {
+    aplicar.current = fn;
+  }, []);
   // Marzo a julio de 2026 vinieron de la hoja; agosto en adelante está limpio.
   const bloqueado = mes >= "2026-03" && mes <= "2026-07";
 
@@ -66,7 +106,22 @@ export function PlanillaPreview() {
                 mes >= "2026-08" ? { etiqueta: "POLIZA INS", amountCRC: 8000 } : null,
             }}
             onRegistrar={async () => ({ creadas: 0, actualizadas: 6 })}
+            onListoParaSugerencias={publicar}
           />
+          <div className="mt-5">
+            <TecnicoPagosCard
+              data={{
+                ...PAGOS_AGOSTO,
+                yearMonth: mes,
+                confiable: mes >= "2026-08",
+                aviso:
+                  mes >= "2026-08"
+                    ? null
+                    : "Antes de 2026-08 el conteo por persona está incompleto: Sergio empezó a usar la app el 16-jul-2026 y la plataforma vieja, que no registra quién hizo cada revisión, se usó hasta el 19 de julio. El número de este mes se queda corto.",
+              }}
+              onUsarComision={(n) => aplicar.current?.(n)}
+            />
+          </div>
         </div>
       </div>
     </>
