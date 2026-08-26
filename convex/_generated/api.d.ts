@@ -10,6 +10,7 @@
 
 import type * as admin from "../admin.js";
 import type * as bi_channels from "../bi/channels.js";
+import type * as bi_correcciones from "../bi/correcciones.js";
 import type * as bi_expenseGroups from "../bi/expenseGroups.js";
 import type * as bi_finance from "../bi/finance.js";
 import type * as bi_financeAuto from "../bi/financeAuto.js";
@@ -55,6 +56,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   "bi/channels": typeof bi_channels;
+  "bi/correcciones": typeof bi_correcciones;
   "bi/expenseGroups": typeof bi_expenseGroups;
   "bi/finance": typeof bi_finance;
   "bi/financeAuto": typeof bi_financeAuto;
