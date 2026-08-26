@@ -12,7 +12,11 @@ import {
 } from "@/lib/bi-format";
 import { BiCard } from "./BiCard";
 import { BiCategoryBars } from "./BiCategoryBars";
-import { ExpenseGroupsCard, type ExpenseBreakdown } from "./ExpenseGroupsCard";
+import {
+  ExpenseGroupsCard,
+  type ExpenseBreakdown,
+  type PeriodoKey,
+} from "./ExpenseGroupsCard";
 import { BiEntriesTable } from "./BiEntriesTable";
 import { BiEntryDrawer } from "./BiEntryDrawer";
 import { BiKpiCard } from "./BiKpiCard";
@@ -38,6 +42,8 @@ export function FinanceDashboard({
   loadingEntries = false,
   readOnly = false,
   expenseBreakdown,
+  periodoGastos,
+  onPeriodoGastos,
 }: {
   summary: FinanceSummary;
   entries: FinanceEntry[];
@@ -48,8 +54,11 @@ export function FinanceDashboard({
   loadingEntries?: boolean;
   /** Vista de muestra (revisión visual): desactiva las acciones de escritura. */
   readOnly?: boolean;
-  /** Desglose de «Otros» (A83). Opcional: si no llega, la tarjeta no se pinta. */
+  /** Desglose de gastos por proveedor (A83/A98). Si no llega, no se pinta. */
   expenseBreakdown?: ExpenseBreakdown;
+  /** Periodo del desglose. Sin estas dos, la tarjeta no muestra el filtro. */
+  periodoGastos?: PeriodoKey;
+  onPeriodoGastos?: (p: PeriodoKey) => void;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<FinanceEntry | null>(null);
@@ -313,7 +322,13 @@ export function FinanceDashboard({
 
         {/* El desglose de «Otros» va inmediatamente después de las categorías:
             es un zoom sobre la barra más grande y sin nombre de la de arriba. */}
-        {expenseBreakdown ? <ExpenseGroupsCard data={expenseBreakdown} /> : null}
+        {expenseBreakdown ? (
+          <ExpenseGroupsCard
+            data={expenseBreakdown}
+            periodo={periodoGastos}
+            onPeriodo={onPeriodoGastos}
+          />
+        ) : null}
       </div>
 
       {/* ---------- tabla ---------- */}

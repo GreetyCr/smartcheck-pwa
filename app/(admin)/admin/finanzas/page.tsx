@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
+import { rangoDelPeriodo, type PeriodoKey } from "@/components/bi/ExpenseGroupsCard";
 import type { FinanceEntry, FinanceEntryInput } from "@/components/bi/types";
 
 /**
@@ -15,11 +16,14 @@ import type { FinanceEntry, FinanceEntryInput } from "@/components/bi/types";
  */
 export default function FinanzasPage() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  /** Periodo del desglose de gastos. Es SUYO y no del tablero: acá la pregunta
+      es «¿cambió el reparto?», que se contesta con meses, no con un mes. */
+  const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
   const summary = useQuery(api.bi.public.financeSummary, {});
   /* El desglose de «Otros» va aparte del bloqueo de carga: es un zoom sobre
      una barra, no una cifra que tenga que cuadrar con las demás. */
-  const breakdown = useQuery(api.bi.public.expenseBreakdown, {});
+  const breakdown = useQuery(api.bi.public.expenseBreakdown, rangoDelPeriodo(periodo));
   const entries = useQuery(
     api.bi.financeForm.listFinanceEntries,
     selectedMonth ? { yearMonth: selectedMonth, limit: 500 } : { limit: 200 },
@@ -57,6 +61,8 @@ export default function FinanzasPage() {
       summary={summary}
       entries={rows}
       expenseBreakdown={breakdown ?? undefined}
+      periodoGastos={periodo}
+      onPeriodoGastos={setPeriodo}
       loadingEntries={entries === undefined}
       selectedMonth={selectedMonth}
       onSelectMonth={setSelectedMonth}

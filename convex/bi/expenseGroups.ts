@@ -201,6 +201,15 @@ const etiquetaRow = v.object({
   etiqueta: v.string(),
   rows: v.number(),
   amountCRC: v.number(),
+  /**
+   * Peso **dentro de su grupo**, no sobre el total.
+   *
+   * Es la pregunta que se hace al mirar la lista: «¿cuánto de servicios
+   * profesionales es Incorporate?». Sobre el total daría 52% y no contestaría
+   * nada; sobre el grupo da 68% y dice que el grupo es, en la práctica, un
+   * proveedor con acompañantes.
+   */
+  pctGrupo: v.number(),
 });
 
 const grupoRow = v.object({
@@ -291,14 +300,27 @@ export async function expenseBreakdownImpl(
   }
 
   const grupos = [...porGrupo.entries()]
-    .map(([grupo, v]) => ({
+    // `acum` y no `v`: `v` es el validador de Convex importado arriba, y
+    // sombrearlo acá dentro hace que `v.amountCRC` parezca un error de tipo
+    // cuando no lo es.
+    .map(([grupo, acum]) => ({
       grupo,
-      rows: v.rows,
-      amountCRC: v.amountCRC,
+      rows: acum.rows,
+      amountCRC: acum.amountCRC,
       // Redondeado a una decimal; con 0 movimientos no se divide entre cero.
-      pct: totalCRC > 0 ? Math.round((v.amountCRC / totalCRC) * 1000) / 10 : 0,
+      pct: totalCRC > 0 ? Math.round((acum.amountCRC / totalCRC) * 1000) / 10 : 0,
       etiquetas: [...(porEtiqueta.get(grupo) ?? new Map()).entries()]
-        .map(([etiqueta, e]) => ({ etiqueta, rows: e.rows, amountCRC: e.amountCRC }))
+        .map(([etiqueta, e]) => ({
+          etiqueta,
+          rows: e.rows,
+          amountCRC: e.amountCRC,
+          // Sobre el GRUPO, no sobre el total: es la pregunta que se hace al
+          // mirar la lista, «¿cuánto de esto es Incorporate?».
+          pctGrupo:
+            acum.amountCRC > 0
+              ? Math.round((e.amountCRC / acum.amountCRC) * 1000) / 10
+              : 0,
+        }))
         .sort((a, b) => b.amountCRC - a.amountCRC),
     }))
     .sort((a, b) => b.amountCRC - a.amountCRC);

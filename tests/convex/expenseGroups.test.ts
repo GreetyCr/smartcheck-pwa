@@ -335,9 +335,18 @@ describe("el desglose ahora cubre dos categorías", () => {
 
     const sw = res.grupos.find((g: any) => g.grupo === "software")!;
     expect(sw.etiquetas).toHaveLength(1); // los dos «OPEN AI» son uno solo
-    expect(sw.etiquetas[0]).toEqual({ etiqueta: "OPEN AI", rows: 2, amountCRC: 35_000 });
+    expect(sw.etiquetas[0]).toEqual({
+      etiqueta: "OPEN AI",
+      rows: 2,
+      amountCRC: 35_000,
+      pctGrupo: 100, // es la única etiqueta del grupo
+    });
 
     const sp = res.grupos.find((g: any) => g.grupo === "servicios_profesionales")!;
     expect(sp.etiquetas.map((e: any) => e.etiqueta)).toEqual(["INCORPORATE", "JRC"]);
+    // El porcentaje es sobre el GRUPO, no sobre el total del desglose.
+    // 300.000 de 410.000 = 73,2%; sobre el total (445.000) daría 67,4%.
+    expect(sp.etiquetas[0].pctGrupo).toBe(73.2);
+    expect(sp.etiquetas.reduce((a: number, e: any) => a + e.pctGrupo, 0)).toBeCloseTo(100, 0);
   });
 });

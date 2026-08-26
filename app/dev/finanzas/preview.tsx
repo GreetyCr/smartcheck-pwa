@@ -8,7 +8,7 @@ import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
  * el punto de esta vista es aprobar el diseño con proporciones de verdad: un
  * grupo que se lleva el 67% se ve muy distinto a seis parejos.
  */
-const DESGLOSE_OTROS = {
+const DESGLOSE_CRUDO = {
     "categorias": [
       "otros",
       "mantenimiento"
@@ -167,6 +167,7 @@ const DESGLOSE_OTROS = {
     "sinClasificar": []
   };
 import type { FinanceEntry, FinanceSummary } from "@/components/bi/types";
+import type { PeriodoKey } from "@/components/bi/ExpenseGroupsCard";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
 
@@ -198,6 +199,24 @@ const SUMMARY: FinanceSummary = {
   },
 };
 
+/**
+ * El porcentaje de cada proveedor **dentro de su grupo** se deriva acá en vez
+ * de escribirse en la muestra: es una función de dos números que ya están, y
+ * copiarlo a mano es la vía más corta a que la vista de revisión enseñe un
+ * porcentaje que el servidor nunca calcularía así.
+ */
+const DESGLOSE_OTROS = {
+  ...DESGLOSE_CRUDO,
+  grupos: DESGLOSE_CRUDO.grupos.map((g) => ({
+    ...g,
+    etiquetas: (g.etiquetas ?? []).map((e) => ({
+      ...e,
+      pctGrupo:
+        g.amountCRC > 0 ? Math.round((e.amountCRC / g.amountCRC) * 1000) / 10 : 0,
+    })),
+  })),
+};
+
 const D = (iso: string) => Date.parse(`${iso}T00:00:00-06:00`);
 
 const ENTRIES: FinanceEntry[] = [
@@ -217,6 +236,9 @@ const ENTRIES: FinanceEntry[] = [
 
 export function FinanzasPreview() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>("2026-07");
+  /* El filtro cambia de pestaña pero NO refiltra: la muestra es estática. Se
+     incluye para poder aprobar el control, no para simular la consulta. */
+  const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
   return (
     <>
@@ -233,6 +255,8 @@ export function FinanzasPreview() {
             simular un guardado que no ocurre. */}
         <FinanceDashboard
           expenseBreakdown={DESGLOSE_OTROS}
+          periodoGastos={periodo}
+          onPeriodoGastos={setPeriodo}
           summary={SUMMARY}
           entries={ENTRIES}
           selectedMonth={selectedMonth}

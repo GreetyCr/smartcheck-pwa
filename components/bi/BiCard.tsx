@@ -21,7 +21,12 @@ export function BiCard({
   return (
     <section
       className={cn(
-        "bi-lift rounded-2xl border border-[var(--bi-ring)] bg-[var(--bi-surface)]",
+        // `min-w-0` no es decorativo: como ítem de grid/flex, una tarjeta tiene
+        // `min-width: auto` y **crece hasta el ancho mínimo de su contenido**,
+        // desbordando su celda y empujando el documento. A 375px eso ponía a
+        // las tarjetas en 388px dentro de una columna de 343 y dejaba todo el
+        // tablero con scroll horizontal. Medido, no supuesto.
+        "bi-lift min-w-0 rounded-2xl border border-[var(--bi-ring)] bg-[var(--bi-surface)]",
         className,
       )}
     >

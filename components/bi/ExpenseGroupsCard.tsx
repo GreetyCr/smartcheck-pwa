@@ -2,10 +2,53 @@
 
 import { TriangleAlert } from "lucide-react";
 import { BiCard } from "@/components/bi/BiCard";
-import { formatCRC, formatPct } from "@/lib/bi-format";
-import { categoryLabel } from "@/lib/bi-format";
+import { categoryLabel, formatCRC, formatPct } from "@/lib/bi-format";
+import { cn } from "@/lib/utils";
 
-export type EtiquetaGrupo = { etiqueta: string; rows: number; amountCRC: number };
+export type EtiquetaGrupo = {
+  etiqueta: string;
+  rows: number;
+  amountCRC: number;
+  /** Peso dentro de SU grupo, no sobre el total. */
+  pctGrupo: number;
+};
+
+/**
+ * Los periodos que ofrece la tarjeta.
+ *
+ * Presets y no un selector de fechas libre: la pregunta que se hace acá es
+ * «¿esto sigue igual que antes?», y para eso sirven tres cortes fijos. Un rango
+ * a medida obligaría a elegir dos fechas cada vez para contestar algo que se
+ * contesta con un clic.
+ */
+export const PERIODOS = [
+  { key: "todo", label: "Todo" },
+  { key: "12m", label: "12 meses", meses: 12 },
+  { key: "6m", label: "6 meses", meses: 6 },
+  { key: "3m", label: "3 meses", meses: 3 },
+] as const;
+
+export type PeriodoKey = (typeof PERIODOS)[number]["key"];
+
+/**
+ * `[desde, hasta)` para un preset, en zona CR y **alineado al inicio de mes**.
+ *
+ * Alinear importa: con un corte a «hace 90 días exactos» el mes más viejo del
+ * rango entraría partido y su total se leería como una caída del proveedor,
+ * cuando lo único que pasó es que faltan días.
+ */
+export function rangoDelPeriodo(key: PeriodoKey, ahora = Date.now()): {
+  fromMs?: number;
+} {
+  const preset = PERIODOS.find((p) => p.key === key);
+  const meses = preset && "meses" in preset ? preset.meses : undefined;
+  if (!meses) return {};
+  const d = new Date(ahora);
+  const desde = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - (meses - 1), 1, 6),
+  );
+  return { fromMs: desde.getTime() };
+}
 
 export type ExpenseBreakdown = {
   categorias: string[];
@@ -18,7 +61,8 @@ export type ExpenseBreakdown = {
     pct: number;
     etiquetas: EtiquetaGrupo[];
   }>;
-  sinClasificar: EtiquetaGrupo[];
+  /** No lleva `pctGrupo`: no pertenece a ningún grupo, ese es su problema. */
+  sinClasificar: Array<{ etiqueta: string; rows: number; amountCRC: number }>;
 };
 
 /** Nombres para mostrar. Los internos son claves; estos son los de Esteban. */
@@ -43,8 +87,19 @@ const NOMBRES: Record<string, string> = {
  * eliminar. Acá se lista **qué proveedor** falta acomodar y cuánto pesa, que es
  * lo único accionable.
  */
-export function ExpenseGroupsCard({ data }: { data: ExpenseBreakdown }) {
-  if (data.totalRows === 0) return null;
+export function ExpenseGroupsCard({
+  data,
+  periodo,
+  onPeriodo,
+}: {
+  data: ExpenseBreakdown;
+  periodo?: PeriodoKey;
+  onPeriodo?: (p: PeriodoKey) => void;
+}) {
+  // Sin filas puede ser que no haya gastos… o que el periodo elegido no tenga.
+  // En el segundo caso esconder la tarjeta dejaría al usuario sin forma de
+  // volver atrás, así que solo se oculta cuando no hay filtro.
+  if (data.totalRows === 0 && !onPeriodo) return null;
 
   const clasificados = data.grupos.filter((g) => g.grupo !== "sin_clasificar");
   const sinClasificar = data.grupos.find((g) => g.grupo === "sin_clasificar");
@@ -56,7 +111,36 @@ export function ExpenseGroupsCard({ data }: { data: ExpenseBreakdown }) {
       subtitle={`${formatCRC(data.totalCRC)} en ${data.totalRows} movimientos · ${data.categorias
         .map((c) => categoryLabel(c))
         .join(" + ")}`}
+      action={
+        onPeriodo ? (
+          <div className="flex shrink-0 gap-1" role="group" aria-label="Periodo">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => onPeriodo(p.key)}
+                aria-pressed={periodo === p.key}
+                className={cn(
+                  "min-h-8 rounded-lg px-2.5 text-[12px] font-medium transition-colors",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]",
+                  periodo === p.key
+                    ? "bg-[var(--bi-surface-2)] text-[var(--bi-ink)]"
+                    : "text-[var(--bi-ink-3)] hover:text-[var(--bi-ink-2)]",
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        ) : null
+      }
     >
+      {data.totalRows === 0 ? (
+        <p className="text-[13px] text-[var(--bi-ink-3)]">
+          No hay gastos de estas categorías en el periodo elegido.
+        </p>
+      ) : null}
+
       <ul className="space-y-4">
         {clasificados.map((g, i) => (
           <li key={g.grupo}>
@@ -97,8 +181,16 @@ export function ExpenseGroupsCard({ data }: { data: ExpenseBreakdown }) {
                     {e.etiqueta}
                     {e.rows > 1 ? <span className="opacity-70"> ×{e.rows}</span> : null}
                   </span>
-                  <span className="bi-num shrink-0 tabular-nums text-[var(--bi-ink-2)]">
-                    {formatCRC(e.amountCRC)}
+                  <span className="flex shrink-0 items-baseline gap-2">
+                    <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+                      {formatCRC(e.amountCRC)}
+                    </span>
+                    {/* Sobre el grupo: contesta «¿cuánto de esto es este
+                        proveedor?», que es lo que se pregunta al mirar la
+                        lista. Sobre el total no contestaría nada. */}
+                    <span className="bi-num w-[46px] text-right tabular-nums text-[11px] text-[var(--bi-ink-3)]">
+                      {formatPct(e.pctGrupo)}
+                    </span>
                   </span>
                 </li>
               ))}
