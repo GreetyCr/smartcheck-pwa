@@ -12,8 +12,11 @@ import { describe, expect, test } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import {
+  CATEGORIAS_CUBIERTAS,
+  GRUPOS,
   clasificar,
   etiquetaDeExternalKey,
+  etiquetaVisible,
 } from "../../convex/bi/expenseGroups";
 
 const convexModules = Object.fromEntries(
@@ -207,5 +210,134 @@ describe("el desglose", () => {
     expect(d.totalCRC).toBe(0);
     expect(d.grupos).toEqual([]);
     expect(d.sinClasificar).toEqual([]);
+  });
+});
+
+
+/* ========================================================================== */
+/* B36 · consulta 7 — el mantenimiento entra, y cada grupo lista sus etiquetas */
+/* ========================================================================== */
+
+describe("«al final igual son servicios profesionales»", () => {
+  test("el mantenimiento del chatbot y el del panel van con los demás", async () => {
+    // Antes el panel era su propio grupo y el chatbot caía sin clasificar.
+    for (const etiqueta of [
+      "MANTENIMIENTO CHATBOT",
+      "MANTENIMIENTO DASHBOARD",
+      "PRIMER PAGO DASHBOARD",
+      "INCORPORATE",
+      "JRC",
+      "CONTADOR",
+    ]) {
+      expect(
+        clasificar({ externalKey: `sheet:JULIO 2026:${etiqueta}:1`, isViatico: false }),
+        etiqueta,
+      ).toBe("servicios_profesionales");
+    }
+  });
+
+  test("«desarrollo_panel» ya no existe como grupo", () => {
+    expect(GRUPOS).not.toContain("desarrollo_panel");
+  });
+
+  test("software le gana a los patrones de servicios — el ORDEN es la regla", () => {
+    // Lo que mantiene a `AIRTABLE (BASE DATOS CHATBOT)` en software no es el
+    // patrón, es que la entrada de servicios va DESPUÉS. Esta etiqueta calza con
+    // los dos (`software` y `desarrollo`) y fija ese orden: si alguien sube la
+    // entrada de servicios, esta prueba se cae.
+    expect(
+      clasificar({ externalKey: "sheet:JULIO 2026:DESARROLLO SOFTWARE:1", isViatico: false }),
+    ).toBe("software");
+  });
+
+  test("las etiquetas de chatbot que son software siguen en software", async () => {
+    for (const etiqueta of [
+      "AIRTABLE (BASE DATOS CHATBOT)",
+      "OPEN AI (CHATBOT)",
+      "CONTABO (BASE DATOS CHATBOT)",
+    ]) {
+      expect(
+        clasificar({ externalKey: `sheet:AGOSTO 2026:${etiqueta}:1`, isViatico: false }),
+        etiqueta,
+      ).toBe("software");
+    }
+    expect(
+      clasificar({ externalKey: "sheet:JULIO 2026:SERVIDOR CHATBOT:1", isViatico: false }),
+    ).toBe("software");
+  });
+});
+
+describe("la etiqueta que se muestra", () => {
+  test("junta al mismo proveedor escrito de dos formas", () => {
+    expect(etiquetaVisible("OPEN AI (CHATBOT)")).toBe("OPEN AI");
+    expect(etiquetaVisible("AIRTABLE (BASE DATOS CHATBOT)")).toBe("AIRTABLE");
+    expect(etiquetaVisible("MANYCHAT (AUTOMATIZACION)")).toBe("MANYCHAT");
+  });
+
+  test("NO junta lo que de verdad es distinto", () => {
+    // Dos celulares distintos. Recortarlos a «CELULAR KOLBI» los fundiría.
+    expect(etiquetaVisible("CELULAR KOLBI TECNICO")).toBe("CELULAR KOLBI TECNICO");
+    expect(etiquetaVisible("BASE DATOS APP PWA")).toBe("BASE DATOS APP PWA");
+  });
+
+  test("una etiqueta que es solo un paréntesis no queda vacía", () => {
+    expect(etiquetaVisible("(CHATBOT)")).toBe("(CHATBOT)");
+  });
+});
+
+describe("el desglose ahora cubre dos categorías", () => {
+  test("entra `mantenimiento` y NO entra lo que está fuera de la lista", async () => {
+    const t = convexTest(schema, convexModules);
+    await t.run(async (ctx) => {
+      for (const [category, etiqueta, amountCRC] of [
+        ["otros", "INCORPORATE", 300_000],
+        ["mantenimiento", "MANTENIMIENTO CHATBOT", 50_000],
+        ["gasolina", "VIATICOS TECNICO", 26_000],
+        ["salario", "SALARIO BRUTO TECNICO", 430_000],
+      ] as const) {
+        await ctx.db.insert(
+          "finance_entries",
+          gasto({ category, amountCRC, externalKey: `sheet:JULIO 2026:${etiqueta}:1` }) as never,
+        );
+      }
+    });
+    const res = await t.query(internal.bi.expenseGroups.expenseBreakdown, {});
+
+    expect(res.categorias).toEqual([...CATEGORIAS_CUBIERTAS]);
+    expect(res.totalCRC).toBe(350_000); // los otros dos quedan afuera
+    expect(res.grupos).toHaveLength(1);
+    expect(res.grupos[0].grupo).toBe("servicios_profesionales");
+  });
+
+  test("cada grupo lista sus etiquetas y suman exactamente su total", async () => {
+    // Es la garantía de que la lista de proveedores no pierde ni inventa plata.
+    const t = convexTest(schema, convexModules);
+    await t.run(async (ctx) => {
+      for (const [etiqueta, amountCRC] of [
+        ["INCORPORATE", 300_000],
+        ["JRC", 110_000],
+        ["OPEN AI", 25_000],
+        ["OPEN AI (CHATBOT)", 10_000],
+      ] as const) {
+        await ctx.db.insert(
+          "finance_entries",
+          gasto({ amountCRC, externalKey: `sheet:JULIO 2026:${etiqueta}:1` }) as never,
+        );
+      }
+    });
+    const res = await t.query(internal.bi.expenseGroups.expenseBreakdown, {});
+
+    for (const g of res.grupos) {
+      const suma = g.etiquetas.reduce((a: number, e: any) => a + e.amountCRC, 0);
+      expect(suma, g.grupo).toBe(g.amountCRC);
+      expect(g.etiquetas.reduce((a: number, e: any) => a + e.rows, 0)).toBe(g.rows);
+    }
+
+    const sw = res.grupos.find((g: any) => g.grupo === "software")!;
+    expect(sw.etiquetas).toHaveLength(1); // los dos «OPEN AI» son uno solo
+    expect(sw.etiquetas[0]).toEqual({ etiqueta: "OPEN AI", rows: 2, amountCRC: 35_000 });
+
+    const sp = res.grupos.find((g: any) => g.grupo === "servicios_profesionales")!;
+    expect(sp.etiquetas.map((e: any) => e.etiqueta)).toEqual(["INCORPORATE", "JRC"]);
   });
 });

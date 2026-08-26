@@ -2,14 +2,23 @@
 
 import { TriangleAlert } from "lucide-react";
 import { BiCard } from "@/components/bi/BiCard";
-import { BiCategoryBars } from "@/components/bi/BiCategoryBars";
 import { formatCRC, formatPct } from "@/lib/bi-format";
+import { categoryLabel } from "@/lib/bi-format";
+
+export type EtiquetaGrupo = { etiqueta: string; rows: number; amountCRC: number };
 
 export type ExpenseBreakdown = {
+  categorias: string[];
   totalCRC: number;
   totalRows: number;
-  grupos: Array<{ grupo: string; rows: number; amountCRC: number; pct: number }>;
-  sinClasificar: Array<{ etiqueta: string; rows: number; amountCRC: number }>;
+  grupos: Array<{
+    grupo: string;
+    rows: number;
+    amountCRC: number;
+    pct: number;
+    etiquetas: EtiquetaGrupo[];
+  }>;
+  sinClasificar: EtiquetaGrupo[];
 };
 
 /** Nombres para mostrar. Los internos son claves; estos son los de Esteban. */
@@ -19,7 +28,6 @@ const NOMBRES: Record<string, string> = {
   viaticos_tecnico: "Viáticos del técnico",
   equipo: "Equipo",
   telefonia: "Telefonía",
-  desarrollo_panel: "Desarrollo del panel",
   sin_clasificar: "Sin clasificar",
 };
 
@@ -40,25 +48,69 @@ export function ExpenseGroupsCard({ data }: { data: ExpenseBreakdown }) {
 
   const clasificados = data.grupos.filter((g) => g.grupo !== "sin_clasificar");
   const sinClasificar = data.grupos.find((g) => g.grupo === "sin_clasificar");
-
-  // `BiCategoryBars` traduce su `category` con `categoryLabel`, que devuelve la
-  // clave tal cual si no la conoce. Los grupos NO son categorías de finanzas, así
-  // que no se meten en ese diccionario: se le pasa el nombre ya traducido.
-  const rows = clasificados.map((g) => ({
-    category: NOMBRES[g.grupo] ?? g.grupo,
-    amountCRC: g.amountCRC,
-  }));
+  const max = Math.max(1, ...clasificados.map((g) => g.amountCRC));
 
   return (
     <BiCard
-      title="Qué hay adentro de «Otros»"
-      subtitle={`${formatCRC(data.totalCRC)} en ${data.totalRows} movimientos`}
+      title="En qué se va el gasto"
+      subtitle={`${formatCRC(data.totalCRC)} en ${data.totalRows} movimientos · ${data.categorias
+        .map((c) => categoryLabel(c))
+        .join(" + ")}`}
     >
-      <BiCategoryBars rows={rows} tone="expense" />
+      <ul className="space-y-4">
+        {clasificados.map((g, i) => (
+          <li key={g.grupo}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-[14px] font-medium text-[var(--bi-ink)]">
+                {NOMBRES[g.grupo] ?? g.grupo}
+              </span>
+              <span className="flex shrink-0 items-baseline gap-2">
+                <span className="bi-num text-[14px] tabular-nums text-[var(--bi-ink)]">
+                  {formatCRC(g.amountCRC)}
+                </span>
+                <span className="bi-num text-[11px] tabular-nums text-[var(--bi-ink-3)]">
+                  {formatPct(g.pct)}
+                </span>
+              </span>
+            </div>
 
-      <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs text-[var(--bi-ink-3)]">
-        Es la misma plata, agrupada — no cambia la utilidad. Los grupos salen del
-        renglón con que cada gasto entró desde la hoja.
+            <div className="mt-1.5 h-[6px] overflow-hidden rounded-full bg-[var(--bi-surface-2)]">
+              <div
+                className="bi-grow-x h-full rounded-full"
+                style={{
+                  width: `${Math.max((g.amountCRC / max) * 100, 2)}%`,
+                  background: "var(--bi-expense)",
+                  animationDelay: `${i * 50}ms`,
+                }}
+              />
+            </div>
+
+            {/* Los proveedores del grupo. Es lo que pidió Esteban: sin esto,
+                «servicios profesionales» dice ₡6,7 M y no dice de quién. */}
+            <ul className="mt-2 space-y-1 border-l border-[var(--bi-ring)] pl-3">
+              {g.etiquetas.map((e) => (
+                <li
+                  key={e.etiqueta}
+                  className="flex items-baseline justify-between gap-3 text-[12.5px]"
+                >
+                  <span className="min-w-0 truncate text-[var(--bi-ink-3)]">
+                    {e.etiqueta}
+                    {e.rows > 1 ? <span className="opacity-70"> ×{e.rows}</span> : null}
+                  </span>
+                  <span className="bi-num shrink-0 tabular-nums text-[var(--bi-ink-2)]">
+                    {formatCRC(e.amountCRC)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+        Es la misma plata, agrupada — no cambia la utilidad. Cada proveedor sale
+        del renglón con que el gasto entró, así que el total de acá no es el de
+        una sola categoría del gráfico de arriba.
       </p>
 
       {sinClasificar ? (
@@ -72,7 +124,7 @@ export function ExpenseGroupsCard({ data }: { data: ExpenseBreakdown }) {
               <p className="text-[13px] font-semibold text-[var(--bi-ink)]">
                 {formatCRC(sinClasificar.amountCRC)} sin clasificar
                 <span className="ml-1 font-normal text-[var(--bi-ink-3)]">
-                  ({formatPct(sinClasificar.pct)} de «Otros»)
+                  ({formatPct(sinClasificar.pct)} del total)
                 </span>
               </p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">

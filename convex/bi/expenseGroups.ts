@@ -47,9 +47,22 @@ export const GRUPOS = [
   "viaticos_tecnico",
   "equipo",
   "telefonia",
-  "desarrollo_panel",
   "sin_clasificar",
 ] as const;
+
+/**
+ * Las categorías de finanzas que entran a este desglose (**B36 · consulta 7**).
+ *
+ * Empezó cubriendo solo `otros`. Esteban pidió que el mantenimiento del chatbot
+ * y el del panel fueran con los demás servicios profesionales —«al final igual
+ * son servicios profesionales»—, y esos viven en `mantenimiento`. Ampliar el
+ * alcance es un cambio de **lectura**, no de datos: no se movió ni una fila.
+ *
+ * Se exporta y se devuelve en la respuesta a propósito: el total de esta tarjeta
+ * ya no es el de la barra «Otros» del gráfico de categorías, y esa diferencia
+ * tiene que poder explicarse sin abrir el código.
+ */
+export const CATEGORIAS_CUBIERTAS = ["otros", "mantenimiento"] as const;
 
 export type Grupo = (typeof GRUPOS)[number];
 
@@ -81,8 +94,20 @@ const MAPEO: Array<{ patrones: string[]; grupo: Grupo }> = [
     patrones: ["kolbi", "claro", "movistar", "liberty", "telefon", "celular", "recarga"],
   },
   {
-    grupo: "desarrollo_panel",
-    patrones: ["dashboard", "panel", "desarrollo", "costa coders", "bi "],
+    // Antes eran su propio grupo («desarrollo del panel»). Esteban los mandó con
+    // los demás servicios profesionales. Se conserva la POSICIÓN original en la
+    // lista y solo cambia el destino: mover la entrada más arriba haría que
+    // «dashboard» le ganara a los patrones de software, y el orden es la regla.
+    grupo: "servicios_profesionales",
+    patrones: [
+      "dashboard", "panel", "desarrollo", "costa coders", "bi ",
+      // La frase completa y no «chatbot» a secas. Hoy da lo mismo —esta entrada
+      // va DESPUÉS de software, así que `AIRTABLE (BASE DATOS CHATBOT)` calza
+      // con `airtable` antes de llegar acá—, pero eso lo sostiene la posición en
+      // la lista, no el patrón. La frase hace que siga siendo correcto aunque
+      // alguien mueva la entrada. Hay una prueba que fija ese orden.
+      "mantenimiento chatbot",
+    ],
   },
   {
     grupo: "equipo",
@@ -131,6 +156,20 @@ export function normalizar(texto: string): string {
 }
 
 /**
+ * La etiqueta como se muestra: sin el paréntesis aclaratorio.
+ *
+ * En la hoja escribió `OPEN AI` y en la app `OPEN AI (CHATBOT)`; lo mismo con
+ * Airtable, Contabo, Captions y ManyChat. Es **el mismo proveedor escrito dos
+ * veces**, y listarlo dos veces en la tarjeta sería ruido disfrazado de detalle.
+ *
+ * Se quita solo el paréntesis, nada más. `CELULAR KOLBI` y `CELULAR KOLBI
+ * TECNICO` **no** se juntan, y está bien: son dos líneas distintas.
+ */
+export function etiquetaVisible(etiqueta: string): string {
+  return etiqueta.replace(/\s*\([^)]*\)/g, "").trim() || etiqueta.trim();
+}
+
+/**
  * A qué grupo pertenece un movimiento.
  *
  * Exportada y pura a propósito: es la única regla, y se prueba directo sin
@@ -158,16 +197,30 @@ export function clasificar(
   return "sin_clasificar";
 }
 
+const etiquetaRow = v.object({
+  etiqueta: v.string(),
+  rows: v.number(),
+  amountCRC: v.number(),
+});
+
 const grupoRow = v.object({
   grupo: v.string(),
   rows: v.number(),
   amountCRC: v.number(),
-  /** Porcentaje sobre el total de «otros». */
+  /** Porcentaje sobre el total del desglose. */
   pct: v.number(),
+  /**
+   * Los proveedores del grupo, de mayor a menor. Es lo que pidió Esteban: «a
+   * cada cosa le ponemos una etiqueta». Sin esto, «servicios profesionales»
+   * dice ₡6,7 M y no dice de quién.
+   */
+  etiquetas: v.array(etiquetaRow),
 });
 
 const breakdownReturns = v.object({
-  /** Total de la categoría «otros» — debe cuadrar con la suma de los grupos. */
+  /** Categorías de finanzas que entran acá. La tarjeta las nombra en pantalla. */
+  categorias: v.array(v.string()),
+  /** Total del desglose — debe cuadrar con la suma de los grupos. */
   totalCRC: v.number(),
   totalRows: v.number(),
   grupos: v.array(grupoRow),
@@ -190,6 +243,8 @@ export async function expenseBreakdownImpl(
   { fromMs, toMs }: { fromMs?: number; toMs?: number },
 ) {
   const porGrupo = new Map<string, { rows: number; amountCRC: number }>();
+  /** Proveedores dentro de cada grupo: grupo → etiqueta visible → totales. */
+  const porEtiqueta = new Map<string, Map<string, { rows: number; amountCRC: number }>>();
   const porNota = new Map<string, { rows: number; amountCRC: number }>();
   let totalCRC = 0;
   let totalRows = 0;
@@ -197,7 +252,7 @@ export async function expenseBreakdownImpl(
   for (const r of await ctx.db.query("finance_entries").collect()) {
     if (r.isDeleted) continue;
     if (r.kind !== "expense") continue;
-    if (r.category !== "otros") continue;
+    if (!(CATEGORIAS_CUBIERTAS as readonly string[]).includes(r.category)) continue;
     if (fromMs != null && r.date < fromMs) continue;
     if (toMs != null && r.date >= toMs) continue;
 
@@ -209,6 +264,18 @@ export async function expenseBreakdownImpl(
     g.rows++;
     g.amountCRC += r.amountCRC;
     porGrupo.set(grupo, g);
+
+    // La etiqueta cruda primero; la nota como respaldo para la captura manual.
+    const cruda =
+      etiquetaDeExternalKey(r.externalKey) ??
+      ((r.note ?? "").trim() || "(sin etiqueta)");
+    const visible = etiquetaVisible(cruda);
+    const dentro = porEtiqueta.get(grupo) ?? new Map();
+    const e = dentro.get(visible) ?? { rows: 0, amountCRC: 0 };
+    e.rows++;
+    e.amountCRC += r.amountCRC;
+    dentro.set(visible, e);
+    porEtiqueta.set(grupo, dentro);
 
     if (grupo === "sin_clasificar") {
       // Se agrupa por ETIQUETA, que es lo accionable: dice qué proveedor falta
@@ -230,6 +297,9 @@ export async function expenseBreakdownImpl(
       amountCRC: v.amountCRC,
       // Redondeado a una decimal; con 0 movimientos no se divide entre cero.
       pct: totalCRC > 0 ? Math.round((v.amountCRC / totalCRC) * 1000) / 10 : 0,
+      etiquetas: [...(porEtiqueta.get(grupo) ?? new Map()).entries()]
+        .map(([etiqueta, e]) => ({ etiqueta, rows: e.rows, amountCRC: e.amountCRC }))
+        .sort((a, b) => b.amountCRC - a.amountCRC),
     }))
     .sort((a, b) => b.amountCRC - a.amountCRC);
 
@@ -237,7 +307,13 @@ export async function expenseBreakdownImpl(
     .map(([etiqueta, v]) => ({ etiqueta, rows: v.rows, amountCRC: v.amountCRC }))
     .sort((a, b) => b.amountCRC - a.amountCRC);
 
-  return { totalCRC, totalRows, grupos, sinClasificar };
+  return {
+    categorias: [...CATEGORIAS_CUBIERTAS],
+    totalCRC,
+    totalRows,
+    grupos,
+    sinClasificar,
+  };
 }
 
 export const expenseBreakdown = internalQuery({

@@ -9,21 +9,163 @@ import { FinanceDashboard } from "@/components/bi/FinanceDashboard";
  * grupo que se lleva el 67% se ve muy distinto a seis parejos.
  */
 const DESGLOSE_OTROS = {
-  totalCRC: 9_266_030,
-  totalRows: 195,
-  grupos: [
-    { grupo: "servicios_profesionales", rows: 36, amountCRC: 6_182_829, pct: 66.7 },
-    { grupo: "software", rows: 78, amountCRC: 943_299, pct: 10.2 },
-    { grupo: "viaticos_tecnico", rows: 32, amountCRC: 744_556, pct: 8 },
-    { grupo: "equipo", rows: 14, amountCRC: 651_692, pct: 7 },
-    { grupo: "telefonia", rows: 32, amountCRC: 485_298, pct: 5.2 },
-    { grupo: "desarrollo_panel", rows: 2, amountCRC: 208_356, pct: 2.2 },
-    { grupo: "sin_clasificar", rows: 1, amountCRC: 50_000, pct: 0.5 },
-  ],
-  sinClasificar: [
-    { etiqueta: "MANTENIMIENTO CHATBOT", rows: 1, amountCRC: 50_000 },
-  ],
-};
+    "categorias": [
+      "otros",
+      "mantenimiento"
+    ],
+    "totalCRC": 8832334,
+    "totalRows": 171,
+    "grupos": [
+      {
+        "grupo": "servicios_profesionales",
+        "rows": 47,
+        "amountCRC": 6752045,
+        "pct": 76.4,
+        "etiquetas": [
+          {
+            "etiqueta": "INCORPORATE",
+            "rows": 14,
+            "amountCRC": 4607841
+          },
+          {
+            "etiqueta": "JRC",
+            "rows": 11,
+            "amountCRC": 1203122
+          },
+          {
+            "etiqueta": "CONTADOR",
+            "rows": 11,
+            "amountCRC": 371866
+          },
+          {
+            "etiqueta": "MANTENIMIENTO CHATBOT",
+            "rows": 8,
+            "amountCRC": 348360
+          },
+          {
+            "etiqueta": "PRIMER PAGO DASHBOARD",
+            "rows": 1,
+            "amountCRC": 195856
+          },
+          {
+            "etiqueta": "MANTENIMIENTO DASHBOARD",
+            "rows": 2,
+            "amountCRC": 25000
+          }
+        ]
+      },
+      {
+        "grupo": "software",
+        "rows": 78,
+        "amountCRC": 943299,
+        "pct": 10.7,
+        "etiquetas": [
+          {
+            "etiqueta": "SAFETY CULTURE",
+            "rows": 13,
+            "amountCRC": 192007
+          },
+          {
+            "etiqueta": "OPEN AI",
+            "rows": 8,
+            "amountCRC": 177020
+          },
+          {
+            "etiqueta": "MANYCHAT",
+            "rows": 8,
+            "amountCRC": 156680
+          },
+          {
+            "etiqueta": "AIRTABLE",
+            "rows": 8,
+            "amountCRC": 99180
+          },
+          {
+            "etiqueta": "BASE DATOS APP",
+            "rows": 2,
+            "amountCRC": 74000
+          },
+          {
+            "etiqueta": "CAPTIONS",
+            "rows": 11,
+            "amountCRC": 54632
+          },
+          {
+            "etiqueta": "IG VERIFIED",
+            "rows": 11,
+            "amountCRC": 54632
+          },
+          {
+            "etiqueta": "SERVIDOR CHATBOT",
+            "rows": 6,
+            "amountCRC": 45378
+          },
+          {
+            "etiqueta": "BASE DATOS APP PWA",
+            "rows": 1,
+            "amountCRC": 37000
+          },
+          {
+            "etiqueta": "CONTABO",
+            "rows": 8,
+            "amountCRC": 27770
+          },
+          {
+            "etiqueta": "GPT",
+            "rows": 2,
+            "amountCRC": 25000
+          }
+        ]
+      },
+      {
+        "grupo": "equipo",
+        "rows": 14,
+        "amountCRC": 651692,
+        "pct": 7.4,
+        "etiquetas": [
+          {
+            "etiqueta": "EQUIPO",
+            "rows": 13,
+            "amountCRC": 646692
+          },
+          {
+            "etiqueta": "AHORRO EQUIPO",
+            "rows": 1,
+            "amountCRC": 5000
+          }
+        ]
+      },
+      {
+        "grupo": "telefonia",
+        "rows": 32,
+        "amountCRC": 485298,
+        "pct": 5.5,
+        "etiquetas": [
+          {
+            "etiqueta": "CELULAR KOLBI",
+            "rows": 14,
+            "amountCRC": 269125
+          },
+          {
+            "etiqueta": "CELULAR CLARO",
+            "rows": 13,
+            "amountCRC": 158673
+          },
+          {
+            "etiqueta": "CELULAR KOLBI TECNICO",
+            "rows": 4,
+            "amountCRC": 46000
+          },
+          {
+            "etiqueta": "CELULAR TECNICO",
+            "rows": 1,
+            "amountCRC": 11500
+          }
+        ]
+      }
+    ],
+    "sinClasificar": []
+  };
 import type { FinanceEntry, FinanceSummary } from "@/components/bi/types";
 import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
 import { cn } from "@/lib/utils";
