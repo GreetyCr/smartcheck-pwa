@@ -13,7 +13,7 @@ import {
 /**
  * Portada del panel admin — **RF-03 arriba, operativo abajo**.
  *
- * Esteban eligió que la portada trajera las dos cosas y no una en vez de la
+ * La portada trae las dos cosas y no una en vez de la
  * otra: el resumen del negocio primero (revisiones, plata, conversión,
  * tendencia, canales) y debajo lo operativo de la PWA que ya estaba
  * (inspecciones de hoy, sin sincronizar, actividad por técnico). Son dos
