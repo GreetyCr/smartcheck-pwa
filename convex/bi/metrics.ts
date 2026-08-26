@@ -31,7 +31,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
-import { canonicalBrand, SIN_MARCA } from "./lib/marcas";
+import { canonicalBrand } from "./lib/marcas";
 
 /* -------------------------------------------------------------------------- */
 /* Constantes                                                                 */
@@ -453,6 +453,20 @@ export function pasaFiltros(
 }
 
 export type { FilterArgs };
+
+/**
+ * Colones con separador de miles, para los textos que el BI **guarda** y que
+ * después se muestran tal cual (los `detail` de `bi_quality_issues`).
+ *
+ * No usa `lib/bi-format`: eso corre en el navegador y esto en Convex. Se
+ * escribe el separador a mano —punto para miles, como en Costa Rica— en vez de
+ * confiar en el locale del servidor, que no está garantizado.
+ */
+function colones(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  const conPuntos = String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${n < 0 ? "−" : ""}₡${conPuntos}`;
+}
 
 /** ¿fila de prueba/junk? (nombre "Test", teléfono 55555555, monto ₡0). */
 function isJunk(name: string, phoneDigits: string, amount: number | undefined): boolean {
@@ -1118,7 +1132,10 @@ export const flagReconciliationGap = internalMutation({
           severity: "warn",
           entity: "finance_entries",
           entityRef: ym,
-          detail: `gap ${ym}: finance=₡${Math.round(fin)} vs inspecciones=₡${Math.round(ins)} → Δ₡${Math.round(gapAbs)} (${Math.round(gapPct * 100) / 100}%)`,
+          // Los montos van con separador de miles: este texto se muestra tal
+          // cual en el tablero de Calidad, y `₡4546000` obliga a contar dígitos
+          // para saber si son cuatro millones o cuarenta y cinco.
+          detail: `gap ${ym}: finanzas=${colones(fin)} vs revisiones=${colones(ins)} → diferencia ${colones(gapAbs)} (${Math.round(gapPct * 100) / 100}%)`,
           runId: rid,
           detectedAt: now,
           resolved: false,

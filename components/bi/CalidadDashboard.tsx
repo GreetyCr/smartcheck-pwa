@@ -168,7 +168,13 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
                       {t.ejemplos.map((e, i) => (
                         <li
                           key={`${t.issueType}-${i}`}
-                          className="truncate text-[11.5px] text-[var(--bi-ink-3)]"
+                          // Envuelve en vez de truncar. Con `truncate`, a 375 px
+                          // «gap 2026-07: finance=₡4.546.000 vs inspeccione…»
+                          // se cortaba **justo donde empieza lo útil**: se veía
+                          // el primer monto y se perdían la comparación y la
+                          // diferencia, que es todo el contenido del ejemplo.
+                          // Medido: 477 px de texto en 296 de ancho.
+                          className="break-words text-[11.5px] leading-snug text-[var(--bi-ink-3)]"
                         >
                           {e}
                         </li>
@@ -198,7 +204,12 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
           {data.cobertura.map((c) => (
             <li key={c.campo}>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0 truncate text-[13px] text-[var(--bi-ink-2)]">
+                {/* Envuelve en vez de truncar: son ocho etiquetas fijas y
+                    cortas, y la palabra que se perdía era la que decidía el
+                    sentido — «Contactos con teléfono utiliz…» y «Contactos con
+                    identificador d…». Medido a 375 px: 219 y 238 px de texto en
+                    184 de ancho. */}
+                <span className="min-w-0 text-[13px] leading-snug text-[var(--bi-ink-2)]">
                   {c.campo}
                 </span>
                 <span className="flex shrink-0 items-baseline gap-2">

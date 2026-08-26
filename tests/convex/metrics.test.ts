@@ -627,3 +627,39 @@ describe("la conciliación", () => {
     expect(mes(res, "2026-02")?.autoCaptura).toBe(false);
   });
 });
+
+describe("los textos que el BI guarda para mostrar", () => {
+  test("el aviso de conciliación trae los montos con separador de miles", async () => {
+    // Este `detail` se pinta tal cual en el tablero de Calidad. Sin separador,
+    // «₡4546000» obliga a contar dígitos para saber si son cuatro millones o
+    // cuarenta y cinco — y en un aviso que pide acción, eso es el dato.
+    const t = await conRevisiones([
+      { clientPhone: "1111-1112", inspectionStartAt: dia("2025-09-10"), totalAmountCharged: 1_000_000 },
+    ]);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", {
+        kind: "income",
+        category: "revision",
+        isViatico: false,
+        amountCRC: 4_546_000,
+        originalCurrency: "CRC",
+        date: dia("2025-09-10"),
+        yearMonth: "2025-09",
+        source: "sheet",
+        isDeleted: false,
+        createdAt: dia("2025-09-10"),
+        updatedAt: dia("2025-09-10"),
+      } as never);
+    });
+    await t.mutation(internal.bi.metrics.flagReconciliationGap, {});
+
+    const issues = await t.run(async (ctx) =>
+      (await ctx.db.query("bi_quality_issues").collect()).filter(
+        (i) => i.issueType === "reconciliation_gap",
+      ),
+    );
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues[0].detail).toContain("₡4.546.000");
+    expect(issues[0].detail).not.toContain("₡4546000");
+  });
+});

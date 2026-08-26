@@ -156,7 +156,11 @@ export function EstadoDatosCard({
                           : "var(--bi-good)",
                     }}
                   />
-                  <span className="truncate text-[13.5px] text-[var(--bi-ink)]">
+                  {/* Sin `truncate`: a 375 px la etiqueta se queda con 123 px
+                      y «Carga del sistema anterior» (180 px) se cortaba en
+                      «Carga del sistema an…». Son cinco nombres fijos y el
+                      renglón puede envolver sin apretar nada. */}
+                  <span className="text-[13.5px] leading-snug text-[var(--bi-ink)]">
                     {p.etiqueta}
                   </span>
                   {p.cadencia === "unica" ? (
