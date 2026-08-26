@@ -19,4 +19,21 @@ crons.weekly(
   { mode: "full" },
 );
 
+/**
+ * Contraste con la hoja de cálculo (**A56**).
+ *
+ * Semanal y no mensual a propósito: la hoja se edita **durante** el mes, y el
+ * incidente que originó esto —julio-2026 cambió después de migrarlo— se
+ * descubrió **once días tarde** y de casualidad. Trece pestañas pequeñas por
+ * corrida no cuestan nada; enterarse un mes después, sí.
+ *
+ * Media hora después del sync de leads para no pelearse por el mismo minuto.
+ */
+crons.weekly(
+  "weekly-sheet-contrast",
+  { dayOfWeek: "monday", hourUTC: 9, minuteUTC: 30 }, // ~3:30 a.m. CR
+  internal.bi.contraste.contrastarHoja,
+  {},
+);
+
 export default crons;

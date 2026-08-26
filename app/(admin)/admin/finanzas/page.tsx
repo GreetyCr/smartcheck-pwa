@@ -40,6 +40,9 @@ export default function FinanzasPage() {
      gracia es la serie completa mes a mes, y acotarla escondería justo los
      meses que se salen del margen. */
   const conciliacion = useQuery(api.bi.public.reconciliation, {});
+  /* El contraste tampoco se filtra: su gracia es cubrir TODOS los meses que
+     vinieron de la hoja, y recortar el periodo escondería justo el que cambió. */
+  const contrasteHoja = useQuery(api.bi.public.contrasteHoja, {});
   /* El desglose de «Otros» va aparte del bloqueo de carga: es un zoom sobre
      una barra, no una cifra que tenga que cuadrar con las demás. */
   const breakdown = useQuery(api.bi.public.expenseBreakdown, rangoDelPeriodo(periodo));
@@ -83,6 +86,7 @@ export default function FinanzasPage() {
       entries={rows}
       expenseBreakdown={breakdown ?? undefined}
       conciliacion={conciliacion ?? undefined}
+      contrasteHoja={contrasteHoja ?? undefined}
       periodoGastos={periodo}
       onPeriodoGastos={setPeriodo}
       loadingEntries={entries === undefined}

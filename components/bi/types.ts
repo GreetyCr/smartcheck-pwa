@@ -178,6 +178,50 @@ export type Operacion = {
   nota: string;
 };
 
+/** Espejo de `contrasteReturns` (`convex/bi/contraste.ts`) — A56.
+ *
+ * **Dos comparaciones que no son la misma** y por eso van en campos distintos:
+ *  - `meses[].difIngreso/difGasto` = el panel contra **las filas** de la hoja.
+ *    Es la alarma: si un mes cambió allá después de copiarlo, sale acá.
+ *  - `hojaNoCuadra` = las filas de la hoja contra **su propia celda TOTAL**.
+ *    No dice nada del panel; dice que la hoja se equivoca en su suma.
+ */
+export type ContrasteHoja = {
+  corridaAt: number | null;
+  estado: string | null;
+  mensaje: string | null;
+  meses: Array<{
+    yearMonth: string;
+    moneda: string;
+    hojaIngreso: number;
+    hojaGasto: number;
+    hojaFilas: number;
+    totalIngreso: number | null;
+    totalGasto: number | null;
+    convexIngreso: number;
+    convexGasto: number;
+    convexFilas: number;
+    difIngreso: number;
+    difGasto: number;
+    difTotalIngreso: number | null;
+    difTotalGasto: number | null;
+    significativo: boolean;
+    explicacion: string | null;
+  }>;
+  conDiferencia: number;
+  conExplicacion: number;
+  hojaNoCuadra: Array<{
+    yearMonth: string;
+    moneda: string;
+    campo: string;
+    filas: number;
+    total: number;
+    diferencia: number;
+  }>;
+  tolerancia: number;
+  nota: string;
+};
+
 /** Una fila de `channelRevenue.canales` (`convex/bi/channels.ts`). */
 export type ChannelMixRow = {
   canal: string;

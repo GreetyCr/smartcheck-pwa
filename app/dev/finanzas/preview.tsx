@@ -167,6 +167,7 @@ const DESGLOSE_CRUDO = {
     "sinClasificar": []
   };
 import type {
+  ContrasteHoja,
   FinanceEntry,
   FinanceSummary,
   Reconciliation,
@@ -284,6 +285,290 @@ const CONCILIACION: Reconciliation = {
   note: "Ver `reconciliationImpl` en convex/bi/metrics.ts.",
 };
 
+/* -------------------------------------------------------------------------- */
+/* Contraste hoja ↔ panel — respuesta LITERAL de producción, 26-ago-2026       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Los 13 meses cuadran; la única diferencia es la corrección de marzo que
+ * Esteban autorizó (B37) y que la hoja no tiene. Lo que sí trae son **tres
+ * puntos donde la hoja no cuadra consigo misma**, que es lo que esta tarjeta
+ * tiene que saber mostrar sin culpar al panel.
+ *
+ * Regenerar con:  npx convex run --prod bi/contraste:contraste \'{}\'
+ */
+const CONTRASTE: ContrasteHoja = {
+  "conDiferencia": 0,
+  "conExplicacion": 1,
+  "corridaAt": 1787727188887,
+  "estado": "ok",
+  "hojaNoCuadra": [
+    {
+      "campo": "ingresos",
+      "diferencia": 941000,
+      "filas": 4011000,
+      "moneda": "CRC",
+      "total": 3070000,
+      "yearMonth": "2025-07"
+    },
+    {
+      "campo": "gastos",
+      "diferencia": -308510,
+      "filas": 1927710,
+      "moneda": "CRC",
+      "total": 2236220,
+      "yearMonth": "2025-07"
+    },
+    {
+      "campo": "gastos",
+      "diferencia": -2680,
+      "filas": 2921,
+      "moneda": "USD",
+      "total": 5601,
+      "yearMonth": "2025-12"
+    }
+  ],
+  "mensaje": "13 meses contrastados, todos cuadran",
+  "meses": [
+    {
+      "convexFilas": 40,
+      "convexGasto": 1927710,
+      "convexIngreso": 4011000,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": -308510,
+      "difTotalIngreso": 941000,
+      "explicacion": null,
+      "hojaFilas": 40,
+      "hojaGasto": 1927710,
+      "hojaIngreso": 4011000,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 2236220,
+      "totalIngreso": 3070000,
+      "yearMonth": "2025-07"
+    },
+    {
+      "convexFilas": 33,
+      "convexGasto": 1517100,
+      "convexIngreso": 2219373,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 33,
+      "hojaGasto": 1517100,
+      "hojaIngreso": 2219373,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 1517100,
+      "totalIngreso": 2219373,
+      "yearMonth": "2025-08"
+    },
+    {
+      "convexFilas": 40,
+      "convexGasto": 3922.66,
+      "convexIngreso": 7282.79,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 40,
+      "hojaGasto": 3922.66,
+      "hojaIngreso": 7282.79,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 3922.66,
+      "totalIngreso": 7282.79,
+      "yearMonth": "2025-09"
+    },
+    {
+      "convexFilas": 35,
+      "convexGasto": 3277.35,
+      "convexIngreso": 4873,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 35,
+      "hojaGasto": 3277.35,
+      "hojaIngreso": 4873,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 3277.35,
+      "totalIngreso": 4873,
+      "yearMonth": "2025-10"
+    },
+    {
+      "convexFilas": 34,
+      "convexGasto": 3301,
+      "convexIngreso": 6643,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 34,
+      "hojaGasto": 3301,
+      "hojaIngreso": 6643,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 3301,
+      "totalIngreso": 6643,
+      "yearMonth": "2025-11"
+    },
+    {
+      "convexFilas": 23,
+      "convexGasto": 2921,
+      "convexIngreso": 2916,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": -2680,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 23,
+      "hojaGasto": 2921,
+      "hojaIngreso": 2916,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 5601,
+      "totalIngreso": 2916,
+      "yearMonth": "2025-12"
+    },
+    {
+      "convexFilas": 41,
+      "convexGasto": 4037,
+      "convexIngreso": 7918,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 41,
+      "hojaGasto": 4037,
+      "hojaIngreso": 7918,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 4037,
+      "totalIngreso": 7918,
+      "yearMonth": "2026-01"
+    },
+    {
+      "convexFilas": 41,
+      "convexGasto": 3804,
+      "convexIngreso": 7686.25,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 41,
+      "hojaGasto": 3804,
+      "hojaIngreso": 7686.25,
+      "moneda": "USD",
+      "significativo": false,
+      "totalGasto": 3804,
+      "totalIngreso": 7686.25,
+      "yearMonth": "2026-02"
+    },
+    {
+      "convexFilas": 43,
+      "convexGasto": 2786017,
+      "convexIngreso": 3227500,
+      "difGasto": -20004,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": "Corrección autorizada por Esteban el 24-ago (B37/A97): marzo llevaba las cargas sociales completas y solo correspondía el aporte patronal. La hoja conserva el valor viejo.",
+      "hojaFilas": 43,
+      "hojaGasto": 2806021,
+      "hojaIngreso": 3227500,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 2806021,
+      "totalIngreso": 3227500,
+      "yearMonth": "2026-03"
+    },
+    {
+      "convexFilas": 48,
+      "convexGasto": 3072113.03,
+      "convexIngreso": 3971750,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 48,
+      "hojaGasto": 3072113.03,
+      "hojaIngreso": 3971750,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 3072113.03,
+      "totalIngreso": 3971750,
+      "yearMonth": "2026-04"
+    },
+    {
+      "convexFilas": 43,
+      "convexGasto": 2676085.04,
+      "convexIngreso": 4376000,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 43,
+      "hojaGasto": 2676085.04,
+      "hojaIngreso": 4376000,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 2676085.04,
+      "totalIngreso": 4376000,
+      "yearMonth": "2026-05"
+    },
+    {
+      "convexFilas": 45,
+      "convexGasto": 2858036.28,
+      "convexIngreso": 5618000,
+      "difGasto": 0,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 45,
+      "hojaGasto": 2858036.28,
+      "hojaIngreso": 5618000,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 2858036.28,
+      "totalIngreso": 5618000,
+      "yearMonth": "2026-06"
+    },
+    {
+      "convexFilas": 46,
+      "convexGasto": 3035269,
+      "convexIngreso": 4546000,
+      "difGasto": -0.13,
+      "difIngreso": 0,
+      "difTotalGasto": 0,
+      "difTotalIngreso": 0,
+      "explicacion": null,
+      "hojaFilas": 46,
+      "hojaGasto": 3035269.13,
+      "hojaIngreso": 4546000,
+      "moneda": "CRC",
+      "significativo": false,
+      "totalGasto": 3035269.13,
+      "totalIngreso": 4546000,
+      "yearMonth": "2026-07"
+    }
+  ],
+  "nota": "Se compara en MONEDA ORIGINAL (la hoja está en $ de sep-2025 a feb-2026) para que el tipo de cambio no entre en la cuenta. «Convex» son solo las filas con source:sheet — lo capturado por la app o a mano no viene de la hoja y no debería cuadrar con ella. La comparación titular es contra las FILAS de la hoja, no contra su celda TOTAL: esa celda se equivoca en dos meses.",
+  "tolerancia": 1
+};
+
 export function FinanzasPreview() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>("2026-07");
   /* El filtro cambia de pestaña pero NO refiltra: la muestra es estática. Se
@@ -306,6 +591,7 @@ export function FinanzasPreview() {
         <FinanceDashboard
           expenseBreakdown={DESGLOSE_OTROS}
           conciliacion={CONCILIACION}
+          contrasteHoja={CONTRASTE}
           periodoGastos={periodo}
           onPeriodoGastos={setPeriodo}
           summary={SUMMARY}

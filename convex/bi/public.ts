@@ -57,6 +57,7 @@ import { calidadImpl, calidadReturns } from "./calidad";
 import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
 import { operacionImpl, operacionReturns } from "./operacion";
 import { filterOptionsImpl, filterOptionsReturns } from "./filtros";
+import { contrasteImpl, contrasteReturns } from "./contraste";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -286,6 +287,19 @@ export const filterOptions = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return filterOptionsImpl(ctx);
+  },
+});
+
+/**
+ * Contraste mensual **hoja ↔ Convex** (**A56**): en qué meses dejaron de
+ * coincidir, y en cuáles la hoja no cuadra ni consigo misma.
+ */
+export const contrasteHoja = query({
+  args: {},
+  returns: contrasteReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return contrasteImpl(ctx);
   },
 });
 

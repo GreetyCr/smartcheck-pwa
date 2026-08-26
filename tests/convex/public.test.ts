@@ -92,6 +92,7 @@ const PUBLICAS = [
   ["estadoDatos", api.bi.public.estadoDatos, {}],
   ["operacion", api.bi.public.operacion, {}],
   ["filterOptions", api.bi.public.filterOptions, {}],
+  ["contrasteHoja", api.bi.public.contrasteHoja, {}],
 ] as const;
 
 describe("bi/public — el gate de admin", () => {

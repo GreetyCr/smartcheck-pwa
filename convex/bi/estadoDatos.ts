@@ -61,6 +61,12 @@ export const PROCESOS: Record<string, Meta> = {
     cadencia: "unica",
     queEs: "Las revisiones del CRM viejo. Se hizo una vez y no se repite.",
   },
+  sheet_contrast: {
+    etiqueta: "Contraste con la hoja de cálculo",
+    cadencia: "semanal",
+    queEs:
+      "Compara mes a mes lo que hay acá contra la hoja, por si algo cambió allá.",
+  },
 };
 
 /**

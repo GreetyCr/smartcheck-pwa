@@ -22,9 +22,11 @@ import { BiEntryDrawer } from "./BiEntryDrawer";
 import { BiKpiCard } from "./BiKpiCard";
 import { BiMonthlyBars } from "./BiMonthlyBars";
 import { ConciliacionCard } from "./ConciliacionCard";
+import { ContrasteHojaCard } from "./ContrasteHojaCard";
 import type {
   FinanceEntry,
   FinanceEntryInput,
+  ContrasteHoja,
   FinanceSummary,
   Reconciliation,
 } from "./types";
@@ -47,6 +49,7 @@ export function FinanceDashboard({
   periodoGastos,
   onPeriodoGastos,
   conciliacion,
+  contrasteHoja,
 }: {
   summary: FinanceSummary;
   entries: FinanceEntry[];
@@ -64,6 +67,8 @@ export function FinanceDashboard({
   onPeriodoGastos?: (p: PeriodoKey) => void;
   /** Conciliación finanzas ↔ revisiones (mitad de RF-05). Si no llega, no se pinta. */
   conciliacion?: Reconciliation;
+  /** Contraste hoja ↔ Convex (A56). Si no llega, no se pinta. */
+  contrasteHoja?: ContrasteHoja;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<FinanceEntry | null>(null);
@@ -343,6 +348,16 @@ export function FinanceDashboard({
       {conciliacion ? (
         <div className="mt-4">
           <ConciliacionCard data={conciliacion} />
+        </div>
+      ) : null}
+
+      {/* ---------- contraste con la hoja ----------
+          Debajo de la conciliación y no encima: aquella contesta «¿cuadra lo
+          cobrado con lo revisado?» —sobre datos de acá— y esta «¿seguimos
+          diciendo lo mismo que la hoja?», que es una duda sobre el origen. */}
+      {contrasteHoja ? (
+        <div className="mt-4">
+          <ContrasteHojaCard data={contrasteHoja} />
         </div>
       ) : null}
 

@@ -651,6 +651,52 @@ export default defineSchema({
     message: v.optional(v.string()),
   }).index("by_key", ["key"]),
 
+  /**
+   * Contraste mensual **hoja ↔ Convex** (A56).
+   *
+   * La hoja de cálculo sigue viva y la migración fue una foto: cualquier mes
+   * puede cambiar hacia atrás sin que nos enteremos. Una fila por mes, que se
+   * reescribe en cada corrida.
+   *
+   * **Se guardan DOS comparaciones, no una**, y esa es toda la idea:
+   *
+   *  1. `difIngreso`/`difGasto` = Convex − **las filas** de la hoja. Contesta
+   *     «¿seguimos teniendo lo mismo que la hoja?», que es lo que pedía A56.
+   *  2. `difTotalIngreso`/`difTotalGasto` = las filas de la hoja − **su propia
+   *     celda TOTAL**. Contesta «¿la hoja cuadra consigo misma?».
+   *
+   * La segunda apareció al construir esto y no estaba prevista: en la primera
+   * corrida encontró que **julio-2025 se deja la última semana fuera del total**
+   * y que **diciembre-2025 suma dos veces el subtotal de fijos**. Comparar
+   * contra la celda TOTAL —lo natural— habría dado por buena la hoja y por mala
+   * a Convex, que es al revés.
+   */
+  bi_sheet_contrast: defineTable({
+    yearMonth: v.string(),
+    /** Moneda en que está escrito ese mes en la hoja (`CRC` | `USD` | `mixta`). */
+    moneda: v.string(),
+    /** Suma de las FILAS de la hoja, sin sus subtotales. */
+    hojaIngreso: v.number(),
+    hojaGasto: v.number(),
+    hojaFilas: v.number(),
+    /** Lo que dice la celda TOTAL de la hoja. `null` si no se encontró. */
+    totalIngreso: v.union(v.number(), v.null()),
+    totalGasto: v.union(v.number(), v.null()),
+    /** Suma de las filas de Convex con `source:"sheet"`, en moneda original. */
+    convexIngreso: v.number(),
+    convexGasto: v.number(),
+    convexFilas: v.number(),
+    difIngreso: v.number(),
+    difGasto: v.number(),
+    difTotalIngreso: v.union(v.number(), v.null()),
+    difTotalGasto: v.union(v.number(), v.null()),
+    /** Alguna diferencia pasa el umbral y NO está declarada como esperada. */
+    significativo: v.boolean(),
+    /** Motivo, si la diferencia es una que ya conocemos y aceptamos. */
+    explicacion: v.union(v.string(), v.null()),
+    runAt: v.number(),
+  }).index("by_year_month", ["yearMonth"]),
+
   /* ------------------------------------------------------------------------ */
   /* PLANILLA DEL MES — los tres datos que Esteban escribe (B28)               */
   /* ------------------------------------------------------------------------ */
