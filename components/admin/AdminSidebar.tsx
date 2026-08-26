@@ -15,6 +15,7 @@ import {
   Menu,
   Settings,
   Users,
+  Wrench,
   X, Calculator,
   Radio,
   ShieldCheck,
@@ -69,6 +70,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Operación",
     items: [
+      { href: "/admin/operacion", label: "Hallazgos", Icon: Wrench },
       { href: "/admin/inspecciones", label: "Inspecciones", Icon: Car },
       {
         href: "/admin/tecnicos",

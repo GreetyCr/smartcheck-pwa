@@ -55,6 +55,7 @@ import {
 import { pagosTecnicoImpl, pagosTecnicoReturns } from "./pagosTecnico";
 import { calidadImpl, calidadReturns } from "./calidad";
 import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
+import { operacionImpl, operacionReturns } from "./operacion";
 
 /* -------------------------------------------------------------------------- */
 /* Finanzas                                                                   */
@@ -261,5 +262,23 @@ export const estadoDatos = query({
   handler: async (ctx) => {
     await requireAdmin(ctx);
     return estadoDatosImpl(ctx);
+  },
+});
+
+/**
+ * Calidad **& operación** de las revisiones (**RF-07**): hallazgos frecuentes,
+ * condición del vehículo y SLA de respuesta.
+ *
+ * Ojo al leerla: la polaridad de cada ítem sale del catálogo del formulario, no
+ * de una tabla propia — 18 de los 44 ítems sí/no son hallazgo cuando la
+ * respuesta es **no**. Y el SLA se calcula solo sobre las entregadas que tienen
+ * las dos fechas; `sinFechaInicio` dice cuántas quedaron fuera.
+ */
+export const operacion = query({
+  args: {},
+  returns: operacionReturns,
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return operacionImpl(ctx);
   },
 });

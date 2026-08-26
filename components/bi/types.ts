@@ -115,6 +115,69 @@ export type Reconciliation = {
   note: string;
 };
 
+/** Espejo de `operacionReturns` (`convex/bi/operacion.ts`) — RF-07.
+ *
+ * **Cada porcentaje de acá tiene un denominador distinto**, y esa es la única
+ * forma de leerlo bien:
+ *  - `hallazgos.top[].pct` → sobre `evaluados` (las veces que ese punto se
+ *    revisó), NO sobre el total de revisiones.
+ *  - `condicion.niveles[].pct` → sobre las revisiones **con** el dato.
+ *  - Lo del SLA → sobre `sla.medibles`, que es menos que `sla.entregadas`.
+ */
+export type Operacion = {
+  revisiones: { total: number; entregadas: number; conChecklist: number };
+  condicion: {
+    niveles: Array<{
+      nivel: number;
+      etiqueta: string;
+      rows: number;
+      pct: number;
+    }>;
+    sinDato: number;
+  };
+  hallazgos: {
+    evaluadas: number;
+    total: number;
+    promedioPorRevision: number;
+    sinHallazgos: number;
+    porSeccion: Array<{
+      seccion: string;
+      etiqueta: string;
+      hallazgos: number;
+      revisionesConAlguno: number;
+      revisionesEvaluadas: number;
+      pct: number;
+    }>;
+    top: Array<{
+      seccion: string;
+      seccionEtiqueta: string;
+      item: string;
+      itemEtiqueta: string;
+      hallazgos: number;
+      evaluados: number;
+      pct: number;
+    }>;
+    fueraDelRanking: number;
+    minEvaluaciones: number;
+    /** Debe estar vacío. Si trae algo, hay un punto del formulario sin catalogar. */
+    itemsSinCatalogar: string[];
+  };
+  sla: {
+    medibles: number;
+    entregadas: number;
+    sinFechaInicio: number;
+    inconsistentes: number;
+    medianaHoras: number;
+    p90Horas: number;
+    maxHoras: number;
+    dentroDe24h: number;
+    dentroDe48h: number;
+    porMes: Array<{ ym: string; rows: number; medianaHoras: number }>;
+    sinFechaEntrega: number;
+  };
+  nota: string;
+};
+
 /** Una fila de `channelRevenue.canales` (`convex/bi/channels.ts`). */
 export type ChannelMixRow = {
   canal: string;
