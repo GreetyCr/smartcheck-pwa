@@ -91,6 +91,8 @@ const PUBLICAS = [
   ["calidad", api.bi.public.calidad, {}],
   ["estadoDatos", api.bi.public.estadoDatos, {}],
   ["operacion", api.bi.public.operacion, {}],
+  // PII: nombres del personal técnico.
+  ["inspecciones", api.bi.public.inspecciones, {}],
   ["filterOptions", api.bi.public.filterOptions, {}],
   ["contrasteHoja", api.bi.public.contrasteHoja, {}],
 ] as const;

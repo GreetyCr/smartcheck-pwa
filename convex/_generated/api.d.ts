@@ -19,6 +19,7 @@ import type * as bi_filtros from "../bi/filtros.js";
 import type * as bi_finance from "../bi/finance.js";
 import type * as bi_financeAuto from "../bi/financeAuto.js";
 import type * as bi_financeForm from "../bi/financeForm.js";
+import type * as bi_inspecciones from "../bi/inspecciones.js";
 import type * as bi_leads from "../bi/leads.js";
 import type * as bi_leadsReconcile from "../bi/leadsReconcile.js";
 import type * as bi_leadsSync from "../bi/leadsSync.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   "bi/finance": typeof bi_finance;
   "bi/financeAuto": typeof bi_financeAuto;
   "bi/financeForm": typeof bi_financeForm;
+  "bi/inspecciones": typeof bi_inspecciones;
   "bi/leads": typeof bi_leads;
   "bi/leadsReconcile": typeof bi_leadsReconcile;
   "bi/leadsSync": typeof bi_leadsSync;

@@ -58,6 +58,7 @@ import { calidadImpl, calidadReturns } from "./calidad";
 import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
 import { operacionImpl, operacionReturns } from "./operacion";
 import { filterOptionsImpl, filterOptionsReturns } from "./filtros";
+import { inspeccionesImpl, inspeccionesReturns } from "./inspecciones";
 import { contrasteImpl, contrasteReturns } from "./contraste";
 
 /* -------------------------------------------------------------------------- */
@@ -310,5 +311,22 @@ export const operacion = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     return operacionImpl(ctx, args);
+  },
+});
+
+/**
+ * Control de inspecciones realizadas (**A114**): total histórico, desglose
+ * mensual y quién las hizo. El titular sale de la vista unificada, así que
+ * **cuadra con la portada** — que es para lo que se pidió: poder corroborar.
+ *
+ * Devuelve nombres de técnicos, o sea PII de personal: solo-admin, y no debe
+ * salir a logs.
+ */
+export const inspecciones = query({
+  args: { ...filterValidator },
+  returns: inspeccionesReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return inspeccionesImpl(ctx, args);
   },
 });

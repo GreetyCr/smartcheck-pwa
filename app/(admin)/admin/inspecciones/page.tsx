@@ -8,6 +8,32 @@ import { InspectionTableRow } from "@/components/admin/InspectionTableRow";
 import { BiCard } from "@/components/bi/BiCard";
 import { formatInt } from "@/lib/bi-format";
 import { formatCrc } from "@/lib/admin/inspectionPrice";
+import {
+  FiltrosGlobales,
+  useFiltrosBi,
+} from "@/components/bi/FiltrosGlobales";
+import { InspeccionesResumen } from "@/components/bi/InspeccionesResumen";
+
+/**
+ * Las ocho dimensiones de la barra global. Esta pantalla las honra todas porque
+ * el resumen de arriba lee la **vista unificada**, igual que la portada.
+ *
+ * Los filtros de la tabla de abajo (estado, técnico, fechas) son otra cosa y se
+ * quedan donde están: son operativos, existen solo del lado app y sirven para
+ * encontrar **una** revisión, no para medir. Mezclarlos en la barra global los
+ * pondría en pantallas donde esas columnas no existen. Cada bloque dice qué
+ * filtro lo gobierna.
+ */
+const SOPORTA = [
+  "periodo",
+  "channel",
+  "province",
+  "engineType",
+  "agency",
+  "brand",
+  "sellerType",
+  "currency",
+] as const;
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos los estados" },
@@ -32,6 +58,9 @@ export default function AdminInspeccionesPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [refresh, setRefresh] = useState(0);
 
+  const { args: filtrosGlobales } = useFiltrosBi(SOPORTA);
+  const panel = useQuery(api.bi.public.inspecciones, filtrosGlobales);
+
   const users = useQuery(api.users.list, {});
 
   const listArgs = useMemo(() => {
@@ -50,12 +79,13 @@ export default function AdminInspeccionesPage() {
       technicianClerkId: technicianClerkId || undefined,
       dateFrom: from,
       dateTo: to,
-      limit: 150,
+      limit: 400,
       refresh,
     };
   }, [status, technicianClerkId, dateFrom, dateTo, refresh]);
 
-  const rows = useQuery(api.admin.listAllInspections, listArgs);
+  const listado = useQuery(api.admin.listAllInspections, listArgs);
+  const rows = listado?.rows;
 
   const pdfBatch = useQuery(
     api.pdfs.getPdfStatusBatch,
@@ -83,9 +113,35 @@ export default function AdminInspeccionesPage() {
           Inspecciones
         </h1>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
-          Vista global con técnico asignado y acceso al PDF
+          Total histórico, desglose por mes y quién las hizo
         </p>
       </header>
+
+      <div className="mb-4">
+        <FiltrosGlobales soporta={SOPORTA} />
+      </div>
+
+      {panel === undefined ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="bi-skeleton h-[110px] rounded-2xl" />
+          ))}
+        </div>
+      ) : (
+        <InspeccionesResumen panel={panel} />
+      )}
+
+      {/* De acá para abajo manda otro filtro, y hay que decirlo: la tabla lista
+          solo lo que se hizo en la app —es la única con estado y PDF— y se
+          gobierna con sus propios controles, no con la barra de arriba. */}
+      <h2 className="bi-display mb-3 mt-8 text-[18px] font-bold uppercase leading-none text-[var(--bi-ink)]">
+        Detalle de las hechas en la app
+      </h2>
+      <p className="mb-3 text-[13px] text-[var(--bi-ink-2)]">
+        Una fila por revisión, con su estado y su PDF. Esta tabla{" "}
+        <strong>no usa la barra de filtros de arriba</strong>: tiene los suyos,
+        porque el estado y el técnico solo existen del lado app.
+      </p>
 
       <BiCard className="mb-4">
         <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
@@ -239,9 +295,14 @@ export default function AdminInspeccionesPage() {
         {rows !== undefined ? (
           <div className="flex flex-col gap-1 border-t border-[var(--bi-ring)] bg-[var(--bi-plane)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[var(--bi-ink-3)]">
-              {rows.length === 0
+              {listado === undefined || rows.length === 0
                 ? "Sin resultados para el filtro actual"
-                : `Suma de ${formatInt(rows.length)} inspección${rows.length === 1 ? "" : "es"} del filtro actual`}
+                : listado.truncated
+                  ? /* Antes decía el largo de lo que recibía, que con el tope
+                       puesto no era el total sino el tope. Ahora dice las dos
+                       cosas: cuántas hay y cuántas se están pintando. */
+                    `${formatInt(listado.totalMatched)} inspecciones con este filtro · se muestran las ${formatInt(rows.length)} más recientes`
+                  : `${formatInt(listado.totalMatched)} inspección${listado.totalMatched === 1 ? "" : "es"} con este filtro`}
             </p>
             <p className="text-[13px] text-[var(--bi-ink-2)]">
               Total cobrado:{" "}

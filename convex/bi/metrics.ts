@@ -314,7 +314,7 @@ function normalizeChannel(raw: string | undefined | null): string | undefined {
 /* -------------------------------------------------------------------------- */
 
 /** Fila normalizada de la vista unificada (§8, A30/A31). */
-type UnifiedRow = {
+export type UnifiedRow = {
   date: number; // epoch ms CR
   amountCRC: number | undefined;
   isPlaceholderIncome: boolean; // amount === 1000 → cuenta como revisión, sin ingreso
@@ -335,6 +335,20 @@ type UnifiedRow = {
   sellerType: string | undefined;
   /** Moneda en que se cobró (`CRC` | `USD`). La app cobra siempre en colones. */
   currency: string;
+  /**
+   * Quién hizo la revisión (`clerkUserId`), o `undefined` si no se puede saber.
+   *
+   * **Solo existe del lado app.** `inspections_legacy` no tiene campo de técnico
+   * —el CRM viejo nunca lo registró—, así que las 741 filas históricas son
+   * `undefined` para siempre y no hay forma de rellenarlas. No es un dato que
+   * falte por cargar: es un dato que nunca se tomó. Por eso la pantalla lo
+   * cuenta en un balde visible en vez de repartirlo o esconderlo (A64/A88).
+   *
+   * **No entra en el dedupe** ni en ninguna llave de unión, por la misma razón
+   * que `rawVehicle` y `brand` viven separados: cualquier campo nuevo que toque
+   * el emparejamiento mueve el total de revisiones.
+   */
+  technicianId: string | undefined;
   source: "legacy" | "era_app";
 };
 
@@ -389,7 +403,7 @@ export const filterValidator = {
 };
 
 /** ¿la fila pasa los filtros? (periodo semiabierto [from, to); dims normalizadas). */
-function passesFilters(r: UnifiedRow, f: FilterArgs): boolean {
+export function passesFilters(r: UnifiedRow, f: FilterArgs): boolean {
   if (f.fromMs != null && r.date < f.fromMs) return false;
   if (f.toMs != null && r.date >= f.toMs) return false;
   if (f.province != null && norm(r.province) !== norm(f.province)) return false;
@@ -517,6 +531,7 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
       sellerType: r.sellerType ?? undefined,
       // La app cobra siempre en colones: no guarda moneda de origen.
       currency: "CRC",
+      technicianId: r.clerkUserId ?? undefined,
       source: "era_app",
       name: norm(r.clientName),
       phone8: last8(r.clientPhone),
@@ -549,6 +564,8 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
       // El CRM viejo no registraba si el vendedor era particular o agencia.
       sellerType: undefined,
       currency: r.originalCurrency ?? "CRC",
+      // El CRM viejo no registraba quién hizo la revisión. Nunca se va a saber.
+      technicianId: undefined,
       source: "legacy",
       name: norm(r.clientName),
       phone8: last8(r.phone8),
@@ -593,6 +610,7 @@ export async function buildInspectionsAll(ctx: { db: any }): Promise<{
     brand: r.brand,
     sellerType: r.sellerType,
     currency: r.currency,
+    technicianId: r.technicianId,
     source: r.source,
   });
 

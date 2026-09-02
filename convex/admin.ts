@@ -158,22 +158,38 @@ export const listAllInspections = query({
       rows = rows.filter((r) => r._creationTime <= args.dateTo!);
     }
 
-    const cap = Math.min(Math.max(args.limit ?? 100, 1), 400);
+    /**
+     * **El conteo se toma ANTES de recortar** — A114.
+     *
+     * La página pedía 150 filas y mostraba «Suma de N inspecciones del filtro
+     * actual» con el largo de lo que recibía. Al pasar de 150 revisiones en la
+     * app (hoy 164) empezó a informar 150 como si fuera el total: no era una
+     * lista incompleta, era un **número equivocado**, y encima uno que se
+     * quedaba quieto mientras el negocio crecía. El tope sigue existiendo
+     * porque la tabla no puede pintar miles de filas, pero ahora la pantalla
+     * sabe cuántas hay de verdad y puede decir que está mostrando una parte.
+     */
+    const totalMatched = rows.length;
+    const cap = Math.min(Math.max(args.limit ?? 100, 1), 1000);
     rows = rows.slice(0, cap);
 
     const usersList = await ctx.db.query("users").collect();
     const byClerk = new Map(usersList.map((u) => [u.clerkId, u]));
 
-    return rows.map((insp) => {
-      const tech = insp.clerkUserId
-        ? byClerk.get(insp.clerkUserId)
-        : undefined;
-      return {
-        inspection: insp,
-        technicianName: tech?.name?.trim() || tech?.email || "Sin asignar",
-        technicianEmail: tech?.email ?? "",
-      };
-    });
+    return {
+      totalMatched,
+      truncated: totalMatched > rows.length,
+      rows: rows.map((insp) => {
+        const tech = insp.clerkUserId
+          ? byClerk.get(insp.clerkUserId)
+          : undefined;
+        return {
+          inspection: insp,
+          technicianName: tech?.name?.trim() || tech?.email || "Sin asignar",
+          technicianEmail: tech?.email ?? "",
+        };
+      }),
+    };
   },
 });
 

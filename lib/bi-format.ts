@@ -166,3 +166,24 @@ export const EXPENSE_CATEGORIES = [
   "seguro",
   "impuestos",
 ] as const;
+
+/**
+ * Cada cuántos meses se rotula el eje, según cuántos haya y qué tan ancha sea
+ * la pantalla — **A114**.
+ *
+ * No es cosmética: el rótulo largo («ABR 25») mide **38px** y el corto («ABR»)
+ * **18,8px**, medido. Con 18 meses el área de trazado da casillas de 25,5px en
+ * escritorio y ~13px a 375px, así que sin saltar rótulos el texto **se parte en
+ * dos líneas** —las 18, incluso en escritorio— y el eje se vuelve una pared.
+ * Saltando uno de cada dos, cada rótulo dispone del doble y vuelve a leerse.
+ *
+ * Los meses saltados **no se pierden**: conservan su barra, su tooltip y su
+ * `aria-label`. Lo único que deja de escribirse es lo que no cabía.
+ *
+ * Los umbrales salen de la medición, no del gusto: en escritorio el rótulo
+ * largo entra cómodo hasta 12 meses; en angosto el corto entra hasta 8.
+ */
+export function pasoEtiquetasMes(meses: number, angosto: boolean): number {
+  if (angosto) return meses > 16 ? 3 : meses > 8 ? 2 : 1;
+  return meses > 12 ? 2 : 1;
+}

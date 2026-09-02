@@ -404,3 +404,40 @@ export type FinanceEntryInput = {
   tecnico?: string;
   localidad?: string;
 };
+
+/** Un mes del control de inspecciones: el total y de dónde sale (A114). */
+export type InspeccionMes = {
+  yearMonth: string;
+  total: number;
+  /** Hechas en la app. */
+  app: number;
+  /** Traídas del CRM viejo. */
+  legacy: number;
+};
+
+/** Un técnico con su volumen. Solo existe del lado app (A114). */
+export type InspeccionTecnico = {
+  technicianId: string;
+  nombre: string;
+  rows: number;
+  primeraMs: number;
+  ultimaMs: number;
+  porMes: { yearMonth: string; rows: number }[];
+};
+
+export type InspeccionesPanel = {
+  /** Revisiones que pasan los filtros. */
+  total: number;
+  /** Total sin filtros — el ancla contra la que se compara. */
+  totalHistorico: number;
+  conFiltros: boolean;
+  deLaApp: number;
+  delHistorico: number;
+  porMes: InspeccionMes[];
+  porTecnico: InspeccionTecnico[];
+  /** Las del CRM viejo: nunca se va a saber quién las hizo. */
+  sinTecnico: number;
+  /** Las que sí se pueden atribuir — el denominador honesto de `porTecnico`. */
+  atribuibles: number;
+  note: string;
+};

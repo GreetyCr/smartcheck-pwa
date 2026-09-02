@@ -8,6 +8,7 @@ import {
   formatMonthLong,
   formatMonthShort,
   formatPct,
+  pasoEtiquetasMes,
 } from "@/lib/bi-format";
 import type { ConversionPorMes } from "./types";
 
@@ -82,7 +83,17 @@ export function ConversionPorMesChart({
    */
   const escala = Math.max(1, ...meses.map((m) => m.tasaPct));
   const ultimo = meses[meses.length - 1];
-  const pasoAngosto = meses.length > 8 ? 2 : 1;
+  const pasoAngosto = pasoEtiquetasMes(meses.length, true);
+  /* Hoy son 10 meses y en escritorio entran de sobra, pero la serie crece un
+     mes por mes: al llegar a 13 se parte igual que se partía la de
+     inspecciones. La regla es la misma para las dos. */
+  const pasoAncho = pasoEtiquetasMes(meses.length, false);
+  /* El salto se cuenta **desde el final**, no desde el principio: con 18
+     meses y paso 2 el último quedaba sin rótulo, y el mes más reciente es
+     justo el que se busca al mirar el gráfico. Anclado atrás, el último
+     siempre se escribe y los que se saltan quedan en el medio. */
+  const rotula = (i: number, paso: number) =>
+    (meses.length - 1 - i) % paso === 0;
 
   return (
     <div>
@@ -193,12 +204,17 @@ export function ConversionPorMesChart({
                   />
                 </span>
 
-                <span className="bi-num absolute inset-x-0 bottom-0 text-center text-[10px] tracking-wide text-[var(--bi-ink-3)]">
+                {/* `whitespace-nowrap`: la caja del rótulo mide **una** casilla, así que
+    saltar meses reparte el espacio pero no ensancha la caja — sin esto,
+    «MAY 25» se sigue partiendo en dos líneas dentro de sus 25,5px aunque
+    el vecino esté vacío. Con nowrap desborda centrado hacia los huecos
+    que el salto acaba de dejar libres, que es de donde sale el espacio. */}
+                <span className="bi-num absolute inset-x-0 bottom-0 whitespace-nowrap text-center text-[10px] tracking-wide text-[var(--bi-ink-3)]">
                   <span className="sm:hidden">
-                    {i % pasoAngosto === 0 ? formatMonthAbbr(m.yearMonth) : ""}
+                    {rotula(i, pasoAngosto) ? formatMonthAbbr(m.yearMonth) : ""}
                   </span>
                   <span className="hidden sm:inline">
-                    {formatMonthShort(m.yearMonth)}
+                    {rotula(i, pasoAncho) ? formatMonthShort(m.yearMonth) : ""}
                   </span>
                 </span>
 
