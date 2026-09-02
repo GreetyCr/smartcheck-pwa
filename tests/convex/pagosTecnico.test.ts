@@ -215,3 +215,44 @@ describe("bordes", () => {
     });
   });
 });
+
+/* ========================================================================== */
+/* El mes en curso (A120)                                                     */
+/* ========================================================================== */
+
+describe("el mes en curso se marca aparte de «no confiable»", () => {
+  /**
+   * Son dos cosas distintas y la pantalla dice cosas distintas por cada una:
+   * `confiable=false` es «este número está incompleto por un hueco del dato»;
+   * `enCurso=true` es «este número todavía no terminó de pasar». Un mes puede
+   * ser confiable y estar en curso a la vez — de hecho es el caso normal, y es
+   * justo cuando la comisión marca ₡0 las primeras semanas y se lee como error.
+   */
+  const mesDeHoy = () =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Costa_Rica",
+      year: "numeric",
+      month: "2-digit",
+    }).format(new Date());
+
+  test("el mes de hoy viene marcado como en curso", async () => {
+    const t = await setup([]);
+    const r = await pedir(t, mesDeHoy());
+    expect(r.enCurso).toBe(true);
+  });
+
+  test("un mes cerrado no", async () => {
+    const t = await setup([]);
+    const r = await pedir(t, "2026-08");
+    expect(r.enCurso).toBe(mesDeHoy() === "2026-08");
+    // y si hoy no es agosto, además tiene que ser un mes confiable y cerrado
+    if (mesDeHoy() !== "2026-08") expect(r.confiable).toBe(true);
+  });
+
+  test("«en curso» y «confiable» son independientes", async () => {
+    const t = await setup([]);
+    const viejo = await pedir(t, "2026-06");
+    expect(viejo.confiable).toBe(false); // anterior a 2026-08
+    expect(viejo.enCurso).toBe(false); // y ya cerrado
+  });
+});

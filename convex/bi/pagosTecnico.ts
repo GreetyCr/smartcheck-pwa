@@ -26,7 +26,7 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { lunesDeLaSemana, mesDePagoSemanal } from "./lib/dates";
+import { lunesDeLaSemana, mesDePagoSemanal, nowMs, yearMonth as ymDe } from "./lib/dates";
 
 /** ₡ por revisión, desde la primera. */
 export const VIATICO_POR_REVISION = 2_000;
@@ -91,6 +91,12 @@ export const pagosTecnicoReturns = v.object({
   }),
   /** `false` para los meses en que el conteo por persona está incompleto. */
   confiable: v.boolean(),
+  /**
+   * ¿Es el mes que todavía está corriendo? **No es lo mismo que «no confiable»**:
+   * el dato del mes en curso es correcto, pero **parcial por definición**, y el
+   * número va a subir hasta que el mes cierre.
+   */
+  enCurso: v.boolean(),
   aviso: v.union(v.string(), v.null()),
 });
 
@@ -157,6 +163,20 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
     .sort((a, b) => b.revisiones - a.revisiones);
 
   const confiable = yearMonth >= PRIMER_MES_CONFIABLE;
+  /**
+   * El mes en curso se marca aparte — **A120**.
+   *
+   * La pantalla abre por defecto en el mes de hoy, así que lo primero que se ve
+   * un día 2 es un viático pequeño y una **comisión en ₡0**: la comisión solo
+   * arranca en la revisión número 46 del mes, de modo que las primeras semanas
+   * marcan cero **por regla, no por error**. Sin decirlo, ese cero se lee como
+   * que el cálculo no corrió o que la planilla está rota.
+   *
+   * Va separado de `confiable` a propósito: aquel dice «este número está
+   * incompleto por un hueco del dato»; este dice «este número todavía no
+   * terminó de pasar».
+   */
+  const enCurso = yearMonth === ymDe(nowMs());
 
   return {
     yearMonth,
@@ -170,6 +190,7 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
       revisionesSinComision: REVISIONES_SIN_COMISION,
     },
     confiable,
+    enCurso,
     aviso: confiable
       ? null
       : `Antes de ${PRIMER_MES_CONFIABLE} el conteo por persona está incompleto: Sergio empezó a usar la app el 16-jul-2026 y la plataforma vieja, que no registra quién hizo cada revisión, se usó hasta el 19 de julio. El número de este mes se queda corto.`,

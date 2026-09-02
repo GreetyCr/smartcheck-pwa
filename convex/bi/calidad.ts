@@ -49,11 +49,38 @@ type Entrada = {
 export const CATALOGO: Record<string, Entrada> = {
   reconciliation_gap: {
     clase: "accion",
-    titulo: "Un mes no cuadra",
+    titulo: "Un mes no cuadra con la captura automática",
     queEs:
-      "Lo cobrado según las revisiones de ese mes no coincide con lo que entró a Finanzas.",
+      "Desde que el cobro se registra solo, lo cobrado según las revisiones de un mes debería coincidir con lo que entró a Finanzas. En este mes no coincide.",
     queHacer:
-      "Revisar el mes en el tablero de conciliación. El mes en curso siempre muestra diferencia y no es un problema: la revisión se cuenta cuando se hace y el ingreso cuando se entrega el informe.",
+      "Revisar el mes en el tablero de conciliación: acá sí hay algo que mirar, porque el ingreso ya no se escribe a mano. El mes en curso no se marca nunca — la revisión se cuenta cuando se hace y el ingreso cuando se entrega el informe, así que su diferencia es normal.",
+  },
+  /**
+   * Los meses de la época en que el ingreso se anotaba a mano — **A121**.
+   *
+   * Es el mismo detector que `reconciliation_gap`, separado **por la época del
+   * mes**, no por su tamaño. Antes de la captura automática el ingreso se
+   * tecleaba en la hoja y la diferencia contra las revisiones es historia
+   * contable de Esteban: nadie va a reconciliar setiembre de 2025, y diez
+   * avisos permanentes en «pide acción» —con cero resueltos, mes tras mes—
+   * enseñan a ignorar la pantalla entera, que es justo lo que este tablero
+   * existe para evitar.
+   *
+   * **No se ocultan ni se borran**: siguen listados, con su monto y su mes. Lo
+   * que cambia es que dejan de pedir una acción que no existe.
+   *
+   * Y el corte no es arbitrario: desde que la captura automática arrancó, la
+   * diferencia cayó a **2,2%** y **ningún mes volvió a marcarse**. O sea que un
+   * gap en un mes automático **sí** significa algo roto hoy — y ahora se ve
+   * solo, en vez de perderse entre diez que nadie va a tocar.
+   */
+  reconciliation_gap_manual: {
+    clase: "informativo",
+    titulo: "Un mes viejo no cuadra (ingreso anotado a mano)",
+    queEs:
+      "Antes de que el cobro se capturara solo, el ingreso se escribía en la hoja. Lo cobrado según las revisiones de esos meses no siempre coincide con lo que quedó anotado.",
+    queHacer:
+      "Nada, salvo que se quiera auditar un mes concreto. Son meses cerrados de la contabilidad anterior; el panel los muestra para que la diferencia no desaparezca, no porque haya algo que arreglar.",
   },
   malformed_row: {
     clase: "accion",
@@ -179,12 +206,47 @@ export async function calidadImpl(ctx: QueryCtx) {
   type Acum = { sinResolver: number; resueltos: number; ejemplos: string[] };
   const porTipo = new Map<string, Acum>();
 
+  /**
+   * Primer mes con captura automática del cobro, para separar los gaps viejos
+   * de los que importan hoy (**A121**).
+   *
+   * Se deriva del dato —el primer `finance_entries` cuyo `source` es
+   * `inspection`— y no de una constante escrita: el día que la automatización
+   * se apague o se adelante, el corte se mueve solo. Si todavía no hay ninguno,
+   * queda `null` y **nada se reclasifica**: sin captura automática no hay «época
+   * nueva» contra la cual comparar.
+   */
+  let primerMesAuto: string | null = null;
+  for (const r of await ctx.db.query("finance_entries").collect()) {
+    if (r.isDeleted || r.source !== "inspection") continue;
+    if (primerMesAuto === null || r.yearMonth < primerMesAuto) {
+      primerMesAuto = r.yearMonth;
+    }
+  }
+
+  /**
+   * El tipo con el que se cuenta un aviso, que no siempre es el guardado.
+   *
+   * `entityRef` de un `reconciliation_gap` es su mes (`"2026-07"`), así que la
+   * separación se hace **al leer** y no reescribiendo `bi_quality_issues`: no
+   * hay migración, no hay que correr nada contra producción, y el día que el
+   * corte cambie el tablero se reacomoda solo.
+   */
+  const tipoEfectivo = (i: { issueType: string; entityRef?: string }): string => {
+    if (i.issueType !== "reconciliation_gap") return i.issueType;
+    if (primerMesAuto === null || !i.entityRef) return i.issueType;
+    return i.entityRef < primerMesAuto
+      ? "reconciliation_gap_manual"
+      : "reconciliation_gap";
+  };
+
   for (const i of await ctx.db.query("bi_quality_issues").collect()) {
-    const a = porTipo.get(i.issueType) ?? { sinResolver: 0, resueltos: 0, ejemplos: [] };
+    const tipo = tipoEfectivo(i);
+    const a = porTipo.get(tipo) ?? { sinResolver: 0, resueltos: 0, ejemplos: [] };
     if (i.resolved) a.resueltos++;
     else a.sinResolver++;
     if (!i.resolved && a.ejemplos.length < 3 && i.detail) a.ejemplos.push(i.detail);
-    porTipo.set(i.issueType, a);
+    porTipo.set(tipo, a);
   }
 
   const sinCatalogar: string[] = [];

@@ -214,3 +214,85 @@ describe("cobertura de los datos", () => {
     expect(res.totalIssues).toBe(0);
   });
 });
+
+/* ========================================================================== */
+/* Los gaps de la época manual (A121)                                         */
+/* ========================================================================== */
+
+describe("un mes que no cuadra se clasifica por su ÉPOCA, no por su tamaño", () => {
+  /**
+   * Antes de la captura automática el ingreso se tecleaba, así que la
+   * diferencia contra las revisiones es historia contable cerrada. Diez avisos
+   * permanentes en «pide acción», con cero resueltos mes tras mes, enseñan a
+   * ignorar la pantalla — que es exactamente lo que este tablero existe para
+   * evitar. Lo que importa hoy es un gap en un mes **automático**: ese sí
+   * significa algo roto.
+   *
+   * La separación se hace **al leer**, con el `entityRef` del aviso (su mes)
+   * contra el primer mes con captura automática. Nada se oculta ni se borra.
+   */
+  async function conGaps(primerMesAuto: string | null, meses: string[]) {
+    const t = convexTest(schema, convexModules);
+    await t.run(async (ctx) => {
+      if (primerMesAuto) {
+        await ctx.db.insert("finance_entries", {
+          kind: "income", category: "inspeccion", isViatico: false,
+          amountCRC: 60_000, originalCurrency: "CRC",
+          date: Date.parse(`${primerMesAuto}-15T10:00:00-06:00`),
+          yearMonth: primerMesAuto, source: "inspection",
+          isDeleted: false, createdAt: 0, updatedAt: 0,
+        } as never);
+      }
+      for (const ym of meses) {
+        await ctx.db.insert("bi_quality_issues", {
+          issueType: "reconciliation_gap", entity: "finance_entries",
+          entityRef: ym, detail: `gap ${ym}`, severity: "warn",
+          resolved: false, detectedAt: 0, runId: "test",
+        } as never);
+      }
+    });
+    return t.query(internal.bi.calidad.calidad, {});
+  }
+
+  const cuenta = (r: any, tipo: string) =>
+    r.tipos.find((x: any) => x.issueType === tipo)?.sinResolver ?? 0;
+
+  test("los anteriores a la captura automática salen de «pide acción»", async () => {
+    const r = await conGaps("2026-08", ["2025-09", "2026-01", "2026-07"]);
+
+    expect(cuenta(r, "reconciliation_gap_manual")).toBe(3);
+    expect(cuenta(r, "reconciliation_gap")).toBe(0);
+    expect(r.porClase.accion).toBe(0);
+    expect(r.porClase.informativo).toBe(3);
+  });
+
+  test("un mes CON captura automática sigue pidiendo acción", async () => {
+    const r = await conGaps("2026-08", ["2026-08", "2026-09"]);
+
+    expect(cuenta(r, "reconciliation_gap")).toBe(2);
+    expect(cuenta(r, "reconciliation_gap_manual")).toBe(0);
+    expect(r.porClase.accion).toBe(2);
+  });
+
+  test("se separan en la misma corrida, no es todo o nada", async () => {
+    const r = await conGaps("2026-08", ["2025-09", "2026-08"]);
+
+    expect(cuenta(r, "reconciliation_gap_manual")).toBe(1);
+    expect(cuenta(r, "reconciliation_gap")).toBe(1);
+  });
+
+  test("sin captura automática todavía, NADA se reclasifica", async () => {
+    // Sin una época nueva no hay contra qué comparar: reclasificar ahí sería
+    // apagar avisos sin motivo.
+    const r = await conGaps(null, ["2025-09", "2026-07"]);
+
+    expect(cuenta(r, "reconciliation_gap")).toBe(2);
+    expect(cuenta(r, "reconciliation_gap_manual")).toBe(0);
+    expect(r.porClase.accion).toBe(2);
+  });
+
+  test("ninguno queda sin catalogar", async () => {
+    const r = await conGaps("2026-08", ["2025-09", "2026-08"]);
+    expect(r.sinCatalogar).toEqual([]);
+  });
+});

@@ -133,6 +133,10 @@ export function PlanillaPreview() {
                 ...PAGOS_AGOSTO,
                 yearMonth: mes,
                 confiable: mes >= "2026-08",
+                /* El selector de la muestra llega hasta el mes de hoy, así que
+                   este es el estado que hay que poder aprobar: el aviso del mes
+                   en curso aparece al elegir el último (A120). */
+                enCurso: mes === new Date().toISOString().slice(0, 7),
                 aviso:
                   mes >= "2026-08"
                     ? null

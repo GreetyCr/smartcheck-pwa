@@ -24,6 +24,7 @@ export type PagosTecnico = {
     revisionesSinComision: number;
   };
   confiable: boolean;
+  enCurso: boolean;
   aviso: string | null;
 };
 
@@ -150,6 +151,22 @@ export function TecnicoPagosCard({
           ) : null}
         </div>
       )}
+
+      {/* El mes en curso, dicho antes que la letra chica: la pantalla abre en
+          el mes de hoy, así que un día 2 lo primero que se ve es una comisión en
+          ₡0 —la comisión arranca en la revisión 46 del mes—, y ese cero se lee
+          como que el cálculo no corrió (A120). */}
+      {data.enCurso ? (
+        <p className="mt-4 rounded-xl border border-[var(--bi-ring)] px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">
+          <b className="text-[var(--bi-ink)]">Este mes todavía va corriendo.</b>{" "}
+          El cálculo se rehace solo con cada revisión nueva, así que este número
+          sube hasta que el mes cierre — no hay nada que ejecutar a fin de mes. Y
+          la <b>comisión arranca en la revisión {formatInt(
+            data.tarifas.revisionesSinComision + 1,
+          )}</b>{" "}
+          del mes: las primeras semanas marca ₡0 <b>por regla, no por error</b>.
+        </p>
+      ) : null}
 
       <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-[11.5px] leading-relaxed text-[var(--bi-ink-3)]">
         La semana va de <b className="text-[var(--bi-ink-2)]">lunes a domingo</b> y
