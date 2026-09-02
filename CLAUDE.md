@@ -88,3 +88,30 @@ grep -n "A56" ~/Developer/SmartCheck-BI-Proyecto/LOG.md
 Vale la pena antes de "arreglar" cualquier cosa que parezca arbitraria: buena parte de lo raro esta razonado ahi, con el incidente que lo origino.
 
 `docs/` guarda lo operativo del proyecto (auth Clerk↔Convex, checklist de la migracion local-first, planes por PR). `convex/README.md` cubre variables de entorno, el JWT template `convex` de Clerk y los helpers de roles.
+
+## Cierre de sesión: escribir la bitácora
+
+Este repo es trabajo de **Costa Coders** y su registro de horas vive en el vault, no acá:
+
+```
+~/Documents/Obsidian Vault/2. Areas/Costa Coders/Operación/Bitácora/AAAA-MM.md
+```
+
+**Al cerrar una sesión de trabajo, añadí una línea al final de `## Sesiones`**, sin reemplazar nada:
+
+```
+- AAAA-MM-DD · ~Nh · <cliente> · <qué se hizo>
+```
+
+El cliente de este repo es **SmartCheck CR**. Si el trabajo fue interno de la agencia, es `Costa Coders`.
+
+**Por qué importa:** es el único insumo que existe para saber cuánto toma de verdad cada cosa, y de
+ahí sale el precio por proyecto y la revisión del plan de soporte. Sin esa línea, el trabajo ocurrió
+pero no se puede cotizar.
+
+Y si en la sesión se entregó algo o se cerró un compromiso, actualizalo también en
+`Operación/Compromisos/`: `estado: entregado`, y volcá las horas a `horas_reales`. El tablero que lo
+muestra todo es `Operación/Panel.md`.
+
+> Las decisiones **técnicas de este proyecto** siguen yendo al log de este repo, no al vault. El vault
+> indexa, no duplica. Solo las de negocio, marca o precio van a `3. Resources/Decisiones/`.
