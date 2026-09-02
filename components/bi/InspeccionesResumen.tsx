@@ -39,6 +39,20 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
     [panel.porTecnico, panel.atribuibles],
   );
 
+  /**
+   * La base de los porcentajes, **dicha con su número**.
+   *
+   * Decía «81,9% del total» y con un filtro puesto «el total» es ambiguo: puede
+   * leerse como las 904 de siempre —y entonces 81,9% no cuadra— o como las 166
+   * del filtro. Greety leyó la tarjeta «Hechas en la app» (136) como si fuera el
+   * titular de la pantalla y la comparó contra las 166 de Canales, que es
+   * exactamente el mismo número que el titular de acá. El porcentaje ahora
+   * arrastra su base para que la tarjeta se lea sola.
+   */
+  const base = panel.conFiltros
+    ? `de ${formatInt(panel.total)} en el filtro`
+    : `de ${formatInt(panel.totalHistorico)}`;
+
   /** El mes con más revisiones, para poder nombrarlo en palabras. */
   const mejorMes = useMemo(() => {
     if (panel.porMes.length === 0) return null;
@@ -68,7 +82,7 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
           label="Hechas en la app"
           tone="neutral"
           value={formatInt(panel.deLaApp)}
-          exact={`${formatPct(pctOf(panel.deLaApp, panel.total))} del total`}
+          exact={`${formatPct(pctOf(panel.deLaApp, panel.total))} ${base}`}
           hint="Con técnico y PDF"
         />
         <BiKpiCard
@@ -76,7 +90,7 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
           label="Del CRM viejo"
           tone="neutral"
           value={formatInt(panel.delHistorico)}
-          exact={`${formatPct(pctOf(panel.delHistorico, panel.total))} del total`}
+          exact={`${formatPct(pctOf(panel.delHistorico, panel.total))} ${base}`}
           hint="Histórico migrado"
         />
         <BiKpiCard

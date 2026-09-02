@@ -393,6 +393,19 @@ export function LeadsDashboard({
             </span>{" "}
             de quienes escriben termina pagando una revisión.
           </p>
+          {/* Se comparó «Convirtieron» contra el total de revisiones de Canales
+              y no cuadraba. No tiene por qué: cuentan cosas distintas. Decirlo
+              acá, donde está el número, en vez de esperar que alguien recuerde
+              la nota del encabezado. */}
+          <p className="mt-2 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+            <strong>Esto no es la cantidad de revisiones del periodo.</strong> Es
+            cuántos de los <em>contactos que llegaron</em> en él ya son clientes.
+            Las revisiones del periodo están en Inspecciones y en Canales, y son
+            más: hay revisiones que <strong>no tienen lead</strong> con el cual
+            emparejarse —el CRM viejo casi nunca trae teléfono— y otras cuyo lead
+            <strong> llegó antes</strong>, así que su conversión no cuenta acá
+            aunque su revisión sí cuente allá.
+          </p>
           {funnel.recompras > 0 ? (
             /* No es una salvedad menor: son personas que el emparejamiento
                encuentra de verdad, pero que ya eran clientes. Contarlas le
