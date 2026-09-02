@@ -265,3 +265,174 @@ describe("el embudo", () => {
     expect(nombres).not.toContain("Por Nombre");
   });
 });
+
+/* ========================================================================== */
+/* Recompra (A112) y cohorte por periodo (A113)                               */
+/* ========================================================================== */
+
+/**
+ * Estos dos bloques nacen de una queja concreta de Esteban el 1-set-2026: «entre
+ * noviembre y agosto tuve muchísimos clientes, ¿por qué los porcentajes no se
+ * mueven?». No se movían porque la pantalla promediaba nueve meses; y una parte
+ * de lo que sí contaba no eran clientes nuevos.
+ */
+describe("una revisión anterior al lead es recompra, no conversión", () => {
+  test("el que ya era cliente y volvió a escribir NO cuenta como convertido", async () => {
+    // La revisión es de enero; el contacto escribió en julio. El emparejamiento
+    // por teléfono los une bien —es la misma persona—, pero atribuirle esa venta
+    // al bot sería contar un cliente que ya estaba.
+    const t = await montar([{}], [{ inspectionStartAt: dia("2026-01-15") }]);
+    const e = await embudo(t);
+
+    expect(e.recompras).toBe(1);
+    expect(e.converted).toBe(0);
+    expect(e.convertedRatePct).toBe(0);
+  });
+
+  test("pero la revisión de hace tres días SÍ cuenta: es el mismo hecho comercial", async () => {
+    // El caso real de PROD: la revisión se hizo y la ficha se registró después.
+    // Los datos separan los dos grupos con una franja vacía de 62 días, así que
+    // el umbral de 7 no parte nada por la mitad.
+    const t = await montar([{}], [{ inspectionStartAt: dia("2026-06-28") }]);
+    const e = await embudo(t);
+
+    expect(e.recompras).toBe(0);
+    expect(e.converted).toBe(1);
+  });
+
+  test("la recompra tampoco aparece en la lista de convertidos", async () => {
+    // Si la lista y el titular no miden lo mismo, la pantalla se contradice sola.
+    const t = await montar([{}], [{ inspectionStartAt: dia("2026-01-15") }]);
+    const conv = await t.query(internal.bi.matches.convertedLeads, {});
+    expect(conv).toHaveLength(0);
+    expect(conv).toHaveLength((await embudo(t)).converted);
+  });
+});
+
+describe("el periodo corta por la fecha del CONTACTO, no la de la revisión", () => {
+  /** Dos contactos: uno de marzo (su revisión en abril) y uno de julio. */
+  const dosCohortes = () =>
+    montar(
+      [
+        { dedupKey: "marzo", phone8: "11112222", sourceCreatedAt: dia("2026-03-02") },
+        { dedupKey: "julio", phone8: "88887777", sourceCreatedAt: dia("2026-07-01") },
+      ],
+      [
+        { clientPhone: "1111-2222", inspectionStartAt: dia("2026-04-10") },
+        { clientPhone: "8888-7777", inspectionStartAt: dia("2026-07-10") },
+      ],
+    );
+
+  test("sin periodo entran los dos", async () => {
+    const e = await embudo(await dosCohortes());
+    expect(e.leadsTotal).toBe(2);
+    expect(e.converted).toBe(2);
+    expect(e.conPeriodo).toBe(false);
+  });
+
+  test("con periodo de julio queda solo el de julio — numerador Y denominador", async () => {
+    // Lo que hacía que el porcentaje no se moviera era exactamente esto: filtrar
+    // uno solo de los dos lados. Si el denominador se quedara en 2, la tasa
+    // diría 50% de un universo que la pantalla ya no muestra.
+    const t = await dosCohortes();
+    const e = await t.query(internal.bi.matches.conversionFunnel, {
+      fromMs: dia("2026-06-01"),
+    });
+
+    expect(e.leadsTotal).toBe(1);
+    expect(e.converted).toBe(1);
+    expect(e.convertedRatePct).toBe(100);
+    expect(e.conPeriodo).toBe(true);
+  });
+
+  test("la revisión de abril NO arrastra a su contacto de marzo al periodo", async () => {
+    // El contacto es de marzo aunque su revisión caiga en abril: cortar por la
+    // fecha de la revisión respondería otra pregunta.
+    const t = await dosCohortes();
+    const e = await t.query(internal.bi.matches.conversionFunnel, {
+      fromMs: dia("2026-04-01"),
+      toMs: dia("2026-05-01"),
+    });
+
+    expect(e.leadsTotal).toBe(0);
+    expect(e.converted).toBe(0);
+  });
+
+  test("la lista de convertidos respeta el mismo recorte", async () => {
+    const t = await dosCohortes();
+    const args = { fromMs: dia("2026-06-01") };
+    const conv = await t.query(internal.bi.matches.convertedLeads, args);
+    const e = await t.query(internal.bi.matches.conversionFunnel, args);
+
+    expect(conv).toHaveLength(e.converted);
+  });
+});
+
+describe("la cohorte mensual cuadra con el titular", () => {
+  test("los meses suman exactamente los leads y los convertidos", async () => {
+    // La serie es lo que Esteban va a mirar. Si no sumara el titular, el gráfico
+    // y el número grande de arriba contarían historias distintas.
+    const t = await montar(
+      [
+        { dedupKey: "a", phone8: "11112222", sourceCreatedAt: dia("2026-05-02") },
+        { dedupKey: "b", phone8: "33334444", sourceCreatedAt: dia("2026-06-02") },
+        { dedupKey: "c", phone8: "55556666", sourceCreatedAt: dia("2026-06-20") },
+      ],
+      [
+        { clientPhone: "1111-2222", inspectionStartAt: dia("2026-05-10") },
+        { clientPhone: "3333-4444", inspectionStartAt: dia("2026-06-10") },
+      ],
+    );
+    const e = await embudo(t);
+    const suma = (f: (m: (typeof e.porMes)[number]) => number) =>
+      e.porMes.reduce((s, m) => s + f(m), 0);
+
+    expect(suma((m) => m.leads)).toBe(e.leadsTotal - e.leadsSinFecha);
+    expect(suma((m) => m.convertidos)).toBe(e.converted);
+    expect(suma((m) => m.recompras)).toBe(e.recompras);
+    expect(e.porMes.map((m) => m.yearMonth)).toEqual(["2026-05", "2026-06"]);
+  });
+
+  test("la tasa de cada mes se calcula sobre SU mes, no sobre el total", async () => {
+    // Junio: 1 de 2 = 50%. Mayo: 1 de 1 = 100%. Sobre el total daría 33% en
+    // ambos, que es justo el promedio que escondía la mejora.
+    const t = await montar(
+      [
+        { dedupKey: "a", phone8: "11112222", sourceCreatedAt: dia("2026-05-02") },
+        { dedupKey: "b", phone8: "33334444", sourceCreatedAt: dia("2026-06-02") },
+        { dedupKey: "c", phone8: "55556666", sourceCreatedAt: dia("2026-06-20") },
+      ],
+      [
+        { clientPhone: "1111-2222", inspectionStartAt: dia("2026-05-10") },
+        { clientPhone: "3333-4444", inspectionStartAt: dia("2026-06-10") },
+      ],
+    );
+    const porMes = new Map((await embudo(t)).porMes.map((m) => [m.yearMonth, m]));
+
+    expect(porMes.get("2026-05")?.tasaPct).toBe(100);
+    expect(porMes.get("2026-06")?.tasaPct).toBe(50);
+  });
+});
+
+describe("un contacto sin fecha no se inventa un mes", () => {
+  test("sin periodo cuenta en el total pero no cae en ninguna cohorte", async () => {
+    const t = await montar([{ sourceCreatedAt: undefined }], []);
+    const e = await embudo(t);
+
+    expect(e.leadsTotal).toBe(1);
+    expect(e.leadsSinFecha).toBe(1);
+    expect(e.porMes).toHaveLength(0);
+  });
+
+  test("con periodo puesto queda fuera, y el número queda a la vista", async () => {
+    // Excluirlo en silencio sería mentir sobre el denominador; meterlo en un mes
+    // cualquiera, peor. Se va y se dice cuántos se fueron (A64/A88).
+    const t = await montar([{ sourceCreatedAt: undefined }], []);
+    const e = await t.query(internal.bi.matches.conversionFunnel, {
+      fromMs: dia("2026-01-01"),
+    });
+
+    expect(e.leadsTotal).toBe(0);
+    expect(e.leadsSinFecha).toBe(1);
+  });
+});

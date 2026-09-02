@@ -17,15 +17,20 @@ import { cn } from "@/lib/utils";
 /**
  * Datos de MUESTRA (no salen de Convex).
  *
- * Los agregados sí copian los de producción —**al 24-ago-2026**: 9.096 leads,
- * 217 conversiones, 2,39%, 31 sin llave, 176 teléfonos inservibles— porque el
+ * Los agregados sí copian los de producción —**al 1-set-2026**: 9.290 leads,
+ * 220 conversiones, 2,37%, 31 sin llave, 166 teléfonos inservibles— porque el
  * punto de esta vista es revisar el diseño con las magnitudes reales: una
- * conversión del 2% se ve muy distinta a una del 30%, y una lista de 176 filas
+ * conversión del 2% se ve muy distinta a una del 30%, y una lista de 166 filas
  * se pagina distinto que una de 5.
  *
  * Llevan la fecha a propósito: son una foto, y sin fecha se leen como si fueran
  * de hoy. Se regeneran con `npx convex run --prod bi/matches:conversionFunnel`
  * y `bi/leads:leadsStats`.
+ *
+ * `converted`, `recompras` y `porMes` (A112/A113) salen del mismo comando, ya
+ * con la función desplegada: PROD devuelve **220 titulares y 16 recompras**,
+ * idéntico a lo que se había calculado a mano sobre las tablas antes del
+ * despliegue. No recalcular a mano: pedirlos al comando.
  *
  * Los nombres, teléfonos e IDs, en cambio, son **inventados**: esta vista no
  * pide sesión y las tablas muestran datos de clientes.
@@ -135,75 +140,104 @@ const POR_REVISAR: LeadsPorRevisar = (() => {
 })();
 
 const FUNNEL: ConversionFunnel = {
-  leadsTotal: 9096,
-  leadsWithPhone: 9025,
-  leadsMatched: 276,
-  converted: 217,
-  convertedRatePct: 2.39,
-  convertedRateOfPhonedPct: 2.4,
+  leadsTotal: 9290,
+  leadsWithPhone: 9218,
+  leadsMatched: 295,
+  /* Los 9.290 traen `sourceCreatedAt`. El campo existe igual porque el día que
+     entre uno sin fecha tiene que verse, no desaparecer del conteo. */
+  leadsSinFecha: 0,
+  conPeriodo: false,
+  recompras: 16,
+  converted: 220,
+  convertedRatePct: 2.37,
+  convertedRateOfPhonedPct: 2.39,
   possibleAdditionalByName: 58,
-  possibleAdditionalByNameRatePct: 0.67,
-  convertedIncludingName: 275,
-  placeholderMatches: 0,
+  possibleAdditionalByNameRatePct: 0.62,
+  convertedIncludingName: 278,
+  placeholderMatches: 1,
+  /**
+   * La cohorte real de PROD. Es el argumento entero de A113 en diez filas: el
+   * promedio de toda la vida es 2,37% y el último mes cerrado va en 6,23%.
+   *
+   * Las recompras se concentran en los meses viejos —cuando el histórico del CRM
+   * dominaba— así que separarlas **acentúa** la pendiente en vez de suavizarla.
+   */
+  porMes: [
+    { yearMonth: "2025-11", leads: 287, convertidos: 3, recompras: 0, tasaPct: 1.05 },
+    { yearMonth: "2025-12", leads: 1233, convertidos: 4, recompras: 1, tasaPct: 0.32 },
+    { yearMonth: "2026-01", leads: 1201, convertidos: 8, recompras: 2, tasaPct: 0.67 },
+    { yearMonth: "2026-02", leads: 1065, convertidos: 7, recompras: 4, tasaPct: 0.66 },
+    { yearMonth: "2026-03", leads: 1090, convertidos: 13, recompras: 4, tasaPct: 1.19 },
+    { yearMonth: "2026-04", leads: 938, convertidos: 10, recompras: 1, tasaPct: 1.07 },
+    { yearMonth: "2026-05", leads: 909, convertidos: 41, recompras: 1, tasaPct: 4.51 },
+    { yearMonth: "2026-06", leads: 872, convertidos: 40, recompras: 2, tasaPct: 4.59 },
+    { yearMonth: "2026-07", leads: 892, convertidos: 44, recompras: 1, tasaPct: 4.93 },
+    { yearMonth: "2026-08", leads: 803, convertidos: 50, recompras: 0, tasaPct: 6.23 },
+  ],
   byBand: [
-    { band: "alta", rows: 152 },
-    { band: "media", rows: 28 },
+    { band: "alta", rows: 202 },
+    { band: "media", rows: 35 },
     { band: "baja", rows: 58 },
   ],
   byMethod: [
-    { method: "phone_exact", rows: 152 },
-    { method: "phone_vehicle_window", rows: 28 },
+    { method: "phone_exact", rows: 202 },
+    { method: "phone_vehicle_window", rows: 35 },
     { method: "name_vehicle_window", rows: 58 },
   ],
   byTarget: [
     { target: "legacy", rows: 155 },
-    { target: "era_app", rows: 83 },
+    { target: "era_app", rows: 140 },
   ],
   // La portada ya no pinta la muestra: la lista completa vive en su tarjeta.
   sampleWhoConverts: [],
-  note: "channel no está disponible en leads (Airtable vacío); sin desglose por canal del lado lead.",
+  note: "El periodo corta por la fecha del LEAD (sourceCreatedAt), no por la de la revisión (A113). channel no está disponible en leads (Airtable vacío en los 9.290). Recompras aparte (A112).",
 };
 
 const MATCHES: MatchesStats = {
-  totalMatches: 276,
-  ambiguous: 28,
-  validIncome: 275,
-  invalidIncome: 0,
+  totalMatches: 295,
+  ambiguous: 35,
+  validIncome: 294,
+  invalidIncome: 1,
   byMatchKeyKind: [
-    { kind: "phone", rows: 180 },
+    { kind: "phone", rows: 237 },
     { kind: "name", rows: 58 },
   ],
   byMethod: FUNNEL.byMethod,
   byBand: FUNNEL.byBand,
   byTarget: FUNNEL.byTarget,
-  leadsWithPhone: 9025,
-  leadsWithoutMatch: 8468,
-  ambiguousMatchIssues: 28,
+  leadsWithPhone: 9218,
+  leadsWithoutMatch: 8995,
+  ambiguousMatchIssues: 34,
 };
 
 const LEADS: LeadsStats = {
-  total: 9096,
+  total: 9290,
   isDeleted: 0,
-  phone8Present: 9025,
-  manychatPresent: 8622,
-  namePresent: 8904,
-  phoneValidTrue: 8920,
-  phoneValidFalse: 176,
-  dupPhone8Groups: 506,
-  dupPhone8ExcessRows: 539,
-  dupManychatGroups: 401,
-  dupManychatExcessRows: 423,
+  phone8Present: 9218,
+  manychatPresent: 8816,
+  namePresent: 9093,
+  phoneValidTrue: 9111,
+  phoneValidFalse: 179,
+  dupPhone8Groups: 519,
+  dupPhone8ExcessRows: 552,
+  dupManychatGroups: 413,
+  dupManychatExcessRows: 435,
   minSourceCreatedAt: D("2025-11-20"),
-  maxSourceCreatedAt: D("2026-08-08"),
-  sourceCreatedPresent: 9096,
+  maxSourceCreatedAt: D("2026-08-30"),
+  sourceCreatedPresent: 9290,
+  /* `convertido` sigue en 236 y no en 220: es una **caché** que escribe el
+     rebuild de matches (A29 ya la marca como «no verdad de conversión»), y
+     todavía no se ha recorrido con la regla de recompra. No se pinta en ninguna
+     tarjeta, así que no contradice nada en pantalla; si algún día se pinta, hay
+     que recorrerla primero. */
   byStage: [
-    { stage: "nuevo", rows: 8526 },
-    { stage: "convertido", rows: 180 },
+    { stage: "nuevo", rows: 9054 },
+    { stage: "convertido", rows: 236 },
   ],
-  byChannel: [{ channel: "(vacío)", rows: 9096 }],
+  byChannel: [{ channel: "(vacío)", rows: 9290 }],
   issuesByType: [
-    { issueType: "lead_dup", rows: 1745 },
-    { issueType: "anomalous_phone", rows: 152 },
+    { issueType: "lead_dup", rows: 1919 },
+    { issueType: "anomalous_phone", rows: 166 },
     { issueType: "lead_no_key", rows: 31 },
   ],
 };

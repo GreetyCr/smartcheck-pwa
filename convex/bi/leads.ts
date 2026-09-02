@@ -21,6 +21,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
+import { leadPeriodValidator, type LeadPeriodArgs } from "./matches";
 
 /* -------------------------------------------------------------------------- */
 /* Enums de dominio (idénticos a schema.ts leads_contacts)                     */
@@ -477,20 +478,42 @@ export const leadsStatsReturns = v.object({
     sourceCreatedPresent: v.number(),
     byStage: v.array(v.object({ stage: v.string(), rows: v.number() })),
     byChannel: v.array(v.object({ channel: v.string(), rows: v.number() })),
+    /**
+     * **NO se recorta por periodo**: `bi_quality_issues` guarda el aviso, no el
+     * lead, así que filtrarlo exigiría un join que hoy no existe. Se devuelve
+     * global y la tarjeta lo rotula como tal — decirlo es barato, y un contador
+     * que cambia a medias con el filtro sería peor que uno que no cambia (A64).
+     */
     issuesByType: v.array(
       v.object({ issueType: v.string(), rows: v.number() }),
     ),
 });
 
 export const leadsStats = internalQuery({
-  args: {},
+  args: { ...leadPeriodValidator },
   returns: leadsStatsReturns,
-  handler: async (ctx) => leadsStatsImpl(ctx),
+  handler: async (ctx, args) => leadsStatsImpl(ctx, args),
 });
 
-/** Stats de calidad de leads, plano y compartido (ver A41 en `bi/metrics.ts`). */
-export async function leadsStatsImpl(ctx: QueryCtx) {
-    const rows = await ctx.db.query("leads_contacts").collect();
+/**
+ * Stats de calidad de leads, plano y compartido (ver A41 en `bi/metrics.ts`).
+ *
+ * El periodo corta por `sourceCreatedAt` —la fecha del contacto—, igual que el
+ * embudo (A113), para que las dos tarjetas de la pantalla hablen del mismo
+ * universo. Sin esa coordinación la cobertura diría 9.290 al lado de un embudo
+ * de 803 y no habría forma de saber cuál de las dos miente.
+ */
+export async function leadsStatsImpl(
+  ctx: QueryCtx,
+  { fromMs, toMs }: LeadPeriodArgs = {},
+) {
+    const conPeriodo = fromMs != null || toMs != null;
+    const rows = (await ctx.db.query("leads_contacts").collect()).filter((r) => {
+      if (r.sourceCreatedAt == null) return !conPeriodo;
+      if (fromMs != null && r.sourceCreatedAt < fromMs) return false;
+      if (toMs != null && r.sourceCreatedAt >= toMs) return false;
+      return true;
+    });
     let isDeleted = 0,
       phone8Present = 0,
       manychatPresent = 0,

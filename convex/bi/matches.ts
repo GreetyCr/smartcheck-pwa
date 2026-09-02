@@ -27,7 +27,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { isoDate } from "./lib/dates";
+import { isoDate, yearMonth } from "./lib/dates";
 
 /* -------------------------------------------------------------------------- */
 /* Reglas / constantes                                                        */
@@ -57,6 +57,35 @@ const isValidIncome = (amt: number | undefined | null): boolean =>
 /** Ventana temporal razonable lead→inspección (para scoring, no filtro duro). */
 const WINDOW_BEFORE_MS = 7 * 24 * 3600 * 1000; // lead hasta 7d después de la inspección
 const WINDOW_AFTER_MS = 180 * 24 * 3600 * 1000; // inspección hasta 180d después del lead
+
+/**
+ * ¿El match es en realidad una **recompra** y no una conversión? (**A112**)
+ *
+ * Un match por teléfono une lead e inspección sin exigir que la inspección sea
+ * *posterior*: la cercanía de fechas puntúa (`score`) pero no descarta. Eso está
+ * bien para emparejar —es la misma persona— y mal para contar: si la revisión
+ * ocurrió **antes** de que el lead existiera, esa persona ya era cliente y
+ * volvió a escribir. Contarla como «lead convertido» le atribuye al bot un
+ * cliente que ya estaba.
+ *
+ * El umbral es `WINDOW_BEFORE_MS` (7 días), la misma constante que ya gobierna
+ * la ventana de matching, y **los datos lo confirman en vez de forzarlo**: en
+ * PROD (1-set-2026) los 19 huecos negativos caen en dos grupos separados por una
+ * franja vacía de 62 días — tres a −2,0/−3,9/−4,6 días (la revisión se hizo y la
+ * ficha se registró después: mismo hecho comercial) y dieciséis a −66 días o más
+ * (recompras de verdad). Cualquier corte entre 5 y 66 días da el mismo
+ * resultado, así que el valor exacto no es una perilla que ajustar.
+ *
+ * Sin fecha de un lado no se puede decidir: se deja como conversión (no se
+ * inventa una recompra por un dato ausente) y `leadsSinFecha` lo hace contable.
+ */
+function esRecompra(
+  inspectionDate: number | undefined | null,
+  leadCreatedAt: number | undefined | null,
+): boolean {
+  if (inspectionDate == null || leadCreatedAt == null) return false;
+  return inspectionDate - leadCreatedAt < -WINDOW_BEFORE_MS;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helpers de normalización (no hay lib/phone.ts todavía; inline y acotado)    */
@@ -498,10 +527,51 @@ export const resetMatchesIssues = internalMutation({
 /* -------------------------------------------------------------------------- */
 
 /** Forma de retorno del embudo — la reusa el wrapper público (`bi/public.ts`). */
+/**
+ * Periodo de la pantalla de Leads — **A113**.
+ *
+ * Es el único filtro que esta pantalla acepta, y **corta por una fecha distinta
+ * a la del resto del tablero**: acá `fromMs`/`toMs` se aplican a
+ * `leads_contacts.sourceCreatedAt` (cuándo llegó el contacto), no a la fecha de
+ * la revisión. Tiene que ser así para que la pregunta tenga sentido —«de los
+ * leads de agosto, cuántos convirtieron»— y por eso la tarjeta lo dice con
+ * todas las letras en pantalla: un filtro que significa dos cosas distintas
+ * según la pestaña, sin avisar, es la trampa que A64 prohíbe.
+ *
+ * Ninguna otra dimensión entra: en los 9.290 leads de PROD el canal viene
+ * **vacío en todos** (Airtable no lo llena) y no hay provincia ni marca del lado
+ * contacto. Se declara `soporta={["periodo"]}` y la barra apaga el resto.
+ */
+export const leadPeriodValidator = {
+  fromMs: v.optional(v.number()),
+  toMs: v.optional(v.number()),
+};
+
+export type LeadPeriodArgs = { fromMs?: number; toMs?: number };
+
 export const conversionFunnelReturns = v.object({
     leadsTotal: v.number(),
     leadsWithPhone: v.number(),
     leadsMatched: v.number(), // con match (válido o no)
+    /** Leads sin `sourceCreatedAt`: no se pueden ubicar en el periodo (hueco visible). */
+    leadsSinFecha: v.number(),
+    /** ¿Hay un periodo puesto? Cambia la lectura de todo lo de arriba. */
+    conPeriodo: v.boolean(),
+    /**
+     * Matches de calidad titular cuya revisión es ANTERIOR al lead: el cliente ya
+     * lo era y volvió a escribir. NO cuentan como conversión (A112).
+     */
+    recompras: v.number(),
+    /** Cohorte por mes de llegada del lead — la serie que hace visible la mejora. */
+    porMes: v.array(
+      v.object({
+        yearMonth: v.string(),
+        leads: v.number(),
+        convertidos: v.number(),
+        recompras: v.number(),
+        tasaPct: v.number(),
+      }),
+    ),
     // MÉTRICA TITULAR (A29): conversión por teléfono, bandas alta+media.
     converted: v.number(),
     convertedRatePct: v.number(), // converted / leadsTotal(8.400) * 100
@@ -535,38 +605,106 @@ export const conversionFunnelReturns = v.object({
  */
 export async function conversionFunnelImpl(
   ctx: QueryCtx,
-  { sampleSize }: { sampleSize?: number },
+  { sampleSize, fromMs, toMs }: { sampleSize?: number } & LeadPeriodArgs,
 ) {
-    const leads = await ctx.db.query("leads_contacts").collect();
-    const leadsTotal = leads.filter((l) => !l.isDeleted).length;
-    const leadsWithPhone = leads.filter(
-      (l) => !l.isDeleted && l.phone8,
-    ).length;
+    const todosLosLeads = (await ctx.db.query("leads_contacts").collect()).filter(
+      (l) => !l.isDeleted,
+    );
+    const conPeriodo = fromMs != null || toMs != null;
 
-    const matches = await ctx.db.query("bi_matches").collect();
+    /* Un lead sin fecha no se puede ubicar en un periodo. Con la barra en «Todo»
+       cuenta como siempre; con un periodo puesto queda fuera —no se le inventa
+       un mes— y `leadsSinFecha` lo deja contable en pantalla (A64/A88). */
+    let leadsSinFecha = 0;
+    const leads = todosLosLeads.filter((l) => {
+      if (l.sourceCreatedAt == null) {
+        leadsSinFecha++;
+        return !conPeriodo;
+      }
+      if (fromMs != null && l.sourceCreatedAt < fromMs) return false;
+      if (toMs != null && l.sourceCreatedAt >= toMs) return false;
+      return true;
+    });
+
+    const leadsTotal = leads.length;
+    const leadsWithPhone = leads.filter((l) => l.phone8).length;
+
+    /* La fecha del lead se necesita dos veces —recompra y cohorte— así que se
+       indexa una vez. Solo los leads del periodo: un match cuyo lead quedó fuera
+       no debe contarse, o el numerador hablaría de un periodo y el denominador
+       de otro. */
+    const fechaLead = new Map<string, number | undefined>();
+    for (const l of leads) fechaLead.set(l._id, l.sourceCreatedAt);
+
+    const matches = (await ctx.db.query("bi_matches").collect()).filter(
+      (m) => m.leadId != null && fechaLead.has(m.leadId),
+    );
     const leadsMatched = matches.length;
-    let converted = 0; // titular: validIncome + banda alta/media
+    let converted = 0; // titular: validIncome + banda alta/media, sin recompras
+    let recompras = 0; // titular en calidad, pero el cliente ya lo era (A112)
     let possibleAdditionalByName = 0; // validIncome + banda baja (nombre)
     let placeholderMatches = 0;
     const byBand = new Map<string, number>();
     const byMethod = new Map<string, number>();
     const byTarget = new Map<string, number>();
+    /** Cohorte: mes de llegada del lead → sus tres contadores. */
+    const cohorte = new Map<
+      string,
+      { leads: number; convertidos: number; recompras: number }
+    >();
+    const balde = (ym: string) => {
+      let b = cohorte.get(ym);
+      if (!b) cohorte.set(ym, (b = { leads: 0, convertidos: 0, recompras: 0 }));
+      return b;
+    };
+    for (const l of leads) {
+      if (l.sourceCreatedAt != null) balde(yearMonth(l.sourceCreatedAt)).leads++;
+    }
+
     for (const m of matches) {
       if (m.validIncome) {
         if (m.confidenceBand === "baja") possibleAdditionalByName++;
-        else converted++;
+        else {
+          const tLead = fechaLead.get(m.leadId!);
+          const vieja = esRecompra(m.inspectionDate, tLead);
+          if (vieja) recompras++;
+          else converted++;
+          if (tLead != null) {
+            const b = balde(yearMonth(tLead));
+            if (vieja) b.recompras++;
+            else b.convertidos++;
+          }
+        }
       } else placeholderMatches++;
       byBand.set(m.confidenceBand, (byBand.get(m.confidenceBand) ?? 0) + 1);
       byMethod.set(m.matchMethod, (byMethod.get(m.matchMethod) ?? 0) + 1);
       byTarget.set(m.matchTarget, (byTarget.get(m.matchTarget) ?? 0) + 1);
     }
 
+    const porMes = [...cohorte.entries()]
+      .map(([ym, b]) => ({
+        yearMonth: ym,
+        leads: b.leads,
+        convertidos: b.convertidos,
+        recompras: b.recompras,
+        tasaPct:
+          b.leads > 0
+            ? Math.round((b.convertidos / b.leads) * 10000) / 100
+            : 0,
+      }))
+      .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+
     // Muestra "quiénes convierten": titular (alta+media) válidos, recientes primero.
     const n = sampleSize ?? 25;
     const leadName = new Map<string, string | undefined>();
     for (const l of leads) leadName.set(l._id, l.name);
     const sampleWhoConverts = matches
-      .filter((m) => m.validIncome && m.confidenceBand !== "baja")
+      .filter(
+        (m) =>
+          m.validIncome &&
+          m.confidenceBand !== "baja" &&
+          !esRecompra(m.inspectionDate, fechaLead.get(m.leadId!)),
+      )
       .sort((a, b) => (b.inspectionDate ?? 0) - (a.inspectionDate ?? 0))
       .slice(0, n)
       .map((m) => ({
@@ -586,6 +724,10 @@ export async function conversionFunnelImpl(
       leadsTotal,
       leadsWithPhone,
       leadsMatched,
+      leadsSinFecha,
+      conPeriodo,
+      recompras,
+      porMes,
       converted,
       convertedRatePct: pct(converted, leadsTotal),
       convertedRateOfPhonedPct: pct(converted, leadsWithPhone),
@@ -603,12 +745,12 @@ export async function conversionFunnelImpl(
         rows,
       })),
       sampleWhoConverts,
-      note: "channel no está disponible en leads (Airtable vacío); sin desglose por canal del lado lead.",
+      note: "El periodo corta por la fecha del LEAD (sourceCreatedAt), no por la de la revisión: la pregunta es «de los leads que llegaron, cuántos convirtieron» (A113). channel no está disponible en leads (Airtable vacío en los 9.290); sin desglose por canal del lado lead —el canal sí existe del lado revisión, en Canales. Recompras (revisión anterior al lead) van aparte y NO cuentan como conversión (A112).",
     };
 }
 
 export const conversionFunnel = internalQuery({
-  args: { sampleSize: v.optional(v.number()) },
+  args: { sampleSize: v.optional(v.number()), ...leadPeriodValidator },
   returns: conversionFunnelReturns,
   handler: async (ctx, args) => conversionFunnelImpl(ctx, args),
 });
@@ -646,15 +788,44 @@ export const convertedLeadsReturns = v.array(
  * Mismo criterio que la métrica titular (A29): solo `validIncome` y bandas
  * alta+media. Los emparejamientos por nombre (banda baja) **no entran**, igual
  * que no entran en el 2,07%.
+ *
+ * **La lista tiene que medir exactamente lo que dice el titular.** Por eso
+ * arrastra los dos recortes nuevos: el periodo del lead (A113) y las recompras
+ * (A112). Una lista de 236 nombres debajo de un titular que dice 220 es la clase
+ * de contradicción que hace desconfiar de la pantalla entera; hay una prueba que
+ * ata `convertedLeads.length` a `conversionFunnel.converted`.
  */
-export async function convertedLeadsImpl(ctx: QueryCtx) {
-  const matches = await ctx.db.query("bi_matches").collect();
-  const leads = await ctx.db.query("leads_contacts").collect();
+export async function convertedLeadsImpl(
+  ctx: QueryCtx,
+  { fromMs, toMs }: LeadPeriodArgs = {},
+) {
+  const leads = (await ctx.db.query("leads_contacts").collect()).filter(
+    (l) => !l.isDeleted,
+  );
+  const conPeriodo = fromMs != null || toMs != null;
   const leadName = new Map<string, string | undefined>();
-  for (const l of leads) leadName.set(l._id, l.name);
+  const fechaLead = new Map<string, number | undefined>();
+  for (const l of leads) {
+    if (l.sourceCreatedAt == null) {
+      if (conPeriodo) continue;
+    } else {
+      if (fromMs != null && l.sourceCreatedAt < fromMs) continue;
+      if (toMs != null && l.sourceCreatedAt >= toMs) continue;
+    }
+    leadName.set(l._id, l.name);
+    fechaLead.set(l._id, l.sourceCreatedAt);
+  }
 
+  const matches = await ctx.db.query("bi_matches").collect();
   return matches
-    .filter((m) => m.validIncome && m.confidenceBand !== "baja")
+    .filter(
+      (m) =>
+        m.validIncome &&
+        m.confidenceBand !== "baja" &&
+        m.leadId != null &&
+        fechaLead.has(m.leadId) &&
+        !esRecompra(m.inspectionDate, fechaLead.get(m.leadId)),
+    )
     .sort((a, b) => (b.inspectionDate ?? 0) - (a.inspectionDate ?? 0))
     .map((m) => ({
       leadName: m.leadId ? leadName.get(m.leadId) : undefined,
@@ -668,9 +839,9 @@ export async function convertedLeadsImpl(ctx: QueryCtx) {
 }
 
 export const convertedLeads = internalQuery({
-  args: {},
+  args: { ...leadPeriodValidator },
   returns: convertedLeadsReturns,
-  handler: async (ctx) => convertedLeadsImpl(ctx),
+  handler: async (ctx, args) => convertedLeadsImpl(ctx, args),
 });
 
 /** Forma de retorno de las stats de matching — la reusa `bi/public.ts`. */

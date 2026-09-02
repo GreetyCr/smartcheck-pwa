@@ -37,6 +37,7 @@ import {
   conversionFunnelReturns,
   convertedLeadsImpl,
   convertedLeadsReturns,
+  leadPeriodValidator,
   matchesStatsImpl,
   matchesStatsReturns,
 } from "./matches";
@@ -132,7 +133,7 @@ export const reconciliation = query({
  * débil que se muestra **aparte**, nunca sumado al titular.
  */
 export const conversionFunnel = query({
-  args: { sampleSize: v.optional(v.number()) },
+  args: { sampleSize: v.optional(v.number()), ...leadPeriodValidator },
   returns: conversionFunnelReturns,
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
@@ -157,11 +158,11 @@ export const matchesStats = query({
  * accionable o se lee como si hubiera 1.900 problemas.
  */
 export const leadsStats = query({
-  args: {},
+  args: { ...leadPeriodValidator },
   returns: leadsStatsReturns,
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    return leadsStatsImpl(ctx);
+    return leadsStatsImpl(ctx, args);
   },
 });
 
@@ -172,11 +173,11 @@ export const leadsStats = query({
  * salir a logs.
  */
 export const convertedLeads = query({
-  args: {},
+  args: { ...leadPeriodValidator },
   returns: convertedLeadsReturns,
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    return convertedLeadsImpl(ctx);
+    return convertedLeadsImpl(ctx, args);
   },
 });
 

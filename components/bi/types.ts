@@ -266,12 +266,29 @@ export type FinanceEntry = {
  * los tipos de finanzas: la vista de revisión (`/dev/leads`) arma estos objetos
  * a mano y necesita el tipo sin arrastrar el cliente de Convex.
  */
+/** Una cohorte mensual del embudo: los leads que llegaron en ese mes (A113). */
+export type ConversionPorMes = {
+  yearMonth: string;
+  leads: number;
+  convertidos: number;
+  /** Ya eran clientes y volvieron a escribir: NO cuentan como conversión (A112). */
+  recompras: number;
+  tasaPct: number;
+};
+
 export type ConversionFunnel = {
   leadsTotal: number;
   leadsWithPhone: number;
   /** Con match de cualquier banda: incluye el fallback débil por nombre. */
   leadsMatched: number;
-  /** MÉTRICA TITULAR (A29): teléfono, bandas alta+media. */
+  /** Leads sin fecha de creación: no se pueden ubicar en un periodo. */
+  leadsSinFecha: number;
+  /** ¿Hay periodo puesto? Cambia qué universo describen las cifras. */
+  conPeriodo: boolean;
+  /** Revisión anterior al lead: recompra, no conversión (A112). */
+  recompras: number;
+  porMes: ConversionPorMes[];
+  /** MÉTRICA TITULAR (A29): teléfono, bandas alta+media, sin recompras. */
   converted: number;
   convertedRatePct: number;
   convertedRateOfPhonedPct: number;

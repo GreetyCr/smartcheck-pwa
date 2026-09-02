@@ -2,9 +2,15 @@
 
 import { useMemo } from "react";
 import { AlertTriangle, CheckCircle2, Info, MinusCircle } from "lucide-react";
-import { formatDateCR, formatInt, formatPct } from "@/lib/bi-format";
+import {
+  formatDateCR,
+  formatInt,
+  formatMonthLong,
+  formatPct,
+} from "@/lib/bi-format";
 import { cn } from "@/lib/utils";
 import { BiCard } from "./BiCard";
+import { ConversionPorMesChart } from "./ConversionPorMesChart";
 import { BiCountBars } from "./BiCountBars";
 import { BiKpiCard } from "./BiKpiCard";
 import { ConvertedLeadsCard } from "./ConvertedLeadsCard";
@@ -232,6 +238,37 @@ export function LeadsDashboard({
       ? `${formatDateCR(leads.minSourceCreatedAt)} – ${formatDateCR(leads.maxSourceCreatedAt)}`
       : "sin fechas de origen";
 
+  /** Mes en curso en hora de Costa Rica: su cohorte todavía no cerró. */
+  const mesActualCR = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Costa_Rica",
+        year: "numeric",
+        month: "2-digit",
+      }).format(new Date()),
+    [],
+  );
+
+  /**
+   * Los extremos de la serie, para decir en palabras lo que muestra el gráfico.
+   *
+   * Se comparan **meses cerrados**: incluir el mes en curso haría anunciar una
+   * caída cada día 1. Y se exige más de un mes cerrado, porque «de 6,2% a 6,2%»
+   * no es una tendencia, es una barra.
+   */
+  const tendencia = useMemo(() => {
+    const cerrados = funnel.porMes.filter((m) => m.yearMonth !== mesActualCR);
+    if (cerrados.length < 2) return null;
+    const a = cerrados[0];
+    const b = cerrados[cerrados.length - 1];
+    return {
+      mesDesde: a.yearMonth,
+      mesHasta: b.yearMonth,
+      desde: formatPct(a.tasaPct, 2),
+      hasta: formatPct(b.tasaPct, 2),
+    };
+  }, [funnel.porMes, mesActualCR]);
+
   return (
     /* El tema (`.bi-graphite`) lo aplica el contenedor —shell de /admin o la
        vista de revisión—; acá solo se maqueta el contenido. */
@@ -243,6 +280,28 @@ export function LeadsDashboard({
         </h1>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
           {formatInt(funnel.leadsTotal)} leads · {rangeLabel}
+        </p>
+        {/* En el resto del tablero el periodo corta por la fecha de la REVISIÓN;
+            acá corta por la fecha del CONTACTO. Es la lectura correcta para esta
+            pregunta, y justo por eso hay que decirlo: un filtro que significa
+            dos cosas distintas según la pestaña, callado, es peor que no
+            tenerlo (A64). */}
+        <p className="mt-2 text-[12px] text-[var(--bi-ink-3)]">
+          {funnel.conPeriodo
+            ? "El periodo corta por la fecha en que llegó el contacto, no por la de la revisión: son los leads que entraron en ese lapso y lo que pasó con ellos después."
+            : "Sin periodo: todo el histórico. El filtro de arriba corta por la fecha en que llegó el contacto."}
+          {funnel.leadsSinFecha > 0 ? (
+            <>
+              {" "}
+              <span className="text-[var(--bi-ink-2)]">
+                {formatInt(funnel.leadsSinFecha)}{" "}
+                {funnel.leadsSinFecha === 1
+                  ? "contacto no trae fecha de creación y no se puede ubicar"
+                  : "contactos no traen fecha de creación y no se pueden ubicar"}{" "}
+                en un periodo.
+              </span>
+            </>
+          ) : null}
         </p>
       </header>
 
@@ -292,6 +351,28 @@ export function LeadsDashboard({
         />
       </div>
 
+      {/* ---------- la tendencia, arriba de todo lo demás ---------- */}
+      <BiCard
+        className="mt-4"
+        title="Conversión mes a mes"
+        subtitle="De los contactos que llegaron en cada mes, cuántos terminaron en una revisión pagada"
+      >
+        <ConversionPorMesChart meses={funnel.porMes} mesEnCurso={mesActualCR} />
+        {tendencia ? (
+          <p className="mt-3 border-t border-[var(--bi-ring)] pt-3 text-[13px] leading-relaxed text-[var(--bi-ink-2)]">
+            De <strong className="text-[var(--bi-ink)]">{tendencia.desde}</strong>{" "}
+            en {formatMonthLong(tendencia.mesDesde)} a{" "}
+            <strong className="text-[var(--bi-ink)]">{tendencia.hasta}</strong> en{" "}
+            {formatMonthLong(tendencia.mesHasta)}.{" "}
+            <span className="text-[var(--bi-ink-3)]">
+              El {formatPct(funnel.convertedRatePct, 2)} de arriba es el promedio
+              de todo el periodo, y por eso se mueve tan poco: cada mes entra un
+              millar de contactos nuevos al denominador.
+            </span>
+          </p>
+        ) : null}
+      </BiCard>
+
       {/* ---------- embudo + estimación aparte ---------- */}
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.9fr_1fr]">
         {/* `min-w-0` en cada hijo del grid: sin él, una tabla ancha no scrollea
@@ -306,10 +387,28 @@ export function LeadsDashboard({
           <BiCountBars rows={funnelRows} total={funnel.leadsTotal} />
           <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs text-[var(--bi-ink-3)]">
             El teléfono es la llave del cruce: un lead sin número no se puede
-            emparejar con una revisión aunque haya comprado. La última barra es
-            una astilla a propósito —de cada 100 personas que escriben, cerca de
-            2 terminan pagando una revisión—.
+            emparejar con una revisión aunque haya comprado. En este periodo,{" "}
+            <span className="bi-num tabular-nums">
+              {formatPct(funnel.convertedRatePct, 2)}
+            </span>{" "}
+            de quienes escriben termina pagando una revisión.
           </p>
+          {funnel.recompras > 0 ? (
+            /* No es una salvedad menor: son personas que el emparejamiento
+               encuentra de verdad, pero que ya eran clientes. Contarlas le
+               atribuiría al bot un cliente que ya estaba. */
+            <p className="mt-2 text-xs text-[var(--bi-ink-3)]">
+              Aparte:{" "}
+              <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+                {formatInt(funnel.recompras)}
+              </span>{" "}
+              {funnel.recompras === 1 ? "contacto" : "contactos"} de este periodo
+              {funnel.recompras === 1 ? " cruzó" : " cruzaron"} con una revisión{" "}
+              <strong>anterior</strong> a su primer mensaje: ya eran clientes y
+              volvieron a escribir. Son recompra, no conversión, y por eso no
+              suman arriba.
+            </p>
+          ) : null}
         </BiCard>
 
         {/* Bloque aparte y en tinta neutra: es la estimación, no la cifra. */}
