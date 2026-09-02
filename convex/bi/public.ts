@@ -59,6 +59,7 @@ import { estadoDatosImpl, estadoDatosReturns } from "./estadoDatos";
 import { operacionImpl, operacionReturns } from "./operacion";
 import { filterOptionsImpl, filterOptionsReturns } from "./filtros";
 import { inspeccionesImpl, inspeccionesReturns } from "./inspecciones";
+import { feriadosImpl, feriadosReturns } from "./feriados";
 import { contrasteImpl, contrasteReturns } from "./contraste";
 
 /* -------------------------------------------------------------------------- */
@@ -328,5 +329,18 @@ export const inspecciones = query({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     return inspeccionesImpl(ctx, args);
+  },
+});
+
+/**
+ * Calendario de feriados de Costa Rica (**RF-20 · RF-21 · RF-22**), con las
+ * revisiones que cayeron en cada uno. Sin PII: fechas y conteos.
+ */
+export const feriados = query({
+  args: { anio: v.optional(v.number()) },
+  returns: feriadosReturns,
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return feriadosImpl(ctx, args);
   },
 });

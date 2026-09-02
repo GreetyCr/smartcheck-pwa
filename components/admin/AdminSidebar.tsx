@@ -7,6 +7,7 @@ import { SignOutButton } from "@clerk/nextjs";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
+  CalendarDays,
   Car,
   Filter,
   LayoutDashboard,
@@ -62,6 +63,9 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/finanzas", label: "Finanzas", Icon: LineChart },
       { href: "/admin/planilla", label: "Planilla", Icon: Calculator },
+      /* Junto a Planilla y no en Operación: lo que decide RF-21 es si el día
+         se paga doble, o sea que es un asunto de planilla, no de campo. */
+      { href: "/admin/feriados", label: "Feriados", Icon: CalendarDays },
       { href: "/admin/leads", label: "Leads", Icon: Filter },
       { href: "/admin/canales", label: "Canales", Icon: Radio },
       { href: "/admin/calidad", label: "Calidad", Icon: ShieldCheck },

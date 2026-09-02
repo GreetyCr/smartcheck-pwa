@@ -441,3 +441,36 @@ export type InspeccionesPanel = {
   atribuibles: number;
   note: string;
 };
+
+/** Un feriado del calendario, con lo que pasó ese día (A117). */
+export type FeriadoDelAnio = {
+  fecha: string;
+  nombre: string;
+  /** `obligatorio` | `no_obligatorio`. */
+  tipo: string;
+  diaSemana: string;
+  pasado: boolean;
+  revisiones: number;
+  revisionesApp: number;
+  revisionesHistorico: number;
+};
+
+export type FeriadosPanel = {
+  anio: number;
+  /** ¿La tabla cubre ese año? Si no, `delAnio` viene vacío **y se dice**. */
+  cubierto: boolean;
+  aniosCubiertos: number[];
+  /** Fecha en que la lista se contrastó contra la fuente legal. */
+  verificadoAl: string;
+  delAnio: FeriadoDelAnio[];
+  proximos: {
+    fecha: string;
+    nombre: string;
+    tipo: string;
+    diaSemana: string;
+    faltanDias: number;
+  }[];
+  revisionesEnObligatorio: number;
+  revisionesEnNoObligatorio: number;
+  note: string;
+};
