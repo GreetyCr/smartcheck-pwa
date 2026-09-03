@@ -436,3 +436,97 @@ describe("un contacto sin fecha no se inventa un mes", () => {
     expect(e.leadsSinFecha).toBe(1);
   });
 });
+
+describe("la caché del lead no puede tener su propia definición (A128)", () => {
+  /**
+   * `leads_contacts.leadStage = "convertido"` es una **caché** que escribe el
+   * rebuild; la verdad vive en `bi_matches`. Pero usaba su propio criterio, así
+   * que tras A112 marcaba 236 mientras el panel decía 220.
+   *
+   * Hoy no se pinta en ninguna pantalla — y por eso mismo es peligrosa: una
+   * segunda definición de «convertido» esperando a que alguien la muestre. Se
+   * encontró **antes** de que llegara a una pantalla, que es la diferencia con
+   * A125.
+   */
+  test("una recompra NO deja el lead marcado como convertido", async () => {
+    const t = await montar([{}], [{ inspectionStartAt: dia("2026-01-15") }]);
+    const [lead] = await leads(t);
+
+    expect(lead.leadStage).not.toBe("convertido");
+    expect((await embudo(t)).recompras).toBe(1);
+  });
+
+  test("los leads marcados coinciden con el titular, no con otro número", async () => {
+    // Dos leads: uno convierte de verdad, el otro es recompra.
+    const t = await montar(
+      [
+        { dedupKey: "a", phone8: "11112222" },
+        { dedupKey: "b", phone8: "33334444" },
+      ],
+      [
+        { clientPhone: "1111-2222", inspectionStartAt: dia("2026-07-10") },
+        { clientPhone: "3333-4444", inspectionStartAt: dia("2026-01-15") },
+      ],
+    );
+    const marcados = (await leads(t)).filter(
+      (l) => l.leadStage === "convertido",
+    ).length;
+
+    expect(marcados).toBe((await embudo(t)).converted);
+    expect(marcados).toBe(1);
+  });
+
+  /**
+   * **La mitad que faltaba: la caché tiene que saber DESmarcar.**
+   *
+   * Las dos pruebas de arriba arrancan en `nuevo`, así que solo comprobaban que
+   * el rebuild no marque de más. No cubrían el caso real: un lead que **ya venía
+   * marcado** de una corrida anterior y dejó de calificar cuando cambió la regla.
+   * El paso 5 no lo alcanza —salta a los que siguen emparejados— así que se
+   * quedaba en `convertido` para siempre. En PROD eso hizo que el rebuild subiera
+   * de 236 a 241 en vez de bajar a 220.
+   */
+  test("un lead que YA venía marcado y dejó de calificar se desmarca", async () => {
+    const t = await montar(
+      [{ leadStage: "convertido" }],
+      [{ inspectionStartAt: dia("2026-01-15") }], // recompra
+    );
+
+    expect((await leads(t))[0].leadStage).toBe("nuevo");
+  });
+
+  test("correr el rebuild dos veces da el mismo resultado", async () => {
+    const t = await montar(
+      [
+        { dedupKey: "a", phone8: "11112222" },
+        { dedupKey: "b", phone8: "33334444", leadStage: "convertido" },
+      ],
+      [
+        { clientPhone: "1111-2222", inspectionStartAt: dia("2026-07-10") },
+        { clientPhone: "3333-4444", inspectionStartAt: dia("2026-01-15") },
+      ],
+    );
+    const marcar = async () =>
+      (await leads(t)).filter((l) => l.leadStage === "convertido").length;
+
+    const primera = await marcar();
+    await t.mutation(internal.bi.matches.rebuildMatches, { runId: "test-2" });
+
+    expect(await marcar()).toBe(primera);
+    expect(primera).toBe(1);
+  });
+
+  /**
+   * Degradar es solo `convertido` → `nuevo`. Las demás etapas las mueve el bot
+   * de seguimiento y no le corresponden al rebuild: si las pisara, un lead
+   * `perdido` volvería a la cola de seguimiento cada lunes.
+   */
+  test("el rebuild no pisa las etapas operativas del bot", async () => {
+    const t = await montar(
+      [{ leadStage: "perdido" }],
+      [{ inspectionStartAt: dia("2026-01-15") }], // recompra: no califica
+    );
+
+    expect((await leads(t))[0].leadStage).toBe("perdido");
+  });
+});

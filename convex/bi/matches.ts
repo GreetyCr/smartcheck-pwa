@@ -415,7 +415,35 @@ export const rebuildMatches = internalMutation({
         linkedLegacyId: u.target === "legacy" ? u.legacyId : undefined,
         updatedAt: now,
       };
-      if (validIncome && p.band !== "baja") patch.leadStage = "convertido";
+      /**
+       * **La misma regla de recompra que el titular, y en los dos sentidos — A128.**
+       *
+       * Esta caché usaba su propio criterio y se quedó fuera cuando A112 separó
+       * las recompras: marcaba **236** mientras el panel decía **220**. No se ve
+       * en ninguna pantalla hoy, y por eso mismo es peligrosa — es una **segunda
+       * definición de «convertido» viviendo en los datos**, esperando a que
+       * alguien la muestre.
+       *
+       * El `else` no es decorativo, y es la mitad que faltaba. Este bucle sabía
+       * **poner** `convertido` pero nunca quitarlo, y el paso 5 solo limpia leads
+       * que dejaron de estar emparejados (`matchedLeadIds` lo salta). Un lead que
+       * sigue emparejado pero **dejó de calificar** —porque cambió la regla, como
+       * pasó con las recompras— se quedaba marcado para siempre: la caché era un
+       * trinquete que solo podía crecer. Corrí el rebuild creyéndolo idempotente
+       * y en vez de bajar a 220 subió a **241**; eso es lo que lo destapó.
+       *
+       * Solo se degrada `convertido` → `nuevo`, igual que el paso 5: las demás
+       * etapas son operativas (las pone el bot) y no le corresponde tocarlas.
+       * Cada lead tiene **a lo sumo un match** (`usedLead` en 3a y el guard de
+       * `matchedLeadIds` en 3b), así que acá no hay riesgo de que un match pise
+       * la decisión de otro.
+       */
+      const esRecompraDeEste = esRecompra(u.dateMs, p.lead.sourceCreatedAt);
+      if (validIncome && p.band !== "baja" && !esRecompraDeEste) {
+        patch.leadStage = "convertido";
+      } else if (p.lead.leadStage === "convertido") {
+        patch.leadStage = "nuevo";
+      }
       await ctx.db.patch(p.lead._id, patch);
       leadCacheUpdated++;
     }
