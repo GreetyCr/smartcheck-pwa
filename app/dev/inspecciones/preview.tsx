@@ -50,6 +50,7 @@ const PANEL: InspeccionesPanel = {
     {
       technicianId: "user_muestra_a",
       nombre: "Técnico de muestra A",
+      rol: "tecnico",
       rows: 101,
       primeraMs: Date.parse("2026-07-16T10:00:00-06:00"),
       ultimaMs: Date.parse("2026-09-01T10:00:00-06:00"),
@@ -61,7 +62,11 @@ const PANEL: InspeccionesPanel = {
     },
     {
       technicianId: "user_muestra_b",
-      nombre: "Técnico de muestra B",
+      nombre: "Cuenta de muestra B (admin)",
+      /* En PROD estas 62 son de Esteban, desde su cuenta de admin: sus revisiones
+         no generan viático ni comisión (B36). La muestra reproduce ese caso
+         porque es el que hay que poder aprobar visualmente. */
+      rol: "admin",
       rows: 62,
       primeraMs: Date.parse("2026-05-10T10:00:00-06:00"),
       ultimaMs: Date.parse("2026-08-28T10:00:00-06:00"),

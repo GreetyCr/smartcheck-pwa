@@ -77,6 +77,17 @@ export const inspeccionesReturns = v.object({
     v.object({
       technicianId: v.string(),
       nombre: v.string(),
+      /**
+       * `admin` | `tecnico` | `desconocido` — **A127**.
+       *
+       * No todas las revisiones de la app las hace un técnico: **62 de las 165
+       * las hizo Esteban desde su propia cuenta de admin**. La tarjeta las
+       * listaba como si fueran de un técnico más, y eso importa porque la regla
+       * de pago dice justamente lo contrario: las suyas **no generan viático ni
+       * comisión** (B36). Sin el rol al lado, el reparto se lee como la
+       * productividad de dos técnicos y no lo es.
+       */
+      rol: v.string(),
       rows: v.number(),
       /** Primera y última revisión suyas dentro del filtro (epoch ms). */
       primeraMs: v.number(),
@@ -102,8 +113,10 @@ export async function inspeccionesImpl(ctx: QueryCtx, args: FilterArgs = {}) {
      unificada guarda el `clerkUserId`, no el nombre, para no arrastrar PII por
      todo el cálculo. */
   const nombrePorClerk = new Map<string, string>();
+  const rolPorClerk = new Map<string, string>();
   for (const u of await ctx.db.query("users").collect()) {
     nombrePorClerk.set(u.clerkId, u.name?.trim() || u.email || u.clerkId);
+    rolPorClerk.set(u.clerkId, u.role);
   }
 
   const meses = new Map<string, { total: number; app: number; legacy: number }>();
@@ -159,6 +172,7 @@ export async function inspeccionesImpl(ctx: QueryCtx, args: FilterArgs = {}) {
          desaparecer del conteo: sus revisiones ocurrieron. Se muestra con su id
          recortado, que es feo a propósito — un nombre inventado sería peor. */
       nombre: nombrePorClerk.get(technicianId) ?? `Usuario ${technicianId.slice(-6)}`,
+      rol: rolPorClerk.get(technicianId) ?? "desconocido",
       rows: t.rows,
       primeraMs: t.primeraMs,
       ultimaMs: t.ultimaMs,

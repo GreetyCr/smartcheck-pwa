@@ -31,6 +31,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
+import { esRecompra } from "./matches";
 import { canonicalBrand } from "./lib/marcas";
 
 /* -------------------------------------------------------------------------- */
@@ -1231,9 +1232,27 @@ export async function executiveSummaryImpl(ctx: QueryCtx, args: FilterArgs) {
     const leadsWithPhone = leads.filter(
       (l: any) => !l.isDeleted && l.phone8,
     ).length;
+    /**
+     * **La misma regla de recompra que Leads — A125.**
+     *
+     * Este conteo tenía su propio bucle y se quedó fuera cuando A112 separó las
+     * recompras, así que la portada decía **236** y Leads **220**: una diferencia
+     * de 16 entre dos pantallas del mismo tablero, que es exactamente el tipo de
+     * cosa que hace desconfiar de todo lo demás. Lo encontró la pasada de
+     * validaciones del 2-set, no una prueba.
+     *
+     * Se importa `esRecompra` en vez de repetir el umbral: dos copias de la misma
+     * regla vuelven a separarse a la primera corrección.
+     */
+    const fechaLead = new Map<string, number | undefined>();
+    for (const l of leads) fechaLead.set(l._id, l.sourceCreatedAt);
     let convertidos = 0;
     for (const m of await ctx.db.query("bi_matches").collect()) {
-      if (m.validIncome && m.confidenceBand !== "baja") convertidos++;
+      if (!m.validIncome || m.confidenceBand === "baja") continue;
+      if (m.leadId && esRecompra(m.inspectionDate, fechaLead.get(m.leadId))) {
+        continue;
+      }
+      convertidos++;
     }
     const pct = (x: number, d: number) =>
       d > 0 ? Math.round((x / d) * 10000) / 100 : 0;

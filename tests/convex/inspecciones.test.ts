@@ -281,3 +281,48 @@ describe("cuadra con el resto del tablero", () => {
     expect(p.total).toBe(rev.total);
   });
 });
+
+/* ========================================================================== */
+/* El rol de quien hizo la revisión (A127)                                    */
+/* ========================================================================== */
+
+describe("no toda revisión de la app la hace un técnico", () => {
+  /**
+   * En PROD, **62 de las 165** las hizo Esteban desde su cuenta de admin. La
+   * tarjeta las listaba junto a las del técnico, sin distinguir — y la regla de
+   * pago dice lo contrario de lo que eso sugiere: las del dueño **no generan
+   * viático ni comisión** (B36). Sin el rol, el reparto se lee como una
+   * comparación de productividad entre dos técnicos, y no lo es.
+   */
+  test("devuelve el rol de cada uno, no solo el nombre", async () => {
+    const t = await montar(
+      [{ clerkUserId: "user_admin" }, { clerkUserId: "user_tec" }],
+      [],
+      [
+        { clerkId: "user_tec", name: "Sergio" },
+        { clerkId: "user_admin", name: "Esteban" },
+      ],
+    );
+    await t.run(async (ctx) => {
+      const u = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("clerkId"), "user_admin"))
+        .unique();
+      await ctx.db.patch(u!._id, { role: "admin" });
+    });
+    const p = await panel(t);
+    const porNombre = new Map(p.porTecnico.map((x) => [x.nombre, x.rol]));
+
+    expect(porNombre.get("Esteban")).toBe("admin");
+    expect(porNombre.get("Sergio")).toBe("tecnico");
+  });
+
+  test("una cuenta borrada no se queda sin rol: dice «desconocido»", async () => {
+    // Sus revisiones ocurrieron; inventarle un rol sería peor que decir que no
+    // se sabe.
+    const t = await montar([{ clerkUserId: "user_fantasma" }], [], []);
+    const p = await panel(t);
+
+    expect(p.porTecnico[0].rol).toBe("desconocido");
+  });
+});

@@ -79,7 +79,7 @@ const WINDOW_AFTER_MS = 180 * 24 * 3600 * 1000; // inspección hasta 180d despu�
  * Sin fecha de un lado no se puede decidir: se deja como conversión (no se
  * inventa una recompra por un dato ausente) y `leadsSinFecha` lo hace contable.
  */
-function esRecompra(
+export function esRecompra(
   inspectionDate: number | undefined | null,
   leadCreatedAt: number | undefined | null,
 ): boolean {

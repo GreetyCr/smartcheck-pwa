@@ -44,6 +44,19 @@ export function OperacionDashboard({ data }: { data: Operacion }) {
           {formatInt(revisiones.conChecklist)} revisiones con checklist ·{" "}
           {formatInt(hallazgos.total)} hallazgos
         </p>
+        {/* **De qué universo habla esta pantalla — A126.**
+            No lo decía en ningún lado, y el número más grande del panel son 906
+            revisiones. Un lector razonable asume que estos hallazgos salen de
+            todas; salen solo de las hechas en la app, porque el CRM viejo no
+            guardaba checklist. Es el mismo riesgo que hizo comparar mal tres
+            pantallas el 2-set (B44): una cifra sin su universo al lado invita a
+            cruzarla con la que no corresponde. */}
+        <p className="mt-2 text-[12px] text-[var(--bi-ink-3)]">
+          Solo las revisiones <strong>hechas en la app</strong>: son las únicas
+          con checklist, fecha de entrega y condición anotada. Las del CRM viejo
+          no guardaban nada de eso, así que no aparecen acá — el total de
+          revisiones de todo el histórico vive en Inspecciones.
+        </p>
       </header>
 
       {/* ---------- KPIs ---------- */}

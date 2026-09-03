@@ -419,6 +419,8 @@ export type InspeccionMes = {
 export type InspeccionTecnico = {
   technicianId: string;
   nombre: string;
+  /** `admin` | `tecnico` | `desconocido`. Las de un admin no generan pago (B36). */
+  rol: string;
   rows: number;
   primeraMs: number;
   ultimaMs: number;

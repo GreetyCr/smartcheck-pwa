@@ -663,3 +663,79 @@ describe("los textos que el BI guarda para mostrar", () => {
     expect(issues[0].detail).not.toContain("₡4546000");
   });
 });
+
+/* ========================================================================== */
+/* La portada y Leads tienen que decir el MISMO número (A125)                  */
+/* ========================================================================== */
+
+describe("la conversión de la portada coincide con la de Leads", () => {
+  /**
+   * **Esta prueba nació de un defecto que ninguna otra vio.**
+   *
+   * Cuando A112 separó las recompras, la regla se aplicó en el embudo y en la
+   * lista de convertidos, pero `executiveSummary` tenía **su propio bucle** y se
+   * quedó afuera: la portada decía **236** y Leads **220**. Dos pantallas del
+   * mismo tablero con 16 de diferencia — el tipo de cosa que, cuando el cliente
+   * la encuentra, hace desconfiar de todo lo demás. La halló la pasada de
+   * validaciones del 2-set, no una prueba.
+   *
+   * Lo que se fija no es el número: es que **los dos caminos den lo mismo**. Si
+   * mañana cambia la definición de conversión, esta prueba obliga a cambiarla en
+   * los dos lados o a cara descubierta.
+   */
+  async function conRecompra() {
+    const t = convexTest(schema, convexModules);
+    const dia = (iso: string) => Date.parse(`${iso}T10:00:00-06:00`);
+    await t.run(async (ctx) => {
+      // Un lead de julio con una revisión de enero: es recompra, no conversión.
+      const leadId = await ctx.db.insert("leads_contacts", {
+        dedupKey: "88887777", phone8: "88887777", phoneValid: true,
+        name: "Ana León", vehicleBrand: "Toyota", leadStage: "nuevo",
+        source: "airtable_migration", sourceCreatedAt: dia("2026-07-01"),
+        isDeleted: false, createdAt: 0, updatedAt: 0,
+      } as never);
+      // Y otro que sí convirtió después de escribir.
+      const leadId2 = await ctx.db.insert("leads_contacts", {
+        dedupKey: "70001111", phone8: "70001111", phoneValid: true,
+        name: "Carlos Mora", vehicleBrand: "Hyundai", leadStage: "nuevo",
+        source: "airtable_migration", sourceCreatedAt: dia("2026-07-01"),
+        isDeleted: false, createdAt: 0, updatedAt: 0,
+      } as never);
+      for (const [leadRef, fecha] of [
+        [leadId, dia("2026-01-15")], // anterior al lead → recompra
+        [leadId2, dia("2026-07-10")], // posterior → conversión
+      ] as const) {
+        await ctx.db.insert("bi_matches", {
+          leadId: leadRef, matchTarget: "era_app", matchMethod: "phone_exact",
+          matchKey: "phone:x", confidence: 1, confidenceBand: "alta",
+          ambiguous: false, validIncome: true, inspectionDate: fecha,
+          amountCRC: 60_000, computedAt: 0,
+        } as never);
+      }
+    });
+    return t;
+  }
+
+  test("las dos pantallas dan el mismo número de convertidos", async () => {
+    const t = await conRecompra();
+    const portada = await t.query(internal.bi.metrics.executiveSummary, {});
+    const leads = await t.query(internal.bi.matches.conversionFunnel, {
+      sampleSize: 0,
+    });
+
+    expect(portada.convertidos).toBe(leads.converted);
+  });
+
+  test("y la recompra queda fuera de las dos, no solo de una", async () => {
+    const t = await conRecompra();
+    const portada = await t.query(internal.bi.metrics.executiveSummary, {});
+    const leads = await t.query(internal.bi.matches.conversionFunnel, {
+      sampleSize: 0,
+    });
+
+    // Hay dos matches válidos de banda alta; uno es recompra.
+    expect(leads.recompras).toBe(1);
+    expect(leads.converted).toBe(1);
+    expect(portada.convertidos).toBe(1);
+  });
+});

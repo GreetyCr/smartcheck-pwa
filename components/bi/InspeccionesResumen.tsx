@@ -30,7 +30,11 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
     () =>
       panel.porTecnico.map((t) => ({
         key: t.technicianId,
-        label: t.nombre,
+        /* El rol al lado del nombre cuando NO es técnico (A127): 62 de las 165
+           las hizo Esteban desde su cuenta de admin, y sus revisiones **no
+           generan viático ni comisión** (B36). Sin decirlo, el reparto se lee
+           como la productividad de dos técnicos y no lo es. */
+        label: t.rol === "tecnico" ? t.nombre : `${t.nombre} · no es técnico`,
         value: t.rows,
         meta: `${formatPct(pctOf(t.rows, panel.atribuibles))} · ${formatDateCR(
           t.primeraMs,
@@ -124,7 +128,7 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
       <BiCard
         className="mt-4"
         title="Quién las hizo"
-        subtitle={`Sobre las ${formatInt(panel.atribuibles)} que registran técnico`}
+        subtitle={`Sobre las ${formatInt(panel.atribuibles)} que registran quién`}
       >
         <BiCountBars
           rows={filaTecnicos}
@@ -152,6 +156,15 @@ export function InspeccionesResumen({ panel }: { panel: InspeccionesPanel }) {
               llevarían un crédito que no se puede comprobar.
             </p>
           </div>
+        ) : null}
+        {panel.porTecnico.some((t) => t.rol !== "tecnico") ? (
+          <p className="mt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+            Las marcadas <strong>«no es técnico»</strong> las hizo una cuenta de
+            administración —el dueño, no un técnico contratado—. Cuentan como
+            revisión, pero <strong>no generan viático ni comisión</strong>, así
+            que este reparto no es una comparación de productividad entre
+            técnicos.
+          </p>
         ) : null}
       </BiCard>
     </>
