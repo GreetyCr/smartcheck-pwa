@@ -28,11 +28,11 @@ function mesActual(): string {
  * Dos decisiones de esta pantalla:
  *
  * 1. **El cálculo se ve ANTES de confirmar.** No es un botón que hace algo
- *    invisible: las seis líneas y su fórmula están en pantalla mientras escribe.
+ *    invisible: las líneas y su fórmula están en pantalla mientras escribe.
  *    Si un número lo sorprende, el porqué está al lado.
  * 2. **Confirmar el mismo mes corrige, no duplica.** Por eso el botón cambia a
  *    «Actualizar» cuando el mes ya está registrado, y se dice explícitamente que
- *    las seis se recalculan. Sin eso, la duda razonable es «¿lo voy a meter dos
+ *    se recalculan. Sin eso, la duda razonable es «¿lo voy a meter dos
  *    veces?» — y la respuesta importa, porque duplicar planilla es un error que
  *    se ve razonable en el tablero.
  *
@@ -343,7 +343,7 @@ export function PayrollMonthCard({
               ? ` (última vez: ${formatDateCR(guardado.insumos.updatedAt)})`
               : ""}
             . Confirmar otra vez <b className="text-[var(--bi-ink-2)]">corrige</b>{" "}
-            las seis líneas; no las duplica.
+            las líneas; no las duplica.
           </p>
         ) : null}
 
@@ -374,10 +374,14 @@ export function PayrollMonthCard({
         </button>
 
         <p className="border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
-          Las seis líneas entran a Finanzas marcadas como calculadas y{" "}
+          <b className="text-[var(--bi-ink)]">
+            El salario y las comisiones también entran a Finanzas como gasto
+          </b>{" "}
+          — no hace falta anotarlos por otro lado. Todas las líneas entran
+          marcadas como calculadas y{" "}
           <b className="text-[var(--bi-ink-2)]">no se editan a mano</b>: si te
-          equivocaste en un dato, corregilo acá arriba y las seis se recalculan
-          solas. Así nunca queda una provisión con un número viejo.
+          equivocaste en un dato, corregilo acá arriba y se recalculan solas. Así
+          nunca queda una provisión con un número viejo.
         </p>
       </div>
     </BiCard>

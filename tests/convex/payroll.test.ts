@@ -59,8 +59,29 @@ describe("reproduce julio de 2026 al colón", () => {
     expect(monto(lineas, "impuestos")).toBe(130_000);
   });
 
-  test("son seis líneas, ni una más", () => {
-    expect(lineas).toHaveLength(6);
+  test("son ocho líneas: los dos pagos y las seis derivadas", () => {
+    // Eran seis hasta el 2-set. Ahora la planilla también **registra lo que se
+    // paga** (A123): el salario y las comisiones dejaron de ser solo insumos del
+    // cálculo, porque tecleados acá y no anotados en Finanzas dejaron ₡485.600
+    // de gasto fuera de agosto.
+    expect(lineas).toHaveLength(8);
+    expect(monto(lineas, "salario")).toBe(JULIO.salarioCRC);
+    expect(monto(lineas, "comisiones")).toBe(JULIO.comisionesCRC);
+  });
+
+  test("un pago en ₡0 no crea línea", () => {
+    // Una fila de ₡0 en Finanzas es ruido que hay que explicar cada vez.
+    const sinComisiones = calcularPlanilla(
+      { ...JULIO, comisionesCRC: 0 },
+      TASAS_JULIO,
+    );
+    expect(sinComisiones).toHaveLength(7);
+    expect(sinComisiones.some((l) => l.linea === "comisiones")).toBe(false);
+  });
+
+  test("el salario va a `salario` y las comisiones a `comision`", () => {
+    expect(lineas.find((l) => l.linea === "salario")?.category).toBe("salario");
+    expect(lineas.find((l) => l.linea === "comisiones")?.category).toBe("comision");
   });
 });
 
@@ -179,7 +200,12 @@ describe("bordes", () => {
       expect(l.formula.length, l.linea).toBeGreaterThan(0);
       expect(l.label.length, l.linea).toBeGreaterThan(0);
     }
-    expect(calcularPlanilla(JULIO, TASAS_JULIO)[4].formula).toContain("aporte patronal");
+    // Por nombre y no por posición: al entrar los dos pagos al principio, un
+    // índice fijo dejó de apuntar a vacaciones. La prueba servía; el índice no.
+    const vac = calcularPlanilla(JULIO, TASAS_JULIO).find(
+      (l) => l.linea === "vacaciones",
+    );
+    expect(vac?.formula).toContain("aporte patronal");
   });
 });
 
@@ -197,6 +223,8 @@ describe("idempotencia", () => {
     const lineas = calcularPlanilla(JULIO, TASAS_JULIO);
     expect(monto(lineas, "aguinaldo")).toBe(monto(lineas, "cesantia"));
     const llaves = new Set(lineas.map((l) => llaveDeLinea("2026-07", l.linea)));
-    expect(llaves.size).toBe(6);
+    // Una llave por línea, sin colisiones — ahora ocho.
+    expect(llaves.size).toBe(lineas.length);
+    expect(llaves.size).toBe(8);
   });
 });

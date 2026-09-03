@@ -35,7 +35,7 @@ export default function AdminPlanillaPage() {
           Planilla del mes
         </h1>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
-          Los gastos que se calculan solos
+          El pago del mes y los gastos que se calculan solos
         </p>
       </header>
 

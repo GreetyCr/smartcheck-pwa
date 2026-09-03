@@ -136,6 +136,52 @@ const lineaPreexistenteValidator = v.object({
  * Por eso se excluye `source: "planilla"`: esas son las nuestras y volver a
  * confirmarlas es el flujo normal de corrección, no un conflicto.
  */
+/**
+ * ¿El mes ya tiene un gasto que **sea** este salario o esta comisión, puesto por
+ * otra vía? — **A123**.
+ *
+ * Desde que la planilla registra también los dos pagos, hace falta un guard más
+ * fino que el de las derivadas: **no alcanza con mirar la categoría**. Esteban
+ * anota a mano el salario del jefe de operaciones (₡800.000) todos los meses y
+ * eso es correcto; bloquear por «ya hay un gasto de salario» dejaría la planilla
+ * inutilizable.
+ *
+ * Por eso el cruce es **por monto exacto**: si ya existe un gasto de salario por
+ * los mismos colones que se están registrando, es el mismo pago escrito dos
+ * veces. Los ₡800.000 no chocan con los ₡402.000 de Sergio; un ₡402.000 anotado
+ * a mano, sí.
+ *
+ * Se prefiere **frenar y explicar** antes que escribir: duplicar un gasto mueve
+ * la utilidad y nadie lo nota hasta que alguien suma a mano.
+ */
+export async function pagoYaRegistradoAMano(
+  ctx: QueryCtx,
+  yearMonth: string,
+  pagos: Array<{ etiqueta: string; category: string; amountCRC: number }>,
+): Promise<Array<{ etiqueta: string; amountCRC: number; nota: string }>> {
+  if (pagos.length === 0) return [];
+  const filas = await ctx.db
+    .query("finance_entries")
+    .withIndex("by_year_month", (q) => q.eq("yearMonth", yearMonth))
+    .collect();
+
+  const choques: Array<{ etiqueta: string; amountCRC: number; nota: string }> = [];
+  for (const f of filas) {
+    if (f.isDeleted || f.kind !== "expense") continue;
+    if (f.source === "planilla") continue; // lo nuestro se actualiza, no choca
+    for (const p of pagos) {
+      if (f.category === p.category && f.amountCRC === p.amountCRC) {
+        choques.push({
+          etiqueta: p.etiqueta,
+          amountCRC: p.amountCRC,
+          nota: (f.note ?? "").trim() || "sin nota",
+        });
+      }
+    }
+  }
+  return choques;
+}
+
 export async function lineasDePlanillaYaCargadas(
   ctx: QueryCtx,
   yearMonth: string,
@@ -224,6 +270,29 @@ export const registrarPlanilla = mutation({
           `cargadas por otra vía (${detalle}). Registrarlo acá las duplicaría en vez ` +
           `de corregirlas. Si querés reemplazarlas, hay que dar de baja primero las ` +
           `que ya están.`,
+      );
+    }
+
+    /* El segundo guard (A123): los dos pagos que ahora sí se registran. Va
+       junto al de B34 y antes de escribir nada, por lo mismo — que al leer sea
+       obvio que la mutation no puede quedar a medias. */
+    const choques = await pagoYaRegistradoAMano(ctx, args.yearMonth, [
+      ...(args.salarioCRC > 0
+        ? [{ etiqueta: "Salario", category: "salario", amountCRC: args.salarioCRC }]
+        : []),
+      ...(args.comisionesCRC > 0
+        ? [{ etiqueta: "Comisiones", category: "comision", amountCRC: args.comisionesCRC }]
+        : []),
+    ]);
+    if (choques.length > 0) {
+      const detalle = choques
+        .map((c) => `${c.etiqueta} de ₡${c.amountCRC.toLocaleString("es-CR")} («${c.nota}»)`)
+        .join(", ");
+      throw new Error(
+        `El mes ${args.yearMonth} ya tiene ese pago anotado a mano en Finanzas: ${detalle}. ` +
+          `La planilla ahora lo registra sola, así que dejarlo en los dos lados lo contaría ` +
+          `doble. Borrá la línea manual y volvé a confirmar, o cambiá el monto si no es el ` +
+          `mismo pago.`,
       );
     }
 

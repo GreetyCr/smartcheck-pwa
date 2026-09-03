@@ -129,16 +129,19 @@ describe("el gate", () => {
 });
 
 describe("registrar el mes", () => {
-  test("crea las seis líneas con los montos de julio", async () => {
+  test("crea las ocho líneas con los montos de julio", async () => {
+    // Seis hasta el 2-set; ahora también **se registra lo que se paga** (A123).
     const { t, admin } = await setup();
     const res = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
 
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
     expect(res.actualizadas).toBe(0);
-    expect(res.totalCRC).toBe(115_756 + 41_900 * 3 + 20_957 + 130_000);
+    expect(res.totalCRC).toBe(
+      430_000 + 73_000 + 115_756 + 41_900 * 3 + 20_957 + 130_000,
+    );
 
     const filas = await filasDePlanilla(t);
-    expect(filas).toHaveLength(6);
+    expect(filas).toHaveLength(8);
     // Todas al último día del mes, como las que vinieron de la hoja.
     expect(new Set(filas.map((f) => f.yearMonth))).toEqual(new Set(["2026-07"]));
   });
@@ -147,7 +150,10 @@ describe("registrar el mes", () => {
     const { t, admin } = await setup();
     await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
     const filas = await filasDePlanilla(t);
-    expect(filas.filter((f) => f.category === "salario")).toHaveLength(5);
+    // 5 derivadas + el salario que ahora se registra = 6 en `salario`;
+    // las comisiones tienen su propia categoría.
+    expect(filas.filter((f) => f.category === "salario")).toHaveLength(6);
+    expect(filas.filter((f) => f.category === "comision")).toHaveLength(1);
     expect(filas.filter((f) => f.category === "impuestos")).toHaveLength(1);
   });
 
@@ -161,7 +167,7 @@ describe("registrar el mes", () => {
     expect(leido.insumos).not.toBeNull();
     expect(leido.insumos!.salarioCRC).toBe(430_000);
     expect(leido.insumos!.comisionesCRC).toBe(73_000);
-    expect(leido.lineas).toHaveLength(6);
+    expect(leido.lineas).toHaveLength(8);
   });
 
   test("un mes sin registrar devuelve insumos en null, no un error", async () => {
@@ -181,11 +187,11 @@ describe("corregir el mes — lo que más duele si falla", () => {
     const segunda = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
 
     expect(segunda.creadas).toBe(0);
-    expect(segunda.actualizadas).toBe(6);
-    expect(await filasDePlanilla(t)).toHaveLength(6); // sigue siendo seis
+    expect(segunda.actualizadas).toBe(8);
+    expect(await filasDePlanilla(t)).toHaveLength(8); // sigue siendo ocho
   });
 
-  test("corregir el salario recalcula las CINCO líneas que dependen de él", async () => {
+  test("corregir el salario recalcula las líneas que dependen de él", async () => {
     const { t, admin } = await setup();
     await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
     await admin.mutation(api.bi.payroll.registrarPlanilla, {
@@ -194,7 +200,7 @@ describe("corregir el mes — lo que más duele si falla", () => {
     });
 
     const filas = await filasDePlanilla(t);
-    expect(filas).toHaveLength(6);
+    expect(filas).toHaveLength(8);
     const porLlave = new Map(filas.map((f) => [f.externalKey, f.amountCRC]));
     expect(porLlave.get("planilla:2026-07:aporte_patronal")).toBe(
       Math.round(500_000 * 0.2692),
@@ -226,17 +232,17 @@ describe("corregir el mes — lo que más duele si falla", () => {
       yearMonth: "2026-08",
       salarioCRC: 450_000,
     });
-    expect(await filasDePlanilla(t)).toHaveLength(12);
+    expect(await filasDePlanilla(t)).toHaveLength(16); // 8 por mes
   });
 });
 
-describe("las seis no se editan a mano", () => {
+describe("las líneas de planilla no se editan a mano", () => {
   test("el listado las marca como no editables", async () => {
     const { admin } = await setup();
     await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
     const filas = await admin.query(api.bi.financeForm.listFinanceEntries, {});
     const dePlanilla = filas.filter((f) => f.source === "planilla");
-    expect(dePlanilla).toHaveLength(6);
+    expect(dePlanilla).toHaveLength(8);
     for (const f of dePlanilla) expect(f.editable, f.note ?? "").toBe(false);
   });
 
@@ -367,21 +373,48 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
     ).rejects.toThrow(/ya tiene/i);
   });
 
-  test("la otra mitad: los SALARIOS BRUTOS no bloquean — es el caso de agosto", async () => {
-    // Agosto solo tiene los dos salarios brutos cargados a mano. Son el
-    // **insumo**, no el resultado. Si esto bloqueara, el único mes registrable
-    // dejaría de serlo y la pantalla no serviría para nada.
+  /**
+   * **Esta prueba cambió de signo el 2-set, y el motivo importa (A123).**
+   *
+   * Decía que un salario bruto anotado a mano **no** bloquea, porque era el
+   * *insumo* del cálculo y no su resultado. Eso era cierto mientras la planilla
+   * solo derivaba cargas. Ahora **también registra el pago**, así que un salario
+   * manual por el mismo monto y una planilla registrada son **la misma plata
+   * escrita dos veces**.
+   *
+   * Lo que no cambia es la condición que la prueba original protegía: la
+   * pantalla tiene que seguir siendo usable. Por eso el cruce es **por monto
+   * exacto** y no por categoría — el salario del jefe de operaciones convive sin
+   * estorbar.
+   */
+  test("un salario manual POR EL MISMO MONTO ahora sí bloquea", async () => {
     const { t, admin } = await setup();
     await filaDeLaHoja(t, {
       etiqueta: "SALARIO BRUTO TECNICO",
-      amountCRC: 430_000,
+      amountCRC: 430_000, // el mismo que JULIO.salarioCRC
       yearMonth: "2026-08",
       source: "manual",
       conLlave: false,
     });
+
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, {
+        ...JULIO,
+        yearMonth: "2026-08",
+      }),
+    ).rejects.toThrow(/anotado a mano/i);
+
+    // Y no deja residuo, como el guard de B34.
+    expect(await filasDePlanilla(t)).toHaveLength(0);
+  });
+
+  test("pero OTRO salario del mismo mes no estorba — es el del jefe de operaciones", async () => {
+    // La condición que hacía valiosa a la prueba original: si cualquier salario
+    // bloqueara, el único mes registrable dejaría de serlo.
+    const { t, admin } = await setup();
     await filaDeLaHoja(t, {
       etiqueta: "SALARIO JEFE OPERACIONES",
-      amountCRC: 800_000,
+      amountCRC: 800_000, // distinto de los ₡430.000 de la planilla
       yearMonth: "2026-08",
       source: "manual",
       conLlave: false,
@@ -391,7 +424,25 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
       ...JULIO,
       yearMonth: "2026-08",
     });
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
+    expect(await filasDePlanilla(t)).toHaveLength(8);
+  });
+
+  test("el error del pago duplicado dice el monto y la nota de lo que encontró", async () => {
+    const { t, admin } = await setup();
+    await filaDeLaHoja(t, {
+      etiqueta: "SALARIO BRUTO TECNICO",
+      amountCRC: 430_000,
+      yearMonth: "2026-08",
+      source: "manual",
+      conLlave: false,
+    });
+    await expect(
+      admin.mutation(api.bi.payroll.registrarPlanilla, {
+        ...JULIO,
+        yearMonth: "2026-08",
+      }),
+    ).rejects.toThrow(/SALARIO BRUTO TECNICO/);
   });
 
   test("una línea dada de baja no bloquea", async () => {
@@ -403,7 +454,7 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
       isDeleted: true,
     });
     const res = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
   });
 
   test("un INGRESO con etiqueta parecida no bloquea", async () => {
@@ -415,7 +466,7 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
       kind: "income",
     });
     const res = await admin.mutation(api.bi.payroll.registrarPlanilla, JULIO);
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
   });
 
   test("bloquea el mes con conflicto y deja pasar el de al lado", async () => {
@@ -433,7 +484,7 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
       ...JULIO,
       yearMonth: "2026-08",
     });
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
   });
 
   test("NO rompe la idempotencia: nuestras propias líneas no son conflicto", async () => {
@@ -446,8 +497,8 @@ describe("B34 · un mes que ya trae la planilla por otra vía", () => {
       ...JULIO,
       salarioCRC: 500_000,
     });
-    expect(segunda.actualizadas).toBe(6);
-    expect(await filasDePlanilla(t)).toHaveLength(6);
+    expect(segunda.actualizadas).toBe(8);
+    expect(await filasDePlanilla(t)).toHaveLength(8);
   });
 
   test("la pantalla se entera ANTES: la query devuelve lo que ya está cargado", async () => {
@@ -485,8 +536,11 @@ describe("B36 · la tasa que rige cada mes", () => {
       ...JULIO,
       yearMonth: "2026-08",
     });
-    expect(res.lineas[0].amountCRC).toBe(Math.round(430_000 * 0.2828)); // 121.604
-    expect(res.lineas[0].formula).toContain("28,28");
+    // Por nombre y no por índice: al entrar los pagos al principio (A123), la
+    // posición 0 dejó de ser el aporte patronal.
+    const aporte = res.lineas.find((l) => l.linea === "aporte_patronal")!;
+    expect(aporte.amountCRC).toBe(Math.round(430_000 * 0.2828)); // 121.604
+    expect(aporte.formula).toContain("28,28");
   });
 
   test("un mes viejo NO se contamina con la tasa nueva", async () => {
@@ -496,7 +550,7 @@ describe("B36 · la tasa que rige cada mes", () => {
       ...JULIO,
       yearMonth: "2026-06",
     });
-    expect(res.lineas[0].amountCRC).toBe(115_756);
+    expect(res.lineas.find((l) => l.linea === "aporte_patronal")!.amountCRC).toBe(115_756);
   });
 
   test("la query dice qué vigencia rige y de dónde sale", async () => {
@@ -576,7 +630,7 @@ describe("B36 · la póliza del INS contada dos veces", () => {
       ...JULIO,
       yearMonth: "2026-08",
     });
-    expect(res.creadas).toBe(6);
+    expect(res.creadas).toBe(8);
   });
 
   test("una póliza dada de baja no avisa", async () => {
@@ -627,6 +681,8 @@ describe("validación de entradas", () => {
       yearMonth: "2026-07",
     });
     expect(leido.insumos!.tasas.aportePatronalPct).toBe(25.83);
-    expect(leido.lineas[0].amountCRC).toBe(Math.round(430_000 * 0.2583));
+    expect(
+      leido.lineas.find((l) => l.linea === "aporte_patronal")!.amountCRC,
+    ).toBe(Math.round(430_000 * 0.2583));
   });
 });

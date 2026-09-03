@@ -127,6 +127,21 @@ export const TASAS_POR_DEFECTO: Tasas = VIGENCIAS[VIGENCIAS.length - 1].tasas;
 
 /** Las seis líneas derivadas, en el orden en que se muestran. */
 export const LINEAS = [
+  /**
+   * **Los dos pagos, primero — A123.**
+   *
+   * Hasta el 2-set la planilla derivaba seis líneas (cargas y provisiones) pero
+   * **no registraba lo que se paga**: el salario y las comisiones eran solo
+   * insumos del cálculo. Esteban tecleó el salario de Sergio acá, dio por hecho
+   * que quedaba anotado —que es lo razonable: se lo pidió esta pantalla— y en
+   * agosto quedaron **₡485.600 de gasto sin registrar**, con la utilidad
+   * sobrestimada por ese monto. El aporte patronal se calculaba sobre un salario
+   * que no existía en ninguna otra parte del sistema.
+   *
+   * Van **primero** en la lista porque son el pago; lo demás se deriva de ellos.
+   */
+  "salario",
+  "comisiones",
   "aporte_patronal",
   "aguinaldo",
   "preaviso",
@@ -139,6 +154,8 @@ export type Linea = (typeof LINEAS)[number];
 
 /** Etiqueta y categoría de finanzas de cada línea. */
 export const META_LINEA: Record<Linea, { label: string; category: string }> = {
+  salario: { label: "Salario", category: "salario" },
+  comisiones: { label: "Comisiones", category: "comision" },
   aporte_patronal: { label: "Aporte patronal CCSS", category: "salario" },
   aguinaldo: { label: "Provisión aguinaldo", category: "salario" },
   preaviso: { label: "Provisión preaviso", category: "salario" },
@@ -171,7 +188,8 @@ function aColones(n: number): number {
 }
 
 /**
- * Las seis líneas, a partir de los tres datos.
+ * Las líneas de la planilla, a partir de los tres datos: **los dos pagos**
+ * (salario y comisiones) y **las seis derivadas** (cargas y provisiones).
  *
  * Pura y exportada: es la única regla del cálculo y se prueba sin base de datos,
  * contra los números reales de julio.
@@ -196,7 +214,29 @@ export function calcularPlanilla(
 
   const f = (n: number) => n.toString().replace(".", ",");
 
+  /* Un cero no se registra: una fila de ₡0 en Finanzas es ruido que hay que
+     explicar cada vez que alguien la ve. Si un mes no hubo comisiones, la línea
+     simplemente no existe. */
+  const pagos: LineaCalculada[] = [];
+  if (salarioCRC > 0) {
+    pagos.push({
+      linea: "salario",
+      ...META_LINEA.salario,
+      amountCRC: aColones(salarioCRC),
+      formula: "lo que se paga de salario en el mes",
+    });
+  }
+  if (comisionesCRC > 0) {
+    pagos.push({
+      linea: "comisiones",
+      ...META_LINEA.comisiones,
+      amountCRC: aColones(comisionesCRC),
+      formula: "lo que se paga de comisiones en el mes",
+    });
+  }
+
   return [
+    ...pagos,
     {
       linea: "aporte_patronal",
       ...META_LINEA.aporte_patronal,
@@ -239,8 +279,8 @@ export function calcularPlanilla(
 /**
  * Llave de idempotencia de cada línea.
  *
- * Mismo patrón que F5-auto: re-registrar el mismo mes **actualiza** las seis
- * filas en vez de duplicarlas. Es lo que hace seguro corregir el salario y
+ * Mismo patrón que F5-auto: re-registrar el mismo mes **actualiza** sus filas
+ * en vez de duplicarlas. Es lo que hace seguro corregir el salario y
  * volver a confirmar.
  */
 export function llaveDeLinea(yearMonth: string, linea: Linea): string {
