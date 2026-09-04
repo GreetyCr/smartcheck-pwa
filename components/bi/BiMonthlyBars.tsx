@@ -46,6 +46,24 @@ export function BiMonthlyBars({
    */
   const pasoAngosto = months.length > 8 ? 2 : 1;
 
+  /**
+   * Lo mismo **en pantalla ancha**, que faltaba — A134.
+   *
+   * En ancho la etiqueta es «JUL 25», más larga que «JUL». Con 14 meses en
+   * 1440px cada columna quedó en **19px** y la etiqueta, en vez de recortarse,
+   * **se parte en dos líneas**: «JUL» arriba y «25» abajo. El eje termina
+   * leyéndose como una fila de años repetidos —25, 25, 25, 26, 26…— y deja de
+   * decir de qué mes es cada barra.
+   *
+   * Medido: dos cajas de línea, 28px de alto para un `line-height` de 15.
+   *
+   * **Saltar etiquetas no alcanza por sí solo**: repartir el espacio no ensancha
+   * la caja, así que hace falta también `whitespace-nowrap`. Es exactamente la
+   * misma pareja de arreglos que necesitó el gráfico de conversión (A113) — el
+   * defecto estaba acá desde antes y no se le aplicó.
+   */
+  const pasoAncho = months.length > 10 ? 2 : 1;
+
   return (
     <div>
       {/* leyenda */}
@@ -158,8 +176,8 @@ export function BiMonthlyBars({
                   <span className="sm:hidden">
                     {i % pasoAngosto === 0 ? formatMonthAbbr(m.yearMonth) : ""}
                   </span>
-                  <span className="hidden sm:inline">
-                    {formatMonthShort(m.yearMonth)}
+                  <span className="hidden whitespace-nowrap sm:inline">
+                    {i % pasoAncho === 0 ? formatMonthShort(m.yearMonth) : ""}
                   </span>
                 </span>
 
