@@ -23,7 +23,7 @@ pnpm test tests/convex/payroll.test.ts
 pnpm test -t "nombre del caso"
 ```
 
-`vitest.config.mjs` asigna entorno por ruta: `tests/convex/**` corre en **edge-runtime** (es el runtime de Convex), `hooks/__tests__/**` en **happy-dom**, y todo lo demas en node. Un test de Convex movido fuera de `tests/convex/` deja de tener el runtime correcto y falla por razones que no tienen que ver con el codigo.
+`vitest.config.mjs` define **un proyecto (`test.projects`) por entorno**: `tests/convex/**` corre en **edge-runtime** (es el runtime de Convex), `hooks/__tests__/**` en **happy-dom**, y `lib/**` en node. Un test de Convex movido fuera de `tests/convex/` deja de tener el runtime correcto y falla por razones que no tienen que ver con el codigo. Cada proyecto tiene una prueba-guarda (`entorno.test.*`) que falla diciendo el entorno, en vez de dejar que el sintoma aparezca a 30 archivos de distancia.
 
 ## Dos productos en una app
 
