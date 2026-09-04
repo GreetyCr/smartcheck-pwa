@@ -62,7 +62,18 @@ export const GRUPOS = [
  * ya no es el de la barra «Otros» del gráfico de categorías, y esa diferencia
  * tiene que poder explicarse sin abrir el código.
  */
-export const CATEGORIAS_CUBIERTAS = ["otros", "mantenimiento"] as const;
+export const CATEGORIAS_CUBIERTAS = [
+  "otros",
+  "mantenimiento",
+  /* Las cuatro que el formulario empezó a ofrecer en A143. Entran acá para que
+     el desglose por proveedor —«INCORPORATE ×14»— siga funcionando cuando un
+     gasto llega ya categorizado: el detalle por proveedor vale igual, venga el
+     grupo del texto o de la categoría. */
+  "servicios_profesionales",
+  "software",
+  "equipo",
+  "telefonia",
+] as const;
 
 export type Grupo = (typeof GRUPOS)[number];
 
@@ -75,7 +86,12 @@ export type Grupo = (typeof GRUPOS)[number];
 const MAPEO: Array<{ patrones: string[]; grupo: Grupo }> = [
   {
     grupo: "servicios_profesionales",
-    patrones: ["incorporate", "jrc", "contador", "contabilidad", "abogad", "legal"],
+    /* «don julio» va con la frase completa y no «julio» a secas: suelto
+       calzaría con cualquier movimiento que mencione el mes (A143). */
+    patrones: [
+      "incorporate", "jrc", "contador", "contabilidad", "abogad", "legal",
+      "don julio",
+    ],
   },
   {
     grupo: "software",
@@ -86,7 +102,7 @@ const MAPEO: Array<{ patrones: string[]; grupo: Grupo }> = [
       "manychat", "airtable", "contabo", "vercel", "convex", "clerk",
       "servidor chatbot", "base datos app", "ig verified", "captions",
       "suscripcion", "software", "licencia", "dominio", "hosting",
-      "canva", "google workspace",
+      "canva", "google workspace", "facturador",
     ],
   },
   {
@@ -176,12 +192,29 @@ export function etiquetaVisible(etiqueta: string): string {
  * montar una base de datos.
  */
 export function clasificar(
-  { externalKey, note, isViatico }:
-    { externalKey?: string; note?: string; isViatico: boolean },
+  { externalKey, note, isViatico, category }:
+    { externalKey?: string; note?: string; isViatico: boolean; category?: string },
 ): Grupo {
   // Un movimiento marcado como viático es viático, diga lo que diga la etiqueta.
   // El dato estructurado le gana al texto libre siempre que exista.
   if (isViatico) return "viaticos_tecnico";
+
+  /**
+   * **Si la categoría YA dice el grupo, no se adivina — A143.**
+   *
+   * Adivinar del texto existe porque el formulario no ofrecía estas opciones:
+   * todo lo que no calzaba en las diez categorías viejas caía en «Otros» —166
+   * movimientos, la categoría más grande del panel— y el grupo había que
+   * deducirlo del nombre del proveedor. Desde que el formulario las ofrece, un
+   * movimiento nuevo llega con su grupo dicho, y adivinarlo encima sería
+   * arriesgarse a contradecir lo que Esteban eligió a mano.
+   *
+   * Los movimientos viejos siguen sin categoría útil y siguen pasando por el
+   * texto: las dos vías conviven a propósito.
+   */
+  if (category && (GRUPOS as readonly string[]).includes(category)) {
+    return category as Grupo;
+  }
 
   // La etiqueta de la hoja primero; la nota solo como respaldo para lo que no
   // vino de la hoja.

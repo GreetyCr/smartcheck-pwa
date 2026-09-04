@@ -30,7 +30,7 @@ import { buildInspectionsAll } from "./metrics";
 export type Clase = "accion" | "informativo" | "esperado";
 
 /**
- * **De qué habla el aviso** — el eje que ordena la pantalla desde A131.
+ * **De qué habla el aviso** — el eje que ordena la pantalla desde A141.
  *
  * Medir el reparto real en producción cambió el diseño. La intuición era
  * separar por época (viejo/nuevo), pero los números dicen otra cosa: de los
@@ -198,7 +198,7 @@ const SIN_CATALOGAR: Entrada = {
 const tipoRow = v.object({
   issueType: v.string(),
   clase: v.string(),
-  /** `sistema` | `airtable` | `migracion` — de qué habla el aviso (A131). */
+  /** `sistema` | `airtable` | `migracion` — de qué habla el aviso (A141). */
   origen: v.string(),
   titulo: v.string(),
   queEs: v.string(),
@@ -228,7 +228,7 @@ export const calidadReturns = v.object({
     esperado: v.number(),
   }),
   /**
-   * Los mismos avisos repartidos por **de qué hablan** (A131). Es el eje que
+   * Los mismos avisos repartidos por **de qué hablan** (A141). Es el eje que
    * contesta la pregunta de Esteban —«¿esto mide mi sistema?»— y el que decide
    * qué se muestra por defecto.
    */

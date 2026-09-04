@@ -189,11 +189,31 @@ export function BiMonthlyBars({
                   />
                 ) : null}
 
-                {/* tooltip */}
+                {/**
+                 * **Anclado por tercios, no centrado — A142.**
+                 *
+                 * Estaba `left-1/2 -translate-x-1/2` sobre una columna que en
+                 * 375px mide ~13px: el globo, que es `w-max` y ronda los 200px,
+                 * se salía casi 95px por cada lado. En el primer y el último mes
+                 * eso empujaba el ancho del documento y el teléfono quedaba con
+                 * scroll horizontal y franjas en blanco a los costados.
+                 *
+                 * Los otros tres gráficos de meses ya se habían arreglado así;
+                 * a este nunca le llegó. Es el mismo patrón de A134: **un
+                 * arreglo medido en un gráfico hay que pasarlo a los demás**,
+                 * porque comparten el problema aunque no el código.
+                 */}
                 {isHover ? (
                   <span
                     aria-hidden
-                    className="bi-fade-up absolute bottom-[calc(100%-8px)] left-1/2 z-10 w-max -translate-x-1/2 rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-surface-2)] px-3 py-2 text-left shadow-xl"
+                    className={cn(
+                      "bi-fade-up absolute bottom-[calc(100%-8px)] z-10 w-max max-w-[min(240px,calc(100vw-2rem))] rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-surface-2)] px-3 py-2 text-left shadow-xl",
+                      i < months.length / 3
+                        ? "left-0"
+                        : i > (months.length * 2) / 3
+                          ? "right-0"
+                          : "left-1/2 -translate-x-1/2",
+                    )}
                   >
                     <span className="block text-[11px] font-semibold text-[var(--bi-ink)]">
                       {formatMonthLong(m.yearMonth)}

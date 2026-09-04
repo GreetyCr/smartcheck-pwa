@@ -78,7 +78,7 @@ const claseDe = (c: string): ClaveClase =>
  */
 export function CalidadDashboard({ data }: { data: CalidadData }) {
   /**
-   * **Por defecto la pantalla mide el sistema, no las herramientas — A131.**
+   * **Por defecto la pantalla mide el sistema, no las herramientas — A141.**
    *
    * Se muestra lo que produce el panel hoy (`origen: "sistema"`) y **todo lo
    * accionable venga de donde venga**, que es lo que impide que el filtro

@@ -50,6 +50,26 @@ export const EXPENSE_CATS: ReadonlySet<string> = new Set([
   // atado al ingreso, NO payroll: hasta ahora el Sheet la mapeaba a `salario`
   // (7 filas, ₡303.427), que es lo que marcan los issues `viatico_review`.
   "comision",
+  /**
+   * **Las cuatro que faltaban — A143.**
+   *
+   * `otros` era la categoría de gasto más grande del panel: **166 movimientos,
+   * ₡8,8M**. No porque el gasto fuera misceláneo, sino porque el formulario no
+   * ofrecía dónde ponerlo — el contador, las suscripciones, las líneas de
+   * celular y el equipo no tenían casilla, así que todo iba a «Otros» y el
+   * desglose tenía que **adivinar el grupo leyendo el nombre del proveedor**.
+   *
+   * Estos cuatro nombres no son nuevos: son los grupos que ese desglose ya
+   * usaba (`GRUPOS` en `expenseGroups.ts`). Lo que se corrige es que Esteban
+   * pueda **decirlo al anotar** en vez de que el sistema lo deduzca después.
+   *
+   * Las filas viejas no se tocan: siguen en `otros` y el desglose las sigue
+   * clasificando por texto.
+   */
+  "servicios_profesionales",
+  "software",
+  "equipo",
+  "telefonia",
 ]);
 
 /** Allow-list de categorías según el tipo de movimiento. */

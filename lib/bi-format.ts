@@ -141,6 +141,10 @@ export const CATEGORY_LABELS: Record<string, string> = {
   seguro: "Seguro",
   impuestos: "Impuestos",
   comision: "Comisión",
+  servicios_profesionales: "Servicios profesionales",
+  software: "Software y herramientas",
+  equipo: "Equipo",
+  telefonia: "Telefonía",
 };
 
 export function categoryLabel(key: string): string {
@@ -155,16 +159,23 @@ export const INCOME_CATEGORIES = [
 ] as const;
 
 export const EXPENSE_CATEGORIES = [
-  "comida",
-  "gasolina",
-  "bonos",
-  "otros",
-  "salario",
-  "comision",
-  "mantenimiento",
+  /* Orden de uso, no alfabético: arriba lo que más se anota. Las cuatro
+     últimas entraron en A143, cuando se vio que «Otros» era la categoría más
+     grande del panel solo porque no había dónde poner lo demás. */
+  "servicios_profesionales",
+  "software",
   "publicidad",
+  "gasolina",
+  "telefonia",
+  "equipo",
+  "mantenimiento",
   "seguro",
   "impuestos",
+  "salario",
+  "comision",
+  "bonos",
+  "comida",
+  "otros",
 ] as const;
 
 /**

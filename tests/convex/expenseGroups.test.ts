@@ -350,3 +350,77 @@ describe("el desglose ahora cubre dos categorías", () => {
     expect(sp.etiquetas.reduce((a: number, e: any) => a + e.pctGrupo, 0)).toBeCloseTo(100, 0);
   });
 });
+
+/* ========================================================================== */
+/* Categorías nuevas y proveedores que faltaban — A143                        */
+/* ========================================================================== */
+
+describe("la categoría explícita le gana al texto (A143)", () => {
+  /**
+   * Adivinar el grupo leyendo el nombre del proveedor existía porque el
+   * formulario no ofrecía estas opciones: todo caía en «Otros» —166
+   * movimientos, la categoría más grande del panel— y el grupo había que
+   * deducirlo. Desde que el formulario las ofrece, adivinar encima sería
+   * arriesgarse a contradecir lo que Esteban eligió a mano.
+   */
+  test("un gasto categorizado va a su grupo aunque el texto diga otra cosa", () => {
+    // El texto dice «AIRTABLE», que por patrón es software. La categoría dice
+    // servicios profesionales. Manda la categoría.
+    expect(
+      clasificar({
+        note: "AIRTABLE",
+        isViatico: false,
+        category: "servicios_profesionales",
+      }),
+    ).toBe("servicios_profesionales");
+  });
+
+  test("sin categoría útil se sigue adivinando por texto", () => {
+    // Las filas viejas están en «otros» y no tienen grupo dicho: las dos vías
+    // conviven a propósito.
+    expect(clasificar({ note: "AIRTABLE", isViatico: false, category: "otros" })).toBe(
+      "software",
+    );
+  });
+
+  test("el viático le gana incluso a la categoría", () => {
+    // El dato estructurado más fuerte manda: un viático es un viático.
+    expect(
+      clasificar({ note: "CONTADOR", isViatico: true, category: "software" }),
+    ).toBe("viaticos_tecnico");
+  });
+
+  test("las cuatro categorías nuevas son grupos válidos", () => {
+    // Si un nombre se separa del otro lado, un gasto categorizado caería en
+    // «sin clasificar» sin que nadie lo note.
+    for (const c of ["servicios_profesionales", "software", "equipo", "telefonia"]) {
+      expect(GRUPOS as readonly string[], c).toContain(c);
+      expect(CATEGORIAS_CUBIERTAS as readonly string[], c).toContain(c);
+    }
+  });
+});
+
+describe("proveedores que quedaban sin clasificar (A143)", () => {
+  test("«Facturador personal» es software", () => {
+    expect(clasificar({ note: "FACTURADOR PERSONAL", isViatico: false })).toBe(
+      "software",
+    );
+  });
+
+  test("«Pago don Julio» son servicios profesionales", () => {
+    expect(clasificar({ note: "PAGO DON JULIO", isViatico: false })).toBe(
+      "servicios_profesionales",
+    );
+  });
+
+  /**
+   * El patrón es la frase completa, no «julio» suelto: suelto calzaría con
+   * cualquier movimiento que mencione el mes y mandaría la planilla de julio a
+   * servicios profesionales.
+   */
+  test("un movimiento que solo menciona el mes NO cae ahí", () => {
+    expect(clasificar({ note: "PLANILLA JULIO 2026", isViatico: false })).not.toBe(
+      "servicios_profesionales",
+    );
+  });
+});
