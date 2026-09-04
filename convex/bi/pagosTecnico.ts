@@ -26,7 +26,8 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { lunesDeLaSemana, mesDePagoSemanal, nowMs, yearMonth as ymDe } from "./lib/dates";
+import { isoDate, lunesDeLaSemana, mesDePagoSemanal, nowMs, yearMonth as ymDe } from "./lib/dates";
+import { feriadoDe } from "./lib/feriados";
 
 /** ₡ por revisión, desde la primera. */
 export const VIATICO_POR_REVISION = 2_000;
@@ -76,8 +77,23 @@ const tecnicoRow = v.object({
   semanas: v.array(semanaRow),
 });
 
+/** Un feriado obligatorio que un técnico trabajó (A129). */
+const feriadoTrabajadoRow = v.object({
+  /** "YYYY-MM-DD" en zona CR. */
+  fecha: v.string(),
+  /** Nombre del feriado, para poder nombrarlo en pantalla. */
+  nombre: v.string(),
+  clerkId: v.string(),
+  tecnico: v.string(),
+  /** Cuántas revisiones hizo ese día. No cambia el pago: el recargo es por día. */
+  revisiones: v.number(),
+});
+
 export const pagosTecnicoReturns = v.object({
   yearMonth: v.string(),
+  /** Días de recargo por feriado obligatorio trabajado: un par fecha×técnico. */
+  feriadosDias: v.number(),
+  feriados: v.array(feriadoTrabajadoRow),
   tecnicos: v.array(tecnicoRow),
   /** Suma de las comisiones — es el dato que va al campo de la planilla. */
   comisionTotalCRC: v.number(),
@@ -128,12 +144,52 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
 
   let revisionesDeOtros = 0;
 
+  /**
+   * **Feriados de pago obligatorio trabajados — A129.**
+   *
+   * Se cuenta por **mes calendario**, no por la regla semanal que rige viáticos
+   * y comisiones, y la diferencia importa: el recargo del feriado es **salario**,
+   * y el salario se paga por mes calendario. Un 1.º de enero cuya semana arrancó
+   * el 30 de diciembre se paga en **enero**, que es donde Esteban lo va a buscar.
+   *
+   * Solo cuentan las revisiones de los **técnicos**, igual que el resto de esta
+   * query: las que hace Esteban desde su cuenta de admin no le generan recargo a
+   * nadie (B36 · A127).
+   *
+   * La clave es `fecha|técnico` porque **cada persona que trabajó ese feriado
+   * gana su propio día**. Si dos técnicos trabajan el mismo 25 de diciembre, son
+   * dos días, no uno.
+   */
+  const feriadosTrabajados = new Map<
+    string,
+    { fecha: string; nombre: string; clerkId: string; tecnico: string; revisiones: number }
+  >();
+
   for (const r of await ctx.db.query("inspections").collect()) {
     const fecha = r.inspectionStartAt ?? r._creationTime;
+    const t = r.clerkUserId ? porTecnico.get(r.clerkUserId) : undefined;
+
+    if (t && ymDe(fecha) === yearMonth) {
+      const dia = isoDate(fecha);
+      const fer = feriadoDe(dia);
+      if (fer && fer.tipo === "obligatorio") {
+        const clave = `${dia}|${r.clerkUserId}`;
+        const ya = feriadosTrabajados.get(clave);
+        if (ya) ya.revisiones++;
+        else
+          feriadosTrabajados.set(clave, {
+            fecha: dia,
+            nombre: fer.nombre,
+            clerkId: r.clerkUserId as string,
+            tecnico: t.nombre,
+            revisiones: 1,
+          });
+      }
+    }
+
     // El mes de PAGO, no el del calendario: la semana manda.
     if (mesDePagoSemanal(fecha) !== yearMonth) continue;
 
-    const t = r.clerkUserId ? porTecnico.get(r.clerkUserId) : undefined;
     if (!t) {
       revisionesDeOtros++;
       continue;
@@ -178,8 +234,18 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
    */
   const enCurso = yearMonth === ymDe(nowMs());
 
+  const feriados = [...feriadosTrabajados.values()].sort(
+    (a, b) => a.fecha.localeCompare(b.fecha) || a.tecnico.localeCompare(b.tecnico),
+  );
+
   return {
     yearMonth,
+    /**
+     * Un día por cada par fecha×técnico. Es el número que la planilla propone,
+     * y el que Esteban confirma antes de que se guarde.
+     */
+    feriadosDias: feriados.length,
+    feriados,
     tecnicos: filas,
     comisionTotalCRC: filas.reduce((a, t) => a + t.comisionCRC, 0),
     viaticosTotalCRC: filas.reduce((a, t) => a + t.viaticosCRC, 0),

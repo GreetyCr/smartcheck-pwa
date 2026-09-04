@@ -111,8 +111,22 @@ export function PlanillaPreview() {
                 salarioCRC: 430_000,
                 comisionesCRC: 73_000,
                 baseImponibleCRC: 1_000_000,
+                feriadosDias: 1,
                 tasas: tasasDelMes(mes),
                 updatedAt: Date.parse("2026-08-24T09:00:00-06:00"),
+              },
+              /* Un feriado detectado, para poder revisar el bloque con
+                 contenido; en setiembre el 15 cae en el mes. */
+              feriadosDetectados: {
+                dias: 1,
+                detalle: [
+                  {
+                    fecha: "2026-09-15",
+                    nombre: "Independencia",
+                    tecnico: "Sergio Smartcheck",
+                    revisiones: 2,
+                  },
+                ],
               },
               tasasPorDefecto: tasasDelMes(mes),
               lineasYaCargadas: bloqueado ? JULIO_YA_EN_LA_HOJA : [],

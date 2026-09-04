@@ -715,6 +715,15 @@ export default defineSchema({
     comisionesCRC: v.number(),
     /** La base que él decide reportar. La elige él; el sistema no la deduce. */
     baseImponibleCRC: v.number(),
+    /**
+     * Días de feriado de pago obligatorio trabajados en el mes (**A129**).
+     *
+     * `optional` porque los meses registrados antes del 4-set no lo tienen, y
+     * ausente **no es cero por descuido**: es «este mes se registró cuando la
+     * planilla todavía no miraba feriados». Se lee como 0 y la pantalla lo
+     * recalcula al volver a confirmar el mes.
+     */
+    feriadosDias: v.optional(v.number()),
     /** Tasas usadas en ESTE mes — congeladas para poder auditar hacia atrás. */
     tasas: v.object({
       aportePatronalPct: v.number(),

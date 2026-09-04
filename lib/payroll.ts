@@ -142,6 +142,13 @@ export const LINEAS = [
    */
   "salario",
   "comisiones",
+  /**
+   * **El recargo por trabajar un feriado de pago obligatorio — A129.**
+   *
+   * Va con los pagos y no con las provisiones porque **es plata que sale**, no
+   * una reserva. Aparece solo en los meses que la tienen: la mayoría no.
+   */
+  "feriados",
   "aporte_patronal",
   "aguinaldo",
   "preaviso",
@@ -156,6 +163,7 @@ export type Linea = (typeof LINEAS)[number];
 export const META_LINEA: Record<Linea, { label: string; category: string }> = {
   salario: { label: "Salario", category: "salario" },
   comisiones: { label: "Comisiones", category: "comision" },
+  feriados: { label: "Feriados trabajados", category: "salario" },
   aporte_patronal: { label: "Aporte patronal CCSS", category: "salario" },
   aguinaldo: { label: "Provisión aguinaldo", category: "salario" },
   preaviso: { label: "Provisión preaviso", category: "salario" },
@@ -171,7 +179,27 @@ export type EntradasPlanilla = {
   comisionesCRC: number;
   /** La base que Esteban decide reportar — la elige él, no la deducimos. */
   baseImponibleCRC: number;
+  /**
+   * Días de feriado **de pago obligatorio** que se trabajaron en el mes (A129).
+   *
+   * El sistema los detecta —cruza el calendario contra las revisiones de los
+   * técnicos— pero el número se **guarda** junto a los otros insumos, igual que
+   * las comisiones: un mes registrado es una foto, y no puede cambiar sola
+   * porque después se corrija una revisión.
+   */
+  feriadosDias: number;
 };
+
+/**
+ * El divisor del salario diario.
+ *
+ * **Son 30 siempre, no los días que tenga el mes.** Es la convención con que se
+ * liquida el salario mensual en Costa Rica y la que usa Esteban, así que febrero
+ * también divide entre 30. Es la regla, no un redondeo: dejarla como constante
+ * con nombre evita que alguien «arregle» esto más adelante creyendo que es un
+ * descuido.
+ */
+export const DIAS_SALARIO_MENSUAL = 30;
 
 export type LineaCalculada = {
   linea: Linea;
@@ -201,10 +229,30 @@ function aColones(n: number): number {
  * y no una persona a las once de la noche.
  */
 export function calcularPlanilla(
-  { salarioCRC, comisionesCRC, baseImponibleCRC }: EntradasPlanilla,
+  {
+    salarioCRC,
+    comisionesCRC,
+    baseImponibleCRC,
+    feriadosDias,
+  }: EntradasPlanilla,
   tasas: Tasas = TASAS_POR_DEFECTO,
 ): LineaCalculada[] {
   const aportePatronal = aColones(salarioCRC * (tasas.aportePatronalPct / 100));
+  /**
+   * **Un día más, no dos — A129.**
+   *
+   * Trabajar un feriado obligatorio se paga **doble** (Código de Trabajo, art.
+   * 152). Pero el salario mensual **ya paga ese día**, se trabaje o no: son
+   * ₡430.000 fijos por los 30. Así que lo que falta para llegar al doble es
+   * **un** día, y esta línea es la diferencia, no el total.
+   *
+   * Escribir acá el doble completo pagaría el **triple**: el día que ya venía
+   * dentro del salario, más dos. Es el error fácil de cometer leyendo «x2», y
+   * por eso la fórmula que se muestra en pantalla dice «día(s) extra».
+   */
+  const feriados = aColones(
+    (salarioCRC / DIAS_SALARIO_MENSUAL) * feriadosDias,
+  );
   const baseProvisiones = salarioCRC + comisionesCRC;
   const provision = aColones(baseProvisiones * (tasas.provisionPct / 100));
   const vacaciones = aColones(
@@ -234,7 +282,28 @@ export function calcularPlanilla(
       formula: "lo que se paga de comisiones en el mes",
     });
   }
+  if (feriadosDias > 0) {
+    pagos.push({
+      linea: "feriados",
+      ...META_LINEA.feriados,
+      amountCRC: feriados,
+      formula: `${feriadosDias} día(s) extra × salario ÷ ${DIAS_SALARIO_MENSUAL}`,
+    });
+  }
 
+  /**
+   * **Las provisiones NO cambian de base por el feriado, y es a propósito.**
+   *
+   * Las cuatro se calculan igual que antes —sobre *(salario + comisiones)* tres
+   * de ellas, y vacaciones sobre *(salario + aporte patronal)*—, sin el recargo
+   * del feriado. Reproducen la hoja de Esteban al colón y **esa hoja no tiene
+   * línea de feriados**, así que meterlo en la base cambiaría cuatro números que
+   * él no pidió cambiar, en silencio y hacia atrás.
+   *
+   * Es una decisión suya, no nuestra: si su contador dice que el recargo entra
+   * en la base de provisiones, se agrega. Mientras tanto la línea se suma al
+   * gasto del mes sin tocar el resto.
+   */
   return [
     ...pagos,
     {

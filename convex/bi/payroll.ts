@@ -11,6 +11,8 @@ import type { QueryCtx } from "../_generated/server";
 import { requireAdmin } from "../lib/auth";
 import { crMidnightMs } from "./lib/dates";
 import { etiquetaDeExternalKey, normalizar } from "./expenseGroups";
+/* A41: una `query` no puede `runQuery`, así que se comparte el helper puro. */
+import { pagosTecnicoImpl } from "./pagosTecnico";
 import {
   calcularPlanilla,
   llaveDeLinea,
@@ -239,6 +241,16 @@ export const registrarPlanilla = mutation({
     salarioCRC: v.number(),
     comisionesCRC: v.number(),
     baseImponibleCRC: v.number(),
+    /**
+     * Días de feriado obligatorio trabajados (**A129**).
+     *
+     * **`optional` a propósito, no por descuido.** Convex se despliega a mano y
+     * **antes** que el frontend, así que hay una ventana en que el servidor nuevo
+     * atiende a la pantalla vieja. Un argumento obligatorio rompería la planilla
+     * durante esa ventana — que es exactamente el error de A115. Ausente se lee
+     * como 0.
+     */
+    feriadosDias: v.optional(v.number()),
     /** Si no vienen, se usan las que reproducen la hoja de Esteban. */
     tasas: v.optional(tasasValidator),
   },
@@ -273,7 +285,20 @@ export const registrarPlanilla = mutation({
       );
     }
 
-    /* El segundo guard (A123): los dos pagos que ahora sí se registran. Va
+    const tasas = args.tasas ?? tasasDelMes(args.yearMonth);
+    const feriadosDias = args.feriadosDias ?? 0;
+    if (!Number.isInteger(feriadosDias) || feriadosDias < 0) {
+      throw new Error(
+        `Los días de feriado tienen que ser un entero de 0 para arriba; llegó ${feriadosDias}.`,
+      );
+    }
+    /* Las líneas se calculan **antes** de los guards para no repetir la fórmula
+       del feriado acá: el guard compara contra el mismo monto que se va a
+       escribir, no contra uno recalculado a mano que podría separarse. */
+    const lineas = calcularPlanilla({ ...args, feriadosDias }, tasas);
+    const lineaFeriados = lineas.find((l) => l.linea === "feriados");
+
+    /* El segundo guard (A123): los pagos que ahora sí se registran. Va
        junto al de B34 y antes de escribir nada, por lo mismo — que al leer sea
        obvio que la mutation no puede quedar a medias. */
     const choques = await pagoYaRegistradoAMano(ctx, args.yearMonth, [
@@ -282,6 +307,15 @@ export const registrarPlanilla = mutation({
         : []),
       ...(args.comisionesCRC > 0
         ? [{ etiqueta: "Comisiones", category: "comision", amountCRC: args.comisionesCRC }]
+        : []),
+      ...(lineaFeriados
+        ? [
+            {
+              etiqueta: lineaFeriados.label,
+              category: lineaFeriados.category,
+              amountCRC: lineaFeriados.amountCRC,
+            },
+          ]
         : []),
     ]);
     if (choques.length > 0) {
@@ -296,7 +330,6 @@ export const registrarPlanilla = mutation({
       );
     }
 
-    const tasas = args.tasas ?? tasasDelMes(args.yearMonth);
     const now = Date.now();
     const date = crMidnightMs(ultimoDiaDelMes(args.yearMonth));
 
@@ -310,6 +343,7 @@ export const registrarPlanilla = mutation({
       salarioCRC: args.salarioCRC,
       comisionesCRC: args.comisionesCRC,
       baseImponibleCRC: args.baseImponibleCRC,
+      feriadosDias,
       tasas,
       updatedAt: now,
     };
@@ -323,8 +357,7 @@ export const registrarPlanilla = mutation({
       });
     }
 
-    // 2) Las seis líneas derivadas, por llave natural.
-    const lineas = calcularPlanilla(args, tasas);
+    // 2) Las líneas derivadas, por llave natural.
     let creadas = 0;
     let actualizadas = 0;
 
@@ -388,11 +421,28 @@ export const planillaDelMes = query({
         salarioCRC: v.number(),
         comisionesCRC: v.number(),
         baseImponibleCRC: v.number(),
+        feriadosDias: v.number(),
         tasas: tasasValidator,
         updatedAt: v.number(),
       }),
       v.null(),
     ),
+    /**
+     * Los feriados obligatorios que **el sistema detectó** trabajados en el mes
+     * (A129). Es la propuesta, no lo guardado: la pantalla la muestra con las
+     * fechas y los nombres para que Esteban confirme o corrija antes de grabar.
+     */
+    feriadosDetectados: v.object({
+      dias: v.number(),
+      detalle: v.array(
+        v.object({
+          fecha: v.string(),
+          nombre: v.string(),
+          tecnico: v.string(),
+          revisiones: v.number(),
+        }),
+      ),
+    }),
     tasasPorDefecto: tasasValidator,
     lineas: v.array(lineaCalculadaValidator),
     totalCRC: v.number(),
@@ -428,6 +478,9 @@ export const planillaDelMes = query({
           salarioCRC: fila.salarioCRC,
           comisionesCRC: fila.comisionesCRC,
           baseImponibleCRC: fila.baseImponibleCRC,
+          /* Los meses registrados antes de A129 no lo traen: se leen como 0, y
+             al volver a confirmar el mes toman el valor detectado. */
+          feriadosDias: fila.feriadosDias ?? 0,
           tasas: fila.tasas,
           updatedAt: fila.updatedAt,
         }
@@ -437,9 +490,20 @@ export const planillaDelMes = query({
       ? calcularPlanilla(insumos, insumos.tasas)
       : [];
 
+    const pagos = await pagosTecnicoImpl(ctx, { yearMonth: ym });
+
     return {
       yearMonth: ym,
       insumos,
+      feriadosDetectados: {
+        dias: pagos.feriadosDias,
+        detalle: pagos.feriados.map((f) => ({
+          fecha: f.fecha,
+          nombre: f.nombre,
+          tecnico: f.tecnico,
+          revisiones: f.revisiones,
+        })),
+      },
       tasasPorDefecto: vig.tasas,
       lineas,
       totalCRC: lineas.reduce((a, l) => a + l.amountCRC, 0),

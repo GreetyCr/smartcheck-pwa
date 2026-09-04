@@ -8,6 +8,7 @@
  */
 import { describe, expect, test } from "vitest";
 import {
+  DIAS_SALARIO_MENSUAL,
   TASAS_POR_DEFECTO,
   VIGENCIAS,
   calcularPlanilla,
@@ -28,6 +29,10 @@ const JULIO = {
   salarioCRC: 430_000,
   comisionesCRC: 73_000,
   baseImponibleCRC: 1_000_000,
+  /* En cero a propósito: la hoja de Esteban **no tiene línea de feriados**, y
+     esta prueba existe para reproducirla al colón. Un valor distinto acá le
+     agregaría una línea que su julio real no tuvo. */
+  feriadosDias: 0,
 };
 
 const monto = (lineas: ReturnType<typeof calcularPlanilla>, linea: string) =>
@@ -82,6 +87,94 @@ describe("reproduce julio de 2026 al colón", () => {
   test("el salario va a `salario` y las comisiones a `comision`", () => {
     expect(lineas.find((l) => l.linea === "salario")?.category).toBe("salario");
     expect(lineas.find((l) => l.linea === "comisiones")?.category).toBe("comision");
+  });
+});
+
+describe("el recargo por feriado obligatorio trabajado (A129)", () => {
+  /**
+   * La regla, en una línea: trabajar un feriado obligatorio se paga **doble**,
+   * pero el salario mensual **ya paga ese día**. Así que la línea es la
+   * diferencia —**un** día— y no el total del día doble.
+   */
+  test("un día de feriado = salario ÷ 30, no ÷ los días del mes", () => {
+    const lineas = calcularPlanilla({ ...JULIO, feriadosDias: 1 }, TASAS_JULIO);
+    // 430.000 / 30 = 14.333,33 → ₡14.333
+    expect(monto(lineas, "feriados")).toBe(14_333);
+  });
+
+  test("el divisor es 30 fijo, no los días que tenga el mes", () => {
+    // Es la convención con que se liquida el salario mensual en Costa Rica, no
+    // un redondeo: febrero también divide entre 30. Se afirma sobre la
+    // constante porque **el cálculo ni siquiera recibe el mes** — no hay forma
+    // de que el divisor varíe, y esta prueba lo deja dicho para que nadie
+    // «arregle» la constante creyendo que es un descuido.
+    expect(DIAS_SALARIO_MENSUAL).toBe(30);
+    expect(monto(calcularPlanilla({ ...JULIO, feriadosDias: 1 }, TASAS_JULIO), "feriados")).toBe(
+      Math.round(JULIO.salarioCRC / DIAS_SALARIO_MENSUAL),
+    );
+  });
+
+  /**
+   * **El redondeo va al final, no por día.** Dos días dan ₡28.667 y no ₡28.666
+   * (= 14.333 × 2): se redondea el total una vez, así el error no se acumula
+   * con la cantidad de días. La diferencia es de ₡1 acá y crecería a ₡1 por día
+   * si se redondeara antes de multiplicar.
+   */
+  test("dos días se redondean UNA vez, no dos", () => {
+    const uno = calcularPlanilla({ ...JULIO, feriadosDias: 1 }, TASAS_JULIO);
+    const dos = calcularPlanilla({ ...JULIO, feriadosDias: 2 }, TASAS_JULIO);
+
+    expect(monto(dos, "feriados")).toBe(
+      Math.round((JULIO.salarioCRC / DIAS_SALARIO_MENSUAL) * 2),
+    );
+    expect(monto(dos, "feriados")).toBe(28_667);
+    expect(monto(uno, "feriados") * 2).toBe(28_666); // lo que daría redondear antes
+  });
+
+  test("sin feriados trabajados NO se crea la línea", () => {
+    // La mayoría de los meses no tienen ninguno. Una fila de ₡0 sería ruido.
+    const lineas = calcularPlanilla(JULIO, TASAS_JULIO);
+    expect(lineas.some((l) => l.linea === "feriados")).toBe(false);
+    expect(lineas).toHaveLength(8);
+  });
+
+  /**
+   * **La prueba que protege el error de leer «x2» de más.** Escribir el día
+   * doble completo en esta línea pagaría el **triple**: el día que ya viene
+   * dentro del salario, más dos.
+   */
+  test("un feriado agrega UN día al total, no dos", () => {
+    const sin = calcularPlanilla(JULIO, TASAS_JULIO);
+    const con = calcularPlanilla({ ...JULIO, feriadosDias: 1 }, TASAS_JULIO);
+    const total = (ls: typeof sin) => ls.reduce((a, l) => a + l.amountCRC, 0);
+
+    expect(total(con) - total(sin)).toBe(Math.round(JULIO.salarioCRC / 30));
+  });
+
+  /**
+   * Las provisiones reproducen la hoja de Esteban, y **esa hoja no tiene línea
+   * de feriados**. Meter el recargo en la base cambiaría cuatro números que él
+   * no pidió cambiar. Es decisión suya, no nuestra.
+   */
+  test("el feriado NO mueve las provisiones ni el aporte patronal", () => {
+    const sin = calcularPlanilla(JULIO, TASAS_JULIO);
+    const con = calcularPlanilla({ ...JULIO, feriadosDias: 3 }, TASAS_JULIO);
+
+    for (const l of [
+      "aporte_patronal",
+      "aguinaldo",
+      "preaviso",
+      "cesantia",
+      "vacaciones",
+      "impuestos",
+    ]) {
+      expect(monto(con, l), l).toBe(monto(sin, l));
+    }
+  });
+
+  test("la fórmula que se muestra dice «extra», para que se lea bien", () => {
+    const lineas = calcularPlanilla({ ...JULIO, feriadosDias: 2 }, TASAS_JULIO);
+    expect(lineas.find((l) => l.linea === "feriados")?.formula).toContain("extra");
   });
 });
 

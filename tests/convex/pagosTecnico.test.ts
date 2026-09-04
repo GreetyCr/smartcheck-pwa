@@ -256,3 +256,116 @@ describe("el mes en curso se marca aparte de «no confiable»", () => {
     expect(viejo.enCurso).toBe(false); // y ya cerrado
   });
 });
+
+/* ========================================================================== */
+/* Feriados obligatorios trabajados — A129                                    */
+/* ========================================================================== */
+
+describe("detecta los feriados de pago obligatorio trabajados (A129)", () => {
+  /**
+   * 15 de setiembre (Independencia) es **obligatorio**; 31 de agosto (Persona
+   * Negra y la Cultura Afrocostarricense) es **no obligatorio**. La diferencia
+   * es la que decide si se paga doble, así que es la primera que se prueba.
+   */
+  test("un feriado obligatorio trabajado cuenta un día", async () => {
+    const t = await setup([{ iso: "2026-09-15" }]);
+    const r = await pedir(t, "2026-09");
+
+    expect(r.feriadosDias).toBe(1);
+    expect(r.feriados[0].nombre).toBe("Independencia");
+    expect(r.feriados[0].tecnico).toBe("Sergio Smartcheck");
+  });
+
+  test("un feriado NO obligatorio no cuenta", async () => {
+    // Trabajarlo se paga sencillo salvo acuerdo: no genera recargo.
+    const t = await setup([{ iso: "2026-08-31" }]);
+    expect((await pedir(t, "2026-08")).feriadosDias).toBe(0);
+  });
+
+  test("un día común no cuenta", async () => {
+    const t = await setup([{ iso: "2026-09-16" }]);
+    expect((await pedir(t, "2026-09")).feriadosDias).toBe(0);
+  });
+
+  /**
+   * La misma regla que rige viáticos y comisiones (B36): las revisiones que hace
+   * Esteban desde su cuenta de admin no le generan pago a nadie.
+   */
+  test("las revisiones de Esteban NO generan recargo", async () => {
+    const t = await setup([{ iso: "2026-09-15", user: ESTEBAN }]);
+    expect((await pedir(t, "2026-09")).feriadosDias).toBe(0);
+  });
+
+  /**
+   * **Varias revisiones el mismo feriado son UN día.** El recargo es por la
+   * jornada, no por revisión: contar por revisión le pagaría tres días por un
+   * martes.
+   */
+  test("tres revisiones el mismo feriado siguen siendo un día", async () => {
+    const t = await setup([
+      { iso: "2026-09-15", hora: "08:00" },
+      { iso: "2026-09-15", hora: "11:00" },
+      { iso: "2026-09-15", hora: "15:00" },
+    ]);
+    const r = await pedir(t, "2026-09");
+
+    expect(r.feriadosDias).toBe(1);
+    expect(r.feriados[0].revisiones).toBe(3);
+  });
+
+  test("dos feriados distintos del mismo mes son dos días", async () => {
+    // 2026: 25 de julio (Anexión) y… solo uno en julio, así que se usa abril:
+    // 11 de abril (Juan Santamaría) y Jueves/Viernes Santo caen en abril.
+    const t = await setup([{ iso: "2026-04-11" }, { iso: "2026-04-02" }]);
+    expect((await pedir(t, "2026-04")).feriadosDias).toBe(2);
+  });
+
+  /**
+   * **El recargo del feriado se corta por MES CALENDARIO, no por la semana.**
+   * Es la excepción deliberada a la regla que usan viáticos y comisiones: el
+   * recargo es salario, y el salario se paga por mes calendario.
+   *
+   * El 1.º de enero de 2027 es viernes; su semana arrancó el lunes 28 de
+   * diciembre, así que `mesDePagoSemanal` lo manda a **diciembre**. El recargo
+   * tiene que quedar en **enero**, que es donde Esteban lo va a buscar.
+   */
+  test("un feriado se paga en SU mes calendario, no en el de su semana", async () => {
+    const t = await setup([{ iso: "2027-01-01" }]);
+
+    expect(mesDePagoSemanal(en("2027-01-01"))).toBe("2026-12"); // la semana dice diciembre
+    expect((await pedir(t, "2027-01")).feriadosDias).toBe(1); // el recargo, enero
+    expect((await pedir(t, "2026-12")).feriadosDias).toBe(0);
+  });
+
+  test("cada técnico que trabaja el mismo feriado gana su propio día", async () => {
+    const t = convexTest(schema, convexModules);
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      for (const [id, nombre] of [
+        [SERGIO, "Sergio Smartcheck"],
+        ["user_otro", "Otro Técnico"],
+      ] as const) {
+        await ctx.db.insert("users", {
+          clerkId: id, email: `${id}@x.com`, name: nombre,
+          role: "tecnico", approvalStatus: "approved", createdAt: now, updatedAt: now,
+        });
+      }
+      for (const u of [SERGIO, "user_otro"]) {
+        await ctx.db.insert("inspections", {
+          clerkUserId: u,
+          inspectionStartAt: en("2026-09-15"),
+        } as never);
+      }
+    });
+
+    expect((await pedir(t, "2026-09")).feriadosDias).toBe(2);
+  });
+
+  test("un mes sin feriados trabajados devuelve cero y lista vacía", async () => {
+    const t = await setup([{ iso: "2026-09-16" }, { iso: "2026-09-17" }]);
+    const r = await pedir(t, "2026-09");
+
+    expect(r.feriadosDias).toBe(0);
+    expect(r.feriados).toEqual([]);
+  });
+});

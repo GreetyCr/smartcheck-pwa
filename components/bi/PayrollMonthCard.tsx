@@ -6,6 +6,7 @@ import { BiCard } from "@/components/bi/BiCard";
 import {
   formatCRC,
   formatDateCR,
+  formatIsoDateCR,
   formatMonthLong,
   toDateInputValue,
 } from "@/lib/bi-format";
@@ -48,9 +49,20 @@ export type PlanillaGuardada = {
     salarioCRC: number;
     comisionesCRC: number;
     baseImponibleCRC: number;
+    feriadosDias: number;
     tasas: Tasas;
     updatedAt: number;
   } | null;
+  /** Feriados obligatorios que el sistema detectó trabajados (A129). */
+  feriadosDetectados: {
+    dias: number;
+    detalle: Array<{
+      fecha: string;
+      nombre: string;
+      tecnico: string;
+      revisiones: number;
+    }>;
+  };
   tasasPorDefecto: Tasas;
   /** Líneas que el mes ya trae desde la hoja o capturadas a mano (B34). */
   lineasYaCargadas: Array<{ etiqueta: string; amountCRC: number; source: string }>;
@@ -76,6 +88,7 @@ export function PayrollMonthCard({
     salarioCRC: number;
     comisionesCRC: number;
     baseImponibleCRC: number;
+    feriadosDias: number;
   }) => Promise<{ creadas: number; actualizadas: number }>;
   /**
    * Le entrega al padre la forma de escribir en el campo de comisiones, para
@@ -91,6 +104,7 @@ export function PayrollMonthCard({
   const [salario, setSalario] = useState("");
   const [comisiones, setComisiones] = useState("");
   const [base, setBase] = useState("");
+  const [feriados, setFeriados] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [ok, setOk] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +116,11 @@ export function PayrollMonthCard({
     setSalario(i ? String(i.salarioCRC) : "");
     setComisiones(i ? String(i.comisionesCRC) : "");
     setBase(i ? String(i.baseImponibleCRC) : "");
+    /* Un mes sin registrar arranca con **lo detectado**, no en blanco: es el
+       número que casi siempre va, y dejarlo vacío obligaría a contar feriados a
+       mano teniéndolos ahí. Un mes ya registrado conserva LO SUYO — recalcularlo
+       le pisaría una corrección que Esteban pudo haber hecho a propósito. */
+    setFeriados(String(i ? i.feriadosDias : guardado.feriadosDetectados.dias));
     setOk(null);
     setError(null);
   }, [guardado?.yearMonth, guardado?.insumos?.updatedAt]);
@@ -124,10 +143,11 @@ export function PayrollMonthCard({
           salarioCRC: num(salario),
           comisionesCRC: num(comisiones),
           baseImponibleCRC: num(base),
+          feriadosDias: num(feriados),
         },
         guardado?.insumos?.tasas ?? guardado?.tasasPorDefecto ?? TASAS_POR_DEFECTO,
       ),
-    [salario, comisiones, base, guardado?.tasasPorDefecto, guardado?.insumos?.tasas],
+    [salario, comisiones, base, feriados, guardado?.tasasPorDefecto, guardado?.insumos?.tasas],
   );
 
   const total = preview.reduce((a, l) => a + l.amountCRC, 0);
@@ -150,6 +170,7 @@ export function PayrollMonthCard({
    * una sorpresa.
    */
   const vigencia = guardado?.vigencia;
+  const detectados = guardado?.feriadosDetectados.detalle ?? [];
   const avisoINS = guardado?.avisoPolizaINS ?? null;
 
   // Se publica una vez el setter del campo de comisiones (ver la prop).
@@ -167,6 +188,7 @@ export function PayrollMonthCard({
         salarioCRC: num(salario),
         comisionesCRC: num(comisiones),
         baseImponibleCRC: num(base),
+        feriadosDias: num(feriados),
       });
       setOk(
         res.creadas > 0
@@ -186,7 +208,7 @@ export function PayrollMonthCard({
   return (
     <BiCard
       title="Planilla del mes"
-      subtitle="Escribí tres datos y el resto se calcula solo"
+      subtitle="Escribí los datos del mes y el resto se calcula solo"
     >
       <div className="space-y-5">
         {/* Mes */}
@@ -298,6 +320,70 @@ export function PayrollMonthCard({
               />
             </label>
           ))}
+        </div>
+
+        {/*
+          Los feriados van **fuera de la grilla de los tres montos** y con su
+          explicación al lado, porque es el único campo que el sistema propone en
+          vez de esperar: se cuenta desde las revisiones. Se muestra siempre,
+          también cuando da cero — un campo que mueve el pago y aparece solo a
+          veces es peor que uno que aparece siempre diciendo «ninguno».
+        */}
+        <div className="rounded-xl border border-[var(--bi-ring)] p-4">
+          <div className="flex flex-wrap items-start gap-4">
+            <label className="block w-full sm:w-[150px] sm:shrink-0">
+              {/* `block` en el rótulo: sin eso, al acotar el ancho del campo el
+                  texto y el input caben en la misma línea y el rótulo se va al
+                  costado, distinto del resto del formulario. */}
+              <span className="block text-xs uppercase tracking-wide text-[var(--bi-ink-3)]">
+                Días de feriado trabajados
+              </span>
+              <input
+                inputMode="numeric"
+                value={feriados}
+                onChange={(e) => setFeriados(e.target.value)}
+                placeholder="0"
+                className={cn(input, "mt-1")}
+              />
+            </label>
+            <div className="min-w-[220px] flex-1 text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">
+              {detectados.length > 0 ? (
+                <>
+                  <p>
+                    El sistema encontró{" "}
+                    <b className="text-[var(--bi-ink)]">
+                      {detectados.length === 1
+                        ? "1 feriado de pago obligatorio"
+                        : `${detectados.length} feriados de pago obligatorio`}
+                    </b>{" "}
+                    con revisiones de un técnico este mes:
+                  </p>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {detectados.map((f) => (
+                      <li key={`${f.fecha}|${f.tecnico}`}>
+                        · <b className="text-[var(--bi-ink)]">{f.nombre}</b>{" "}
+                        ({formatIsoDateCR(f.fecha)}) — {f.tecnico}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[var(--bi-ink-3)]">
+                    Podés corregirlo si trabajó un feriado sin hacer revisiones,
+                    o si no le corresponde.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[var(--bi-ink-3)]">
+                  Este mes <b>ningún técnico registró revisiones en un feriado de
+                  pago obligatorio</b>. Si aun así trabajó uno, escribilo acá.
+                </p>
+              )}
+              <p className="mt-2 border-t border-[var(--bi-ring)] pt-2 text-[var(--bi-ink-3)]">
+                Cada día suma <b>un salario diario</b> (salario ÷ 30) — el que
+                falta para llegar al doble, porque el salario del mes ya paga ese
+                día se trabaje o no.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Lo que se va a registrar, visible ANTES de confirmar */}
