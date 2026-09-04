@@ -94,7 +94,10 @@ export default function AdminDashboardPage() {
           KPIs del resumen y «Inspecciones hoy» compite con «Ingresos». */}
       <div className="mt-10 border-t border-[var(--bi-ring)] pt-8">
         {metrics !== undefined ? (
-          <AdminDashboard metrics={metrics} />
+          <AdminDashboard
+            metrics={metrics}
+            revisionesHistorico={historico?.totalRevisiones}
+          />
         ) : (
           <OperativoSkeleton />
         )}

@@ -141,7 +141,9 @@ export function AdminShellPreview() {
           onPeriodo={setPeriodo}
         />
         <div className="mt-10 border-t border-[var(--bi-ring)] pt-8">
-          <AdminDashboard metrics={METRICS} />
+          {/* El histórico es mayor que lo de la app, que es el caso real y el
+              que dispara el aviso del universo (A133). */}
+          <AdminDashboard metrics={METRICS} revisionesHistorico={887} />
         </div>
       </div>
     </DevAdminShell>

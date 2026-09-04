@@ -34,7 +34,18 @@ const VALUE_H = 18;
 /** Alto reservado a la fila de etiquetas de día (para anclar la línea base). */
 const LABEL_H = 16;
 
-export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
+export function AdminDashboard({
+  metrics,
+  revisionesHistorico,
+}: {
+  metrics: AdminMetrics;
+  /**
+   * Total de revisiones del histórico completo (app + CRM viejo), el mismo que
+   * muestra el resumen de arriba. **Opcional**: si todavía no cargó, el aviso
+   * del universo no se pinta a medias con un número en blanco (A133).
+   */
+  revisionesHistorico?: number;
+}) {
   const {
     todayCount,
     monthCount,
@@ -60,9 +71,35 @@ export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
           Operación de las revisiones
         </h2>
         <p className="bi-num mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--bi-ink-3)]">
-          {formatInt(totalInspections)} inspecciones en sistema ·{" "}
+          {formatInt(totalInspections)} revisiones hechas en la app ·{" "}
           {formatInt(techniciansCount)} técnicos registrados
         </p>
+        {/**
+         * **El universo, dicho con su número — A133.**
+         *
+         * Arriba, en la misma pantalla y a dos dedos de distancia, el resumen
+         * dice «906 revisiones»; acá abajo decía «166 inspecciones en sistema».
+         * Los dos son correctos —aquel cuenta el histórico completo y este solo
+         * lo que vive en la app— pero **la pantalla usaba dos palabras para lo
+         * que el lector entiende como lo mismo**, sin decir en ningún lado que
+         * eran conjuntos distintos.
+         *
+         * Es el patrón exacto de B44, que ya costó una consulta: un subconjunto
+         * correcto presentado sin su universo. Se arregla igual que en A126 —
+         * nombrando el universo— y además **tendiendo el puente con el número de
+         * arriba**, porque acá los dos conviven en la misma pantalla y la
+         * comparación es inevitable.
+         */}
+        {revisionesHistorico !== undefined &&
+        revisionesHistorico > totalInspections ? (
+          <p className="mt-2 max-w-prose text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">
+            De aquí para abajo son <strong>solo las revisiones hechas en la app</strong>
+            , que son las únicas que registran técnico, estado y fecha de entrega.
+            El total del histórico —
+            <strong>{formatInt(revisionesHistorico)}</strong>, con las del CRM
+            viejo— es el de arriba, y su detalle está en Inspecciones.
+          </p>
+        ) : null}
       </header>
 
       {/* ---------- KPIs ---------- */}
@@ -79,7 +116,7 @@ export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
           label="Este mes"
           tone="utilidad"
           value={formatInt(monthCount)}
-          hint={`${formatInt(totalInspections)} acumuladas`}
+          hint={`${formatInt(totalInspections)} en la app`}
         />
         <BiKpiCard
           index={2}
@@ -109,7 +146,7 @@ export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
 
         <BiCard
           title="Inspecciones por técnico"
-          subtitle="Acumulado histórico"
+          subtitle="Todas las hechas en la app"
         >
           <TechnicianBars rows={byTechnician} />
         </BiCard>
@@ -119,7 +156,9 @@ export function AdminDashboard({ metrics }: { metrics: AdminMetrics }) {
       <div className="mt-4">
         <BiCard
           title="Estado de las inspecciones"
-          subtitle="Todo el histórico"
+          /* Decía «Todo el histórico», que es LA frase con que el resumen de
+             arriba rotula el conjunto grande. Acá es el chico (A133). */
+          subtitle="Todas las hechas en la app"
           action={
             <span className="bi-num shrink-0 text-xs text-[var(--bi-ink-3)]">
               {formatInt(totalInspections)} en total
