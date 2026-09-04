@@ -23,8 +23,19 @@ declare global {
   }
 }
 
+/**
+ * El valor queda colgado de `window` para QA y soporte: en DevTools se lee con
+ * `__smartcheck` cuando hace falta.
+ *
+ * Antes esto además imprimía `[smartcheck] useUnifiedDraftFlow: …` en cada
+ * carga. Se quitó: decía siempre lo mismo, a todo el mundo, en producción, y
+ * una consola con ruido fijo es una consola que nadie mira el día que aparece
+ * algo de verdad. El dato no se perdió — se pide cuando se necesita.
+ *
+ * **No borrar el `import "@/lib/featureFlags"` de `ConvexClientProvider`**: no
+ * es un import muerto, es lo que hace que esto corra al cargar el bundle.
+ */
 if (typeof window !== "undefined") {
-  console.info("[smartcheck] useUnifiedDraftFlow:", UNIFIED_DRAFT_FLOW);
   window.__smartcheck = {
     ...(window.__smartcheck ?? {}),
     useUnifiedDraftFlow: UNIFIED_DRAFT_FLOW,

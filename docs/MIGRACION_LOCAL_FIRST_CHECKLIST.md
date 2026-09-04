@@ -18,7 +18,7 @@ Convenciones cerradas:
 
 3. **`SectionForm` (modo local)** — Catálogo de ítems ya es **estático en bundle** (`lib/constants/sectionItems.ts`). Estado por sección en IDB: forma **alineada** a lo que devuelve `sections.getSection`, menos campos server-only. Preferible **`toUpsertPayload(localSectionRow): UpsertSectionArgs`** único (sin lógica por sección). **`upsertSection` solo** cuando exista **`convexId`** del padre; hasta entonces solo IDB. La cola debe **crear/actualizar primero la inspección** (`createOrUpdateFromDraft`) y **después** las secciones de esa inspección. Fotos: **misma cola** que Fase 5 / cabecera (sin canal paralelo).
 
-4. **`useUnifiedDraftFlow`** — Implementado en **`lib/featureFlags.ts`**: boolean por entorno (`NEXT_PUBLIC_USE_UNIFIED_DRAFT_FLOW`, lectura con `trim` + `toLowerCase`). Regla de cola documentada **en comentario junto a la función** (entrada bajo flag; **sync siempre drena**). En cliente: **`console.info("[smartcheck] useUnifiedDraftFlow:", …)`** y **`window.__smartcheck.useUnifiedDraftFlow`** al cargar el bundle (QA / soporte). Granularidad por usuario → segunda iteración si hace falta.
+4. **`useUnifiedDraftFlow`** — Implementado en **`lib/featureFlags.ts`**: boolean por entorno (`NEXT_PUBLIC_USE_UNIFIED_DRAFT_FLOW`, lectura con `trim` + `toLowerCase`). Regla de cola documentada **en comentario junto a la función** (entrada bajo flag; **sync siempre drena**). En cliente: **`window.__smartcheck.useUnifiedDraftFlow`** al cargar el bundle (QA / soporte). El `console.info` que lo acompañaba se quitó el 4-set: imprimía lo mismo en cada carga y en producción; el valor se pide en DevTools cuando hace falta. Granularidad por usuario → segunda iteración si hace falta.
 
 ---
 
@@ -82,7 +82,7 @@ Convenciones cerradas:
 | Archivo | Fase | Rol |
 |---------|------|-----|
 | `lib/images/compressVehiclePhoto.ts` | **1 (hecho)** | JPEG calidad **0.82** (`VEHICLE_PHOTO_JPEG_QUALITY`), lado mayor **1600**; `createImageBitmap` + canvas; `ImageBitmap` cerrado en `finally` (`closeBitmapSafe`); `File` con `type: image/jpeg` y nombre `.jpg`; carrera en **`VehicleForm`** con generación por slot. |
-| `lib/featureFlags.ts` | **3 (hecho)** | `useUnifiedDraftFlow()` + env normalizado + log `[smartcheck]` + `window.__smartcheck`; import side-effect en `ConvexClientProvider.tsx`. |
+| `lib/featureFlags.ts` | **3 (hecho)** | `useUnifiedDraftFlow()` + env normalizado + `window.__smartcheck`; import side-effect en `ConvexClientProvider.tsx`. |
 | `lib/inspection/idValidation.ts` | **3 (hecho)** | `isUuidV4`, `looksLikeConvexInspectionId`; tests `lib/inspection/idValidation.test.ts`. |
 | `lib/validation/inspectionDraft.ts` | **4 (oblig.)** | Esquema Zod compartido (wizard + payload mutación). |
 | `convex/lib/validateInspectionDraft.ts` | **4 (oblig.)** | Validación servidor; importa o duplica controlada vs `lib/validation`. |
