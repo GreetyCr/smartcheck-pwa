@@ -7,20 +7,37 @@ import { resetOfflineDbForTests } from "@/lib/offline/db";
 const UUID = "550e8400-e29b-41d4-a716-446655440004";
 const LEGACY = "30pszp69d7c6k54554wwx9h89gycxhr";
 
-const { mockQuery, convexClientStub } = vi.hoisted(() => {
+const { mockQuery, convexClientStub, syncStub } = vi.hoisted(() => {
   const mockQuery = vi.fn();
   /** Misma referencia en cada render (evita bucle infinito en `useMemo([convex])`). */
   const convexClientStub = { query: mockQuery };
-  return { mockQuery, convexClientStub };
+  /**
+   * El hook solo consume estas tres propiedades de `useSync`. Se mockea el
+   * contexto en vez de montar `SyncProvider`, que abre IndexedDB y arranca la
+   * cola de sync. Mutar el objeto (misma referencia) para cubrir offline.
+   */
+  const syncStub = {
+    isOnline: true,
+    pendingCount: 0,
+    lastSyncAt: null as Date | null,
+  };
+  return { mockQuery, convexClientStub, syncStub };
 });
 
 vi.mock("convex/react", () => ({
   useConvex: () => convexClientStub,
 }));
 
+vi.mock("@/contexts/SyncContext", () => ({
+  useSync: () => syncStub,
+}));
+
 describe("useUnifiedInspection", () => {
   beforeEach(async () => {
     await resetOfflineDbForTests();
+    syncStub.isOnline = true;
+    syncStub.pendingCount = 0;
+    syncStub.lastSyncAt = null;
     mockQuery.mockReset();
     mockQuery.mockImplementation(
       async (_fn: unknown, args: { id?: string; clientId?: string }) => {
