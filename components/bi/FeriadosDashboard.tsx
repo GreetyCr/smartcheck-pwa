@@ -183,13 +183,27 @@ export function FeriadosDashboard({
               </li>
             ))}
           </ul>
+          {/**
+           * **Este texto decía lo contrario hasta el 4-set, y quedó viejo — A132.**
+           *
+           * Decía que el panel «no calcula cuánto habría que pagar de más, y es
+           * a propósito». Era cierto hasta que A129 puso la línea de recargo en
+           * Planilla, y no se actualizó al construirla. Una pantalla que declara
+           * un límite que ya no existe **manda a alguien a hacer a mano una
+           * cuenta que el sistema ya hace**, y encima le quita confianza al
+           * resto de lo que la pantalla afirma.
+           *
+           * Apareció recorriendo el panel como lo recorrería alguien que no lo
+           * conoce, no revisando el código.
+           */}
           <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
-            El panel <strong>no calcula cuánto habría que pagar de más</strong>, y
-            es a propósito: el doble se aplica sobre la jornada, y acá al técnico
-            se le paga viático por revisión más comisión a partir de la 46 del
-            mes. Cómo se traduce eso es una decisión suya con su contador. Acá
-            están los hechos —qué día, cuántas y de dónde salieron—; la cuenta no
-            la inventamos nosotros.
+            El recargo por trabajar estos días <strong>lo calcula la planilla</strong>:
+            cada feriado obligatorio trabajado suma un día de salario
+            (salario ÷ 30), que es lo que falta para llegar al doble, porque el
+            salario del mes ya paga ese día. Entrá a <strong>Planilla</strong>, elegí
+            el mes y confirmá el número de días — ahí podés ponerlo en medio día si
+            se trabajó media jornada. Las comisiones no se duplican: se pagan por
+            revisión, no por día.
           </p>
         </BiCard>
       ) : null}
