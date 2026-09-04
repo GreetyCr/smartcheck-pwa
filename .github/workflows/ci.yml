@@ -1,0 +1,52 @@
+# Verificación automática en cada push y cada PR.
+#
+# Existe porque los comandos ya estaban bien definidos pero solo corrían si
+# alguien se acordaba: dos pruebas del flujo unificado local-first estuvieron
+# tres meses en rojo sin que nadie se enterara. La verificación voluntaria no
+# es verificación.
+#
+# `pnpm lint` entra desde el primer día porque los 34 errores ya están en cero.
+# Si alguna vez vuelve a salir sucio, se arregla el código — no se saca el paso.
+#
+# `pnpm build` NO está a propósito: necesita variables de entorno de Convex y
+# Clerk, y un build que falla por falta de secretos enseña a ignorar el rojo
+# igual que un lint sucio. Sumarlo cuando los secretos estén resueltos.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Un push a la rama de un PR dispara los dos eventos; comparten grupo para que
+# la corrida vieja se cancele en vez de duplicar el check.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: pruebas y lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm, nunca npm: hay pnpm-lock.yaml y mezclar gestores rompe el árbol
+      # de node_modules. Versión fija — `package.json` no declara
+      # `packageManager`, así que corepack no tiene de dónde deducirla.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+
+      - run: pnpm lint
