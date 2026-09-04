@@ -10,6 +10,7 @@ import {
   formatPct,
 } from "@/lib/bi-format";
 import { BiCard } from "./BiCard";
+import { CanalesPorMesChart } from "./CanalesPorMesChart";
 import { BiKpiCard } from "./BiKpiCard";
 import { cn } from "@/lib/utils";
 
@@ -244,9 +245,18 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
       {/* ------------------------------------------------------------------ */}
       <BiCard
         title="Mes a mes"
-        subtitle="Revisiones por canal. Cada fila tiene su PROPIA escala: sirve para ver la tendencia de un canal, no para compararlo con otro."
+        subtitle="La altura es cuántas revisiones hubo ese mes; el color, de qué canal salieron"
       >
-        <SmallMultiples canales={canales} porMes={porMes} />
+        <CanalesPorMesChart
+          canales={canales}
+          porMes={porMes}
+          colorDe={colorDe}
+        />
+        <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+          Un canal chico se ve como una franja delgada, así que para saber si
+          alguno se apagó mirá la tabla de arriba: ahí cada canal dice cuántos
+          meses lleva sin traer una revisión.
+        </p>
       </BiCard>
 
       {/* ------------------------------------------------------------------ */}
@@ -304,101 +314,6 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
  * magnitud ya la da la tarjeta de arriba; acá se lee **forma**, y por eso el
  * subtítulo declara la escala en vez de dejarla implícita.
  */
-function SmallMultiples({
-  canales,
-  porMes,
-}: {
-  canales: CanalRow[];
-  porMes: CanalMes[];
-}) {
-  const meses = porMes.map((m) => m.ym);
-  if (meses.length === 0 || canales.length === 0) {
-    return (
-      <p className="text-xs text-[var(--bi-ink-3)]">
-        No hay revisiones en el periodo.
-      </p>
-    );
-  }
-
-  const valor = (ym: string, canal: string) =>
-    porMes.find((m) => m.ym === ym)?.canales.find((c) => c.canal === canal)
-      ?.rows ?? 0;
-
-  return (
-    <div className="space-y-4">
-      {canales.map((c) => {
-        const serie = meses.map((ym) => valor(ym, c.canal));
-        const max = Math.max(1, ...serie);
-        return (
-          <div key={c.canal}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="flex min-w-0 items-baseline gap-2">
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 translate-y-[1px] rounded-[3px]"
-                  style={{ background: colorDe(c.canal) }}
-                />
-                <span className="truncate text-[13px] text-[var(--bi-ink-2)]">
-                  {c.canal}
-                </span>
-              </span>
-              <span className="bi-num shrink-0 text-[11px] tabular-nums text-[var(--bi-ink-3)]">
-                máx {formatInt(max)}/mes
-              </span>
-            </div>
-
-            <div className="mt-1.5 flex h-9 items-end gap-[3px]">
-              {meses.map((ym, i) => {
-                const v = serie[i];
-                const mes = porMes[i];
-                return (
-                  <div
-                    key={ym}
-                    className="group relative flex-1"
-                    title={`${formatMonthLong(ym)}: ${formatInt(v)} revisiones${mes.enCurso ? " (mes en curso)" : ""}`}
-                  >
-                    <div
-                      className={cn(
-                        "w-full rounded-t-[3px]",
-                        v === 0 && "opacity-40",
-                      )}
-                      style={{
-                        height: `${Math.max((v / max) * 36, v > 0 ? 3 : 1)}px`,
-                        background:
-                          v === 0 ? "var(--bi-surface-2)" : colorDe(c.canal),
-                        // El mes en curso va traslúcido: está a medio llenar y
-                        // leerlo como una caída sería un error caro.
-                        opacity: mes.enCurso ? 0.55 : undefined,
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Eje de meses, una sola vez para todas las filas */}
-      <div className="flex gap-[3px] border-t border-[var(--bi-ring)] pt-1.5">
-        {meses.map((ym, i) => (
-          <span
-            key={ym}
-            className="bi-num flex-1 text-center text-[9.5px] uppercase tabular-nums text-[var(--bi-ink-3)]"
-          >
-            {i === 0 || ym.endsWith("-01") || i === meses.length - 1
-              ? formatMonthAbbr(ym)
-              : ""}
-          </span>
-        ))}
-      </div>
-      <p className="text-[11.5px] text-[var(--bi-ink-3)]">
-        El último mes va traslúcido cuando está en curso: todavía no terminó.
-      </p>
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Pauta: gasto y costo por revisión, mes a mes                               */
 /* -------------------------------------------------------------------------- */
