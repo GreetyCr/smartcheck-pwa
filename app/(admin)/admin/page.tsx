@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { ResumenEjecutivo } from "@/components/bi/ResumenEjecutivo";
 import {
+  rangoAnterior,
   rangoDelPeriodo,
   type PeriodoKey,
 } from "@/components/bi/ExpenseGroupsCard";
@@ -54,6 +55,8 @@ const SOPORTA = [
 export default function AdminDashboardPage() {
   const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
   const rango = useMemo(() => rangoDelPeriodo(periodo), [periodo]);
+  /** El tramo previo del mismo largo, para poder decir «cuánto más que antes». */
+  const previo = useMemo(() => rangoAnterior(periodo), [periodo]);
   const { args: dims } = useFiltrosBi(SOPORTA);
 
   const historico = useQuery(api.bi.public.executiveSummary, dims);
@@ -61,6 +64,13 @@ export default function AdminDashboardPage() {
     ...dims,
     ...rango,
   });
+  /* El periodo anterior (A135). Con «Todo» no hay un antes, así que la query se
+     salta en vez de pedir un rango vacío que devolvería el histórico entero y
+     produciría una comparación falsa contra sí mismo. */
+  const delPeriodoPrevio = useQuery(
+    api.bi.public.executiveSummary,
+    previo ? { ...dims, ...previo } : "skip",
+  );
   // Finanzas solo entiende de periodo: un gasto no tiene provincia ni marca.
   const finanzas = useQuery(api.bi.public.financeSummary, rango);
   const canales = useQuery(api.bi.public.channelRevenue, { ...dims, ...rango });
@@ -80,6 +90,7 @@ export default function AdminDashboardPage() {
         <ResumenEjecutivo
           periodo={delPeriodo}
           historico={historico}
+          anterior={previo ? delPeriodoPrevio : null}
           meses={finanzas.months}
           canales={canales.canales}
           periodoKey={periodo}

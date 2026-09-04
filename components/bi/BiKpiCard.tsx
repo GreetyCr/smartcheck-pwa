@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * Tarjeta de indicador (stat tile). El valor grande usa cifras proporcionales
@@ -26,6 +27,7 @@ export function BiKpiCard({
   delta,
   tone = "neutral",
   index = 0,
+  destacada = false,
 }: {
   label: string;
   value: string;
@@ -41,6 +43,15 @@ export function BiKpiCard({
   delta?: { pct: number; label: string } | null;
   tone?: KpiTone;
   index?: number;
+  /**
+   * La tarjeta titular de una pantalla — **A135**.
+   *
+   * Cambia **solo el tamaño de la cifra y el aire**, no el color ni la
+   * estructura: la jerarquía la tiene que dar el tamaño, que es lo que el ojo
+   * lee primero, y no un acento distinto que competiría con el que ya identifica
+   * a la métrica.
+   */
+  destacada?: boolean;
 }) {
   const accent = TONE_VAR[tone];
   const dir = delta ? (delta.pct > 0 ? "up" : delta.pct < 0 ? "down" : "flat") : null;
@@ -56,7 +67,10 @@ export function BiKpiCard({
 
   return (
     <div
-      className="bi-lift bi-fade-up relative overflow-hidden rounded-2xl border border-[var(--bi-ring)] bg-[var(--bi-surface)] p-4"
+      className={cn(
+        "bi-lift bi-fade-up relative overflow-hidden rounded-2xl border border-[var(--bi-ring)] bg-[var(--bi-surface)]",
+        destacada ? "flex flex-col justify-center p-5 sm:p-6" : "p-4",
+      )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {/* barra de acento (identidad de la métrica) */}
@@ -69,7 +83,12 @@ export function BiKpiCard({
         {label}
       </p>
       <p
-        className="mt-1.5 text-[26px] font-semibold leading-none text-[var(--bi-ink)] sm:text-[30px]"
+        className={cn(
+          "mt-1.5 font-semibold leading-none text-[var(--bi-ink)]",
+          destacada
+            ? "text-[40px] sm:text-[54px]"
+            : "text-[26px] sm:text-[30px]",
+        )}
         title={exact}
       >
         {value}
@@ -83,7 +102,7 @@ export function BiKpiCard({
       <div className="mt-2 space-y-0.5">
         {delta ? (
           <span
-            className="flex items-center gap-1 text-xs font-medium"
+            className="flex items-start gap-1 text-xs font-medium leading-tight"
             style={{
               color:
                 deltaGood === null
@@ -93,8 +112,13 @@ export function BiKpiCard({
                     : "var(--bi-bad)",
             }}
           >
-            <DeltaIcon className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">{delta.label}</span>
+            <DeltaIcon className="mt-[1px] size-3.5 shrink-0" aria-hidden />
+            {/* **Envuelve, no trunca — A135.** La etiqueta nombra el periodo
+                («vs los 3 previos») y en 375px la tarjeta deja 114px para 129
+                de texto: truncar se comía justo la parte que dice contra qué se
+                compara, que es lo único que la vuelve informativa. Partirla en
+                dos líneas no pierde nada; la grilla iguala las alturas. */}
+            <span>{delta.label}</span>
           </span>
         ) : null}
         {hint ? (

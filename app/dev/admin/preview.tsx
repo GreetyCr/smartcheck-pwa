@@ -135,6 +135,21 @@ export function AdminShellPreview() {
         <ResumenEjecutivo
           periodo={RESUMEN}
           historico={RESUMEN}
+          /* Un periodo previo más flojo, para poder revisar la variación en sus
+             dos signos: utilidad e ingresos suben, gastos bajan (A135). */
+          anterior={
+            periodo === "todo"
+              ? null
+              : {
+                  ...RESUMEN,
+                  utilidadCRC: Math.round(RESUMEN.utilidadCRC * 0.72),
+                  ingresosFinancierosCRC: Math.round(
+                    RESUMEN.ingresosFinancierosCRC * 0.85,
+                  ),
+                  gastosCRC: Math.round(RESUMEN.gastosCRC * 1.09),
+                  totalRevisiones: Math.round(RESUMEN.totalRevisiones * 0.93),
+                }
+          }
           meses={MESES}
           canales={CANALES}
           periodoKey={periodo}

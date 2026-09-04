@@ -187,3 +187,33 @@ export function pasoEtiquetasMes(meses: number, angosto: boolean): number {
   if (angosto) return meses > 16 ? 3 : meses > 8 ? 2 : 1;
   return meses > 12 ? 2 : 1;
 }
+
+/**
+ * La variación contra un periodo de referencia — **A135**.
+ *
+ * **Un número de gestión sin su comparación no es información.** «₡1,1M de
+ * utilidad» no le dice a nadie si el mes fue bueno; «₡1,1M, 60% más que julio»
+ * sí. Es la regla más dura del reporte de gestión y la portada no la cumplía:
+ * decía cuánto y casi nunca cuánto más o menos que antes.
+ *
+ * `contra` **nombra** el periodo de referencia en vez de referirlo. Decía «vs
+ * anterior», y anterior a qué es justo lo que el lector no sabe.
+ *
+ * Devuelve `null` cuando no hay con qué comparar —sin dato previo, o previo en
+ * cero, donde el porcentaje sería infinito—. Eso es distinto de «no cambió», y
+ * por eso no se colapsan: sin base la tarjeta no muestra variación, no muestra
+ * un 0%.
+ */
+export function variacion(
+  ahora: number,
+  antes: number | undefined | null,
+  contra: string,
+): { pct: number; label: string } | null {
+  if (antes == null || antes === 0) return null;
+  const pct = ((ahora - antes) / Math.abs(antes)) * 100;
+  if (Math.abs(pct) < 0.05) return { pct: 0, label: `sin cambio ${contra}` };
+  return {
+    pct,
+    label: `${Math.abs(pct).toFixed(1).replace(".", ",")}% ${contra}`,
+  };
+}

@@ -120,7 +120,7 @@ export function AdminDashboard({
         />
         <BiKpiCard
           index={2}
-          label="Sin sincronizar"
+          label="Sin subir"
           tone="warn"
           value={formatInt(pendingSyncCount)}
           // Pista corta a propósito: en 375px la tarjeta trunca lo que no cabe.
@@ -319,15 +319,20 @@ function StatusGrid({
     /** Estado que pide acción del admin. */
     actionable?: boolean;
   }[] = [
-    { key: "draft", label: "Borrador", Icon: FileText },
-    { key: "completed", label: "Completado", Icon: CheckCircle2 },
+    /* **Los nombres son los del negocio, no los del sistema — A136.**
+       Decían «Pendiente sync» y «Sincronizado»: «sync» es palabra nuestra y el
+       dueño del taller no tiene por qué saber qué significa. Lo que le importa
+       de cada estado es si el trabajo llegó al sistema y si el cliente ya tiene
+       su informe. Las llaves no cambian; solo lo que se lee. */
+    { key: "draft", label: "Sin terminar", Icon: FileText },
+    { key: "completed", label: "Terminada", Icon: CheckCircle2 },
     {
       key: "pending_sync",
-      label: "Pendiente sync",
+      label: "Falta subirla",
       Icon: CloudUpload,
       actionable: true,
     },
-    { key: "synced", label: "Sincronizado", Icon: CloudCheck },
+    { key: "synced", label: "Ya subida", Icon: CloudCheck },
     { key: "report_delivered", label: "Informe entregado", Icon: Send },
   ];
 

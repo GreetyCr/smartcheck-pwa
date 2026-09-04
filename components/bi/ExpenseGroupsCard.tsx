@@ -50,6 +50,35 @@ export function rangoDelPeriodo(key: PeriodoKey, ahora = Date.now()): {
   return { fromMs: desde.getTime() };
 }
 
+/**
+ * El **periodo inmediatamente anterior** al preset, del mismo largo — A135.
+ *
+ * Sirve para poder decir «cuánto más o menos que antes», que es lo que
+ * convierte una cifra suelta en un hecho. Sin comparación, «₡1,1M de utilidad»
+ * no le dice a nadie si el mes fue bueno.
+ *
+ * Devuelve `null` para «Todo»: no hay un antes de todo el histórico, y fabricar
+ * una comparación ahí sería inventarla.
+ *
+ * El rango es **semiabierto** `[desde, hasta)` y `hasta` es exactamente el
+ * `fromMs` del periodo actual, así que los dos tramos no comparten ni un día.
+ */
+export function rangoAnterior(
+  key: PeriodoKey,
+  ahora = Date.now(),
+): { fromMs: number; toMs: number } | null {
+  const preset = PERIODOS.find((p) => p.key === key);
+  const meses = preset && "meses" in preset ? preset.meses : undefined;
+  if (!meses) return null;
+  const actual = rangoDelPeriodo(key, ahora);
+  if (actual.fromMs == null) return null;
+  const d = new Date(ahora);
+  const desde = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - (meses * 2 - 1), 1, 6),
+  );
+  return { fromMs: desde.getTime(), toMs: actual.fromMs };
+}
+
 export type ExpenseBreakdown = {
   categorias: string[];
   totalCRC: number;

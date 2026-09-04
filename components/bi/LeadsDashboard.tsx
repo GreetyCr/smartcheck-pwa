@@ -447,7 +447,7 @@ export function LeadsDashboard({
             que <strong>no entra en el {formatPct(funnel.convertedRatePct, 2)}</strong>.
           </p>
           <p className="mt-3 border-t border-[var(--bi-ring)] pt-3 text-xs text-[var(--bi-ink-3)]">
-            Techo teórico si se contaran todos:{" "}
+            Si se contaran todos serían{" "}
             <span className="bi-num tabular-nums">
               {formatInt(funnel.convertedIncludingName)}
             </span>{" "}
@@ -485,19 +485,19 @@ export function LeadsDashboard({
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.9fr_1fr]">
         <BiCard
           className="min-w-0"
-          title="Cómo se emparejó"
-          subtitle={`${formatInt(funnel.leadsMatched)} emparejamientos · ${formatInt(funnel.converted)} cuentan en la conversión`}
+          title="Cómo se supo quién compró"
+          subtitle={`${formatInt(funnel.leadsMatched)} contactos ligados a una revisión · ${formatInt(funnel.converted)} cuentan como conversión`}
           bodyClassName="pt-0"
         >
           <div className="-mx-4 overflow-x-auto pt-4 sm:-mx-5">
             <table className="w-full min-w-[560px] border-collapse text-left">
               <caption className="sr-only">
-                Emparejamientos por método, con la banda de confianza y si
-                cuentan en la conversión titular
+                Cómo se ligó cada contacto con su revisión, qué tan seguro es
+                cada método y si cuenta en la conversión
               </caption>
               <thead>
                 <tr className="border-b border-[var(--bi-ring)]">
-                  {["Método", "Confianza", "Emparejamientos", "¿Cuenta?"].map(
+                  {["Cómo se ligó", "Qué tan seguro", "Cuántos", "¿Cuenta?"].map(
                     (h) => (
                       <th
                         key={h}
@@ -590,7 +590,7 @@ export function LeadsDashboard({
         <BiCard
           className="min-w-0"
           title="Contra qué revisión cruzó"
-          subtitle={`Sobre los ${formatInt(funnel.leadsMatched)} emparejamientos`}
+          subtitle={`Sobre los ${formatInt(funnel.leadsMatched)} contactos ligados a una revisión`}
         >
           <BiCountBars rows={targetRows} />
           <div className="mt-4 space-y-2 border-t border-[var(--bi-ring)] pt-3 text-xs text-[var(--bi-ink-3)]">

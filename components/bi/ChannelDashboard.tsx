@@ -131,7 +131,7 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
           label="Ingresos de revisiones"
           value={formatCompactCRC(data.totalIngresosCRC)}
           exact={formatCRC(data.totalIngresosCRC)}
-          hint="No es el total del P&L — ver la nota"
+          hint="Solo lo cobrado en revisiones — ver la nota"
           tone="income"
         />
         <BiKpiCard

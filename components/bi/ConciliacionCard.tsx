@@ -74,7 +74,7 @@ export function ConciliacionCard({ data }: { data: Reconciliation }) {
   return (
     <BiCard
       title="¿Cuadra lo cobrado con lo revisado?"
-      subtitle={`Desde ${formatMonthLong(data.financeStartISO.slice(0, 7))} · umbral ${thresholdPct}%`}
+      subtitle={`Desde ${formatMonthLong(data.financeStartISO.slice(0, 7))} · se marca a partir de ${thresholdPct}%`}
       action={
         <span className="bi-num shrink-0 text-xs text-[var(--bi-ink-3)]">
           {formatInt(cerrados.length)} meses cerrados

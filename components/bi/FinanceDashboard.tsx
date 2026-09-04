@@ -8,7 +8,9 @@ import {
   formatCRC,
   formatInt,
   formatMonthLong,
+  formatMonthShort,
   formatPct,
+  variacion,
 } from "@/lib/bi-format";
 import { BiCard } from "./BiCard";
 import { BiCategoryBars } from "./BiCategoryBars";
@@ -135,16 +137,23 @@ export function FinanceDashboard({
         rows: totals.rows,
       };
 
-  const delta = (now: number, before: number | undefined) => {
-    if (before === undefined || before === 0) return null;
-    const pct = ((now - before) / Math.abs(before)) * 100;
-    if (Math.abs(pct) < 0.05) return { pct: 0, label: "sin cambio" };
-    // Etiqueta corta: con "vs mes anterior" se truncaba en móvil.
-    return {
-      pct,
-      label: `${Math.abs(pct).toFixed(1).replace(".", ",")}% vs anterior`,
-    };
-  };
+  /**
+   * **Nombra el mes con que compara, en vez de decir «anterior» — A135.**
+   *
+   * Decía «30,6% vs anterior» y anterior a qué es justo lo que el lector no
+   * sabe: ¿el mes pasado, el mismo mes del año pasado, el promedio? Con el
+   * nombre no queda duda, y ocupa lo mismo o menos («vs junio» contra «vs mes
+   * anterior», que era lo que se truncaba en móvil).
+   *
+   * El cálculo ya no vive acá: es `variacion` en `@/lib/bi-format`, compartido
+   * con la portada. Dos copias de la misma fórmula en dos pantallas es la forma
+   * más fácil de que un día muestren números distintos (A125 · A128).
+   */
+  const contraMes = previous
+    ? `vs ${formatMonthShort(previous.yearMonth).toLowerCase()}`
+    : "vs anterior";
+  const delta = (now: number, before: number | undefined) =>
+    variacion(now, before, contraMes);
 
   // Desglose de gastos por categoría del periodo visible (calculado sobre los
   // movimientos ya cargados: completo para un mes).
@@ -290,7 +299,7 @@ export function FinanceDashboard({
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.9fr_1fr]">
         <BiCard
           title="Ingresos y gastos por mes"
-          subtitle="Montos normalizados a colones"
+          subtitle="Todo convertido a colones"
         >
           <BiMonthlyBars
             months={months}

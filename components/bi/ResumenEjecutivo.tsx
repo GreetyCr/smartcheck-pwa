@@ -9,6 +9,7 @@ import {
   formatCRC,
   formatInt,
   formatPct,
+  variacion,
 } from "@/lib/bi-format";
 import { cn } from "@/lib/utils";
 import type {
@@ -55,6 +56,7 @@ import type {
 export function ResumenEjecutivo({
   periodo,
   historico,
+  anterior,
   meses,
   canales,
   periodoKey,
@@ -65,6 +67,13 @@ export function ResumenEjecutivo({
   periodo: ExecutiveSummary;
   /** Las mismas cifras sin filtro. De acá salen los totales históricos. */
   historico: ExecutiveSummary;
+  /**
+   * Las mismas cifras del **periodo inmediatamente anterior**, del mismo largo
+   * (A135). `undefined` mientras carga y `null` cuando no hay con qué comparar
+   * —el preset «Todo» no tiene un antes—; en los dos casos no se pinta
+   * variación, que es distinto de pintar un 0%.
+   */
+  anterior?: ExecutiveSummary | null;
   /** Serie mensual del periodo, para la tendencia. */
   meses: FinanceMonth[];
   /** Mezcla de canales del periodo. */
@@ -86,6 +95,13 @@ export function ResumenEjecutivo({
   const hayFiltro = hayPeriodo || hayDimension;
   const etiquetaPeriodo =
     PERIODOS.find((p) => p.key === periodoKey)?.label ?? "Todo";
+  /**
+   * Con qué se compara, **nombrado**. «vs anterior» deja al lector preguntando
+   * anterior a qué; «vs los 3 previos» lo dice (A135).
+   */
+  const contraPeriodo = `vs los ${etiquetaPeriodo
+    .toLowerCase()
+    .replace(" meses", "")} previos`;
 
   return (
     <section aria-labelledby="resumen-ejecutivo">
@@ -138,40 +154,82 @@ export function ResumenEjecutivo({
             : "Todo el histórico"
         }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/**
+       * **Un titular y tres de apoyo, no cuatro iguales — A135.**
+       *
+       * La portada tenía doce tarjetas del mismo tamaño en tres filas de cuatro.
+       * Cuando todo pesa igual no hay mensaje, y para alguien que nunca vio un
+       * tablero esa es la barrera: no es que no entienda un número, es que no
+       * sabe **cuál de los doce** mirar.
+       *
+       * La utilidad es la respuesta a «¿cómo vamos?», así que va sola y grande.
+       * Ingresos, gastos y revisiones la explican y van debajo, normales.
+       */}
+      <div className="grid gap-3 lg:grid-cols-[1.15fr_2fr]">
         <BiKpiCard
           index={0}
-          label="Ingresos"
-          tone="income"
-          value={formatCompactCRC(periodo.ingresosFinancierosCRC)}
-          exact={formatCRC(periodo.ingresosFinancierosCRC)}
-        />
-        <BiKpiCard
-          index={1}
-          label="Gastos"
-          tone="expense"
-          value={formatCompactCRC(periodo.gastosCRC)}
-          exact={formatCRC(periodo.gastosCRC)}
-        />
-        <BiKpiCard
-          index={2}
           label="Utilidad"
           tone="utilidad"
+          destacada
           value={formatCompactCRC(periodo.utilidadCRC)}
           exact={formatCRC(periodo.utilidadCRC)}
           hint={`${formatPct(periodo.marginPct)} de margen`}
-        />
-        <BiKpiCard
-          index={3}
-          label="Revisiones"
-          tone="neutral"
-          value={formatInt(periodo.totalRevisiones)}
-          hint={
-            periodo.placeholderRows > 0
-              ? `${formatInt(periodo.placeholderRows)} sin cobro`
-              : "todas con cobro"
+          delta={
+            anterior
+              ? variacion(periodo.utilidadCRC, anterior.utilidadCRC, contraPeriodo)
+              : null
           }
         />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <BiKpiCard
+            index={1}
+            label="Ingresos"
+            tone="income"
+            value={formatCompactCRC(periodo.ingresosFinancierosCRC)}
+            exact={formatCRC(periodo.ingresosFinancierosCRC)}
+            delta={
+              anterior
+                ? variacion(
+                    periodo.ingresosFinancierosCRC,
+                    anterior.ingresosFinancierosCRC,
+                    contraPeriodo,
+                  )
+                : null
+            }
+          />
+          <BiKpiCard
+            index={2}
+            label="Gastos"
+            tone="expense"
+            value={formatCompactCRC(periodo.gastosCRC)}
+            exact={formatCRC(periodo.gastosCRC)}
+            delta={
+              anterior
+                ? variacion(periodo.gastosCRC, anterior.gastosCRC, contraPeriodo)
+                : null
+            }
+          />
+          <BiKpiCard
+            index={3}
+            label="Revisiones"
+            tone="neutral"
+            value={formatInt(periodo.totalRevisiones)}
+            hint={
+              periodo.placeholderRows > 0
+                ? `${formatInt(periodo.placeholderRows)} sin cobro`
+                : "todas con cobro"
+            }
+            delta={
+              anterior
+                ? variacion(
+                    periodo.totalRevisiones,
+                    anterior.totalRevisiones,
+                    contraPeriodo,
+                  )
+                : null
+            }
+          />
+        </div>
       </div>
 
       {/* ================= bloque 2: lo que NO se mueve ================= */}
@@ -183,18 +241,36 @@ export function ResumenEjecutivo({
             : "Sobre todo el histórico, sin recorte de periodo"
         }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <BiKpiCard
-          index={0}
-          label="Revisiones totales"
-          tone="neutral"
-          value={formatInt(historico.totalRevisiones)}
-          hint={
-            historico.placeholderRows > 0
-              ? `${formatInt(historico.totalRevisionesSinPlaceholder)} con cobro real`
-              : "todas con cobro real"
-          }
-        />
+      {/**
+       * **«Revisiones totales» solo cuando NO es la misma tarjeta de arriba — A135.**
+       *
+       * Sin periodo ni filtros, esta cifra y la «Revisiones» del bloque de
+       * arriba son **el mismo número**, y estaban a dos tarjetas de distancia.
+       * Repetir un número no lo confirma: hace dudar de si son dos cosas
+       * distintas que casualmente coinciden.
+       *
+       * Con un filtro puesto sí son distintas —aquella se recorta y esta no— y
+       * ahí la tarjeta vuelve, que es justo cuando aporta.
+       */}
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-3",
+          hayFiltro ? "lg:grid-cols-4" : "lg:grid-cols-3",
+        )}
+      >
+        {hayFiltro ? (
+          <BiKpiCard
+            index={0}
+            label="Revisiones totales"
+            tone="neutral"
+            value={formatInt(historico.totalRevisiones)}
+            hint={
+              historico.placeholderRows > 0
+                ? `${formatInt(historico.totalRevisionesSinPlaceholder)} con cobro real`
+                : "todas con cobro real"
+            }
+          />
+        ) : null}
         <BiKpiCard
           index={1}
           label="Contactos"
