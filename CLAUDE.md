@@ -32,6 +32,18 @@ pnpm test -t "nombre del caso"
 
 Comparten Convex, Clerk y layout base, pero son superficies distintas con permisos distintos. `app/(auth)/` es Clerk.
 
+## Commits: decir siempre de que producto son
+
+El asunto del commit **empieza con la etiqueta del producto**, y lo mismo el mensaje con que se anuncia un push:
+
+- **`[PWA]`** — la app del tecnico: `app/(dashboard)/`, inspecciones, offline, fotos, PDF, cola de sync.
+- **`[BI]`** — el panel de Esteban: `app/(admin)/`, `convex/bi/`, `components/bi/`, finanzas, planilla, leads, calidad, canales.
+- **`[PWA][BI]`** — lo compartido: CI, ESLint, Vitest, `convex/` fuera de `bi/`, auth, tipos, dependencias. Van **las dos**, no una elegida a dedo.
+
+**La etiqueta es por superficie, no por repo.** La planilla vive en este repo y es **BI**; el `LOG.md` de `SmartCheck-BI-Proyecto` tambien es BI. Un cambio en `app/(dashboard)/` es PWA aunque lo pida Esteban.
+
+**Por que:** este repo lo trabajan dos agentes en paralelo sobre el mismo arbol, y `git log --oneline` era la unica forma de saber que tocaba que sin abrir los diffs — y no lo decia. Con la etiqueta, `git log --oneline | grep "\[BI\]"` contesta solo, y lo compartido aparece a proposito en las dos busquedas.
+
 ## Backend (Convex)
 
 `convex/schema.ts` (~850 lineas) tiene tres familias de tablas:
