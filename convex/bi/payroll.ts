@@ -287,9 +287,16 @@ export const registrarPlanilla = mutation({
 
     const tasas = args.tasas ?? tasasDelMes(args.yearMonth);
     const feriadosDias = args.feriadosDias ?? 0;
-    if (!Number.isInteger(feriadosDias) || feriadosDias < 0) {
+    /* Se admiten **medios días** —Sergio trabajó medio 15 de agosto— pero no
+       cualquier fracción: la jornada se parte por la mitad, no en tercios, y
+       aceptar 0,37 sería aceptar un error de tipeo como si fuera una decisión. */
+    if (
+      !Number.isFinite(feriadosDias) ||
+      feriadosDias < 0 ||
+      (feriadosDias * 2) % 1 !== 0
+    ) {
       throw new Error(
-        `Los días de feriado tienen que ser un entero de 0 para arriba; llegó ${feriadosDias}.`,
+        `Los días de feriado van de 0 para arriba y en medios días (0, 0,5, 1, 1,5…); llegó ${feriadosDias}.`,
       );
     }
     /* Las líneas se calculan **antes** de los guards para no repetir la fórmula

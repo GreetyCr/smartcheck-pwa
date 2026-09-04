@@ -140,6 +140,17 @@ export function PayrollMonthCard({
   };
 
   /**
+   * Los días de feriado **sí llevan decimal** (medio día), así que no pueden
+   * pasar por `num`, que borra todo lo que no sea dígito y convertiría «0,5» en
+   * 5. Se acepta coma o punto: en Costa Rica se escribe con coma, y el teclado
+   * numérico del teléfono da punto.
+   */
+  const numDias = (s: string) => {
+    const n = Number(s.replace(",", ".").replace(/[^\d.]/g, ""));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  };
+
+  /**
    * La vista previa usa **la misma función** que el servidor (`@/lib/payroll`).
    * Es lo que garantiza que lo que Esteban ve mientras escribe sea exactamente
    * lo que se va a guardar — si estuviera duplicada, tarde o temprano una de las
@@ -152,7 +163,7 @@ export function PayrollMonthCard({
           salarioCRC: num(salario),
           comisionesCRC: num(comisiones),
           baseImponibleCRC: num(base),
-          feriadosDias: num(feriados),
+          feriadosDias: numDias(feriados),
         },
         guardado?.insumos?.tasas ?? guardado?.tasasPorDefecto ?? TASAS_POR_DEFECTO,
       ),
@@ -203,7 +214,7 @@ export function PayrollMonthCard({
         salarioCRC: num(salario),
         comisionesCRC: num(comisiones),
         baseImponibleCRC: num(base),
-        feriadosDias: num(feriados),
+        feriadosDias: numDias(feriados),
       });
       setOk(
         res.creadas > 0
@@ -354,12 +365,15 @@ export function PayrollMonthCard({
                 Días de feriado trabajados
               </span>
               <input
-                inputMode="numeric"
+                inputMode="decimal"
                 value={feriados}
                 onChange={(e) => setFeriados(e.target.value)}
                 placeholder="0"
                 className={cn(input, "mt-1")}
               />
+              <span className="mt-1 block text-[11.5px] text-[var(--bi-ink-3)]">
+                Medio día se escribe <b>0,5</b>
+              </span>
             </label>
             <div className="min-w-[220px] flex-1 text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">
               {detectados.length > 0 ? (
@@ -382,8 +396,11 @@ export function PayrollMonthCard({
                     ))}
                   </ul>
                   <p className="mt-1.5 text-[var(--bi-ink-3)]">
-                    Podés corregirlo si trabajó un feriado sin hacer revisiones,
-                    o si no le corresponde.
+                    El sistema cuenta <b>un día por feriado</b>, que es lo que
+                    puede saber: ve que hubo revisiones, no cuántas horas. Si
+                    trabajó <b>medio día</b>, poné <b>0,5</b>; también podés
+                    subirlo si trabajó un feriado sin hacer revisiones, o
+                    bajarlo si no le corresponde.
                   </p>
                 </>
               ) : (

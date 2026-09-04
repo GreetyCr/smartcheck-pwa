@@ -321,3 +321,43 @@ describe("idempotencia", () => {
     expect(llaves.size).toBe(8);
   });
 });
+
+describe("el recargo admite medios días (A129)", () => {
+  /**
+   * Sergio trabajó **medio** 15 de agosto. El sistema no puede saberlo —ve que
+   * hubo revisiones, no cuántas horas— así que propone un día entero y Esteban
+   * lo corrige. Lo que sí tiene que hacer el cálculo es aceptar la corrección.
+   */
+  test("medio día vale la mitad", () => {
+    const entero = calcularPlanilla({ ...JULIO, feriadosDias: 1 }, TASAS_JULIO);
+    const medio = calcularPlanilla({ ...JULIO, feriadosDias: 0.5 }, TASAS_JULIO);
+
+    expect(monto(medio, "feriados")).toBe(
+      Math.round(JULIO.salarioCRC / DIAS_SALARIO_MENSUAL / 2),
+    );
+    expect(monto(medio, "feriados") * 2).toBe(monto(entero, "feriados") + 1);
+  });
+
+  test("agosto de Sergio: medio Día de la Madre sobre ₡402.000 = ₡6.700", () => {
+    // El caso real que lo motivó, con el salario que agosto tiene registrado.
+    const agosto = calcularPlanilla(
+      { ...JULIO, salarioCRC: 402_000, feriadosDias: 0.5 },
+      tasasDelMes("2026-08"),
+    );
+    expect(monto(agosto, "feriados")).toBe(6_700);
+  });
+
+  test("un día y medio crea línea y suma lo suyo", () => {
+    const l = calcularPlanilla({ ...JULIO, feriadosDias: 1.5 }, TASAS_JULIO);
+    expect(monto(l, "feriados")).toBe(
+      Math.round((JULIO.salarioCRC / DIAS_SALARIO_MENSUAL) * 1.5),
+    );
+  });
+
+  test("la fórmula dice «medio día», no «0,5 día(s)»", () => {
+    // Se lee en pantalla y es lo que hace auditable el monto.
+    const l = calcularPlanilla({ ...JULIO, feriadosDias: 0.5 }, TASAS_JULIO);
+    expect(monto(l, "feriados")).toBeGreaterThan(0);
+    expect(l.find((x) => x.linea === "feriados")?.formula).toContain("medio día");
+  });
+});

@@ -182,6 +182,11 @@ export type EntradasPlanilla = {
   /**
    * Días de feriado **de pago obligatorio** que se trabajaron en el mes (A129).
    *
+   * **Admite medios días.** Sergio trabajó medio 15 de agosto, así que el
+   * recargo de ese feriado es medio salario diario, no uno entero. La unidad es
+   * la jornada, y una jornada se parte por la mitad en la práctica: fijar el
+   * campo en enteros obligaría a redondear plata para arriba o para abajo.
+   *
    * El sistema los detecta —cruza el calendario contra las revisiones de los
    * técnicos— pero el número se **guarda** junto a los otros insumos, igual que
    * las comisiones: un mes registrado es una foto, y no puede cambiar sola
@@ -209,6 +214,17 @@ export type LineaCalculada = {
   /** Cómo salió, en palabras. Se muestra en pantalla para que sea auditable. */
   formula: string;
 };
+
+/**
+ * Los días en palabras, con coma decimal y sin el «(s)» torpe: «medio día
+ * extra», «1 día extra», «1,5 días extra». La fórmula se lee en pantalla y es
+ * lo que hace auditable el monto — que se lea mal es que no se audite.
+ */
+export function formatDias(dias: number): string {
+  if (dias === 0.5) return "medio día extra";
+  const n = dias.toString().replace(".", ",");
+  return `${n} ${dias === 1 ? "día" : "días"} extra`;
+}
 
 /** Colones enteros: es la unidad en la que se registra todo (RF). */
 function aColones(n: number): number {
@@ -287,7 +303,7 @@ export function calcularPlanilla(
       linea: "feriados",
       ...META_LINEA.feriados,
       amountCRC: feriados,
-      formula: `${feriadosDias} día(s) extra × salario ÷ ${DIAS_SALARIO_MENSUAL}`,
+      formula: `${formatDias(feriadosDias)} × salario ÷ ${DIAS_SALARIO_MENSUAL}`,
     });
   }
 
