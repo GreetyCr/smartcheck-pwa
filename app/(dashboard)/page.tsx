@@ -15,6 +15,7 @@ import {
 import { VehicleHistory } from "@/components/dashboard/VehicleHistory";
 import { PullToRefresh } from "@/components/dashboard/PullToRefresh";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useNow } from "@/hooks/useNow";
 import { useSync } from "@/contexts/SyncContext";
 import { useUnsyncedLocalInspections } from "@/hooks/useUnsyncedLocalInspections";
 import { countSyncQueueErrors } from "@/lib/offline/db";
@@ -42,9 +43,17 @@ export default function DashboardPage() {
     void countSyncQueueErrors().then(setErrorCount);
   }, [pendingCount, isSyncing]);
 
+  /**
+   * El reloj va aparte del `useMemo`: adentro quedaría congelado hasta que
+   * otra cosa provoque un render, y el técnico llegaría a ver "hace 2 min" con
+   * veinte encima — justo la etiqueta que existe para decirle si lo que llenó
+   * en campo ya subió.
+   */
+  const nowMs = useNow(30_000);
+
   const lastSyncLabel = useMemo(() => {
     if (!lastSyncAt) return "Última hace —";
-    const diff = Date.now() - lastSyncAt.getTime();
+    const diff = nowMs - lastSyncAt.getTime();
     const m = Math.floor(diff / 60_000);
     if (m < 1) return "Última sync hace un momento";
     if (m < 60) return `Última sync hace ${m} min`;
@@ -52,7 +61,7 @@ export default function DashboardPage() {
     if (h < 24) return `Última sync hace ${h} h`;
     const d = Math.floor(h / 24);
     return `Última sync hace ${d} d`;
-  }, [lastSyncAt]);
+  }, [lastSyncAt, nowMs]);
 
   const statusArg = filter === "all" ? undefined : filter;
 

@@ -11,6 +11,13 @@ export default function OfflinePage() {
       <p className="text-muted-foreground">
         No hay conexión a internet. Revisá tu red e intentá de nuevo.
       </p>
+      {/*
+        `<a>` y no `<Link>` a propósito: acá el punto es forzar una navegación
+        real contra la red — que es el reintento que la pantalla ofrece. Un
+        `<Link>` haría una transición de cliente que no prueba que haya vuelto
+        la conexión. La regla está equivocada en este caso, no el código.
+      */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- reintento de red: la navegación tiene que ser real, no del router */}
       <a
         href="/"
         className="mt-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
