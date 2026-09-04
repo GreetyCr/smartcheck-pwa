@@ -84,6 +84,7 @@ const CONTEOS = [
 const tipos = CONTEOS.map((c) => {
   const e = CATALOGO[c.issueType] ?? {
     clase: "accion",
+    origen: "sistema",
     titulo: "Tipo de aviso sin clasificar",
     queEs: "Apareció un tipo de aviso que todavía no describimos.",
     queHacer: "Avisarnos: hay que decidir si pide acción o es esperado.",
@@ -98,6 +99,10 @@ const MUESTRA: CalidadData = {
   porClase: tipos.reduce(
     (a, t) => ({ ...a, [t.clase]: a[t.clase as keyof typeof a] + t.sinResolver }),
     { accion: 0, informativo: 0, esperado: 0 },
+  ),
+  porOrigen: tipos.reduce(
+    (a, t) => ({ ...a, [t.origen]: a[t.origen as keyof typeof a] + t.sinResolver }),
+    { sistema: 0, airtable: 0, migracion: 0 },
   ),
   tipos,
   sinCatalogar: [],

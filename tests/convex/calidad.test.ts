@@ -296,3 +296,110 @@ describe("un mes que no cuadra se clasifica por su ÉPOCA, no por su tamaño", (
     expect(r.sinCatalogar).toEqual([]);
   });
 });
+
+/* ========================================================================== */
+/* De qué habla cada aviso — A131                                             */
+/* ========================================================================== */
+
+describe("los avisos se reparten por de qué hablan (A131)", () => {
+  /**
+   * El eje salió de **medir**, no de suponer. La intuición era separar por
+   * época (viejo/nuevo); los números de producción dijeron otra cosa: de los
+   * 2.165 sin resolver, **2.118 hablan de los contactos de Airtable**, y eso no
+   * es historia — crece todos los lunes con el sync. Un corte por fecha no lo
+   * habría tocado.
+   */
+  test("cada tipo del catálogo declara su origen", () => {
+    // Sin esto, un tipo nuevo caería en un origen indefinido y desaparecería
+    // del reparto sin que nadie lo note.
+    for (const [k, e] of Object.entries(CATALOGO)) {
+      expect(["sistema", "airtable", "migracion"], k).toContain(e.origen);
+    }
+  });
+
+  test("el reparto por origen suma lo mismo que el reparto por clase", async () => {
+    const t = await sembrar([
+      { issueType: "lead_dup" },
+      { issueType: "anomalous_phone" },
+      { issueType: "malformed_row" },
+      { issueType: "ambiguous_match" },
+    ]);
+    const r = await pedir(t);
+    const sumaClase = r.porClase.accion + r.porClase.informativo + r.porClase.esperado;
+    const sumaOrigen =
+      r.porOrigen.sistema + r.porOrigen.airtable + r.porOrigen.migracion;
+
+    expect(sumaOrigen).toBe(sumaClase);
+    expect(sumaOrigen).toBe(r.sinResolver);
+  });
+
+  test("los duplicados y los teléfonos raros son de Airtable, no del panel", async () => {
+    // Son el 98% del total y describen una herramienta que se está retirando
+    // (A35), no la operación de SmartCheck.
+    const t = await sembrar([
+      { issueType: "lead_dup" },
+      { issueType: "lead_dup" },
+      { issueType: "anomalous_phone" },
+      { issueType: "lead_no_key" },
+    ]);
+    const r = await pedir(t);
+
+    expect(r.porOrigen.airtable).toBe(4);
+    expect(r.porOrigen.sistema).toBe(0);
+  });
+
+  test("lo del CRM viejo y la contabilidad anterior es «migración»", async () => {
+    const t = await sembrar([
+      { issueType: "malformed_row" },
+      { issueType: "currency_ambiguous" },
+      { issueType: "missing_date" },
+    ]);
+    expect((await pedir(t)).porOrigen.migracion).toBe(3);
+  });
+
+  /**
+   * **El accionable de hoy viene de la migración**, así que un filtro que solo
+   * mirara el origen escondería justo lo que hay que hacer. La pantalla muestra
+   * siempre lo accionable venga de donde venga, y esta prueba fija el hecho que
+   * lo vuelve necesario.
+   */
+  test("hay accionables fuera del panel: filtrar solo por origen los escondería", () => {
+    const accionables = Object.entries(CATALOGO).filter(
+      ([, e]) => e.clase === "accion",
+    );
+    expect(accionables.length).toBeGreaterThan(0);
+    expect(accionables.some(([, e]) => e.origen !== "sistema")).toBe(true);
+  });
+
+  test("un tipo sin catalogar cuenta como del panel, no se esconde", async () => {
+    // Va a `sistema` a propósito: mandarlo a un cajón que la pantalla oculta
+    // por defecto sería esconder justo lo que nadie revisó (A64/A88).
+    const t = await sembrar([{ issueType: "algo_nuevo_2027" }]);
+    const r = await pedir(t);
+
+    expect(r.porOrigen.sistema).toBe(1);
+    expect(r.sinCatalogar).toContain("algo_nuevo_2027");
+  });
+
+  test("un mes viejo que no cuadra es de la migración; uno nuevo, del panel", async () => {
+    // Misma separación de A121, ahora también en el eje del origen.
+    const t = convexTest(schema, convexModules);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("finance_entries", {
+        kind: "income", category: "inspeccion", isViatico: false,
+        amountCRC: 60_000, originalCurrency: "CRC",
+        date: Date.parse("2026-08-15T10:00:00-06:00"), yearMonth: "2026-08",
+        source: "inspection", isDeleted: false, createdAt: 0, updatedAt: 0,
+      } as never);
+      for (const mes of ["2025-09", "2026-08"]) {
+        await ctx.db.insert("bi_quality_issues", issue({
+          issueType: "reconciliation_gap", entityRef: mes,
+        }) as never);
+      }
+    });
+    const r = await pedir(t);
+
+    expect(r.porOrigen.migracion).toBe(1); // el de 2025
+    expect(r.porOrigen.sistema).toBe(1); // el de agosto
+  });
+});

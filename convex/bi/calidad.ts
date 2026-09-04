@@ -29,8 +29,30 @@ import { buildInspectionsAll } from "./metrics";
 /** En qué clase cae un tipo de issue. */
 export type Clase = "accion" | "informativo" | "esperado";
 
+/**
+ * **De qué habla el aviso** — el eje que ordena la pantalla desde A131.
+ *
+ * Medir el reparto real en producción cambió el diseño. La intuición era
+ * separar por época (viejo/nuevo), pero los números dicen otra cosa: de los
+ * **2.165 sin resolver, 2.118 (97,8%) hablan de los contactos que sincroniza
+ * Airtable** — la misma persona escribiendo varias veces, gente sin teléfono de
+ * Costa Rica, fichas sin identificador. Eso no es historia: **crece todos los
+ * lunes** con el sync, así que un corte por fecha no lo habría tocado.
+ *
+ * Y no describen la operación de SmartCheck: describen una herramienta que
+ * **se está retirando** (A35). Por eso el eje es el origen y no el calendario.
+ *
+ *  - `sistema` — lo que produce el panel hoy. **Es lo que la pantalla debe
+ *    medir**, y lo único que crece por algo que pase en el negocio.
+ *  - `airtable` — hechos del CRM de contactos. Se van con Airtable.
+ *  - `migracion` — el CRM viejo y la contabilidad anterior. **Conjunto
+ *    cerrado**: no puede crecer.
+ */
+export type Origen = "sistema" | "airtable" | "migracion";
+
 type Entrada = {
   clase: Clase;
+  origen: Origen;
   titulo: string;
   /** Qué es, en castellano y sin jerga. */
   queEs: string;
@@ -49,6 +71,7 @@ type Entrada = {
 export const CATALOGO: Record<string, Entrada> = {
   reconciliation_gap: {
     clase: "accion",
+    origen: "sistema",
     titulo: "Un mes no cuadra con la captura automática",
     queEs:
       "Desde que el cobro se registra solo, lo cobrado según las revisiones de un mes debería coincidir con lo que entró a Finanzas. En este mes no coincide.",
@@ -76,6 +99,7 @@ export const CATALOGO: Record<string, Entrada> = {
    */
   reconciliation_gap_manual: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Un mes viejo no cuadra (ingreso anotado a mano)",
     queEs:
       "Antes de que el cobro se capturara solo, el ingreso se escribía en la hoja. Lo cobrado según las revisiones de esos meses no siempre coincide con lo que quedó anotado.",
@@ -84,12 +108,14 @@ export const CATALOGO: Record<string, Entrada> = {
   },
   malformed_row: {
     clase: "accion",
+    origen: "migracion",
     titulo: "Una fila del sistema viejo quedó fuera",
     queEs: "Una revisión del CRM anterior sin fecha ni nombre; no se pudo importar.",
     queHacer: "Si el monto importa, recuperarla a mano desde la hoja original.",
   },
   lead_dup: {
     clase: "esperado",
+    origen: "airtable",
     titulo: "La misma persona escribió más de una vez",
     queEs:
       "Airtable trae la misma persona en varias fichas. Se marcan para poder contarlas bien, pero no se fusionan.",
@@ -98,6 +124,7 @@ export const CATALOGO: Record<string, Entrada> = {
   },
   anomalous_phone: {
     clase: "informativo",
+    origen: "airtable",
     titulo: "Contactos sin un teléfono de Costa Rica",
     queEs:
       "Escribieron por Instagram o Messenger (donde no hay teléfono) o desde un número internacional.",
@@ -106,6 +133,7 @@ export const CATALOGO: Record<string, Entrada> = {
   },
   lead_no_key: {
     clase: "informativo",
+    origen: "airtable",
     titulo: "Fichas sin forma de identificar a la persona",
     queEs: "No tienen ni teléfono ni identificador de chat.",
     queHacer:
@@ -113,6 +141,7 @@ export const CATALOGO: Record<string, Entrada> = {
   },
   ambiguous_match: {
     clase: "informativo",
+    origen: "sistema",
     titulo: "Dos contactos con el mismo teléfono para una revisión",
     queEs:
       "Al enlazar una revisión con su contacto había más de un candidato. Ya se resolvió por vehículo y fecha.",
@@ -120,30 +149,35 @@ export const CATALOGO: Record<string, Entrada> = {
   },
   viatico_review: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Taxonomía de viáticos revisada",
     queEs: "Movimientos del histórico que había que revisar por su categoría.",
     queHacer: "Nada: ya se revisaron y corrigieron.",
   },
   currency_ambiguous: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Montos del sistema viejo en moneda ambigua",
     queEs: "No se sabía si el monto estaba en colones o en dólares.",
     queHacer: "Nada: se resolvieron con las respuestas de Esteban.",
   },
   zero_or_missing_amount: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Revisiones viejas sin monto",
     queEs: "Filas del CRM anterior a las que no se les anotó el cobro.",
     queHacer: "Nada: ya se completaron o se descartaron.",
   },
   missing_date: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Revisiones viejas sin fecha",
     queEs: "Filas del CRM anterior sin fecha de revisión.",
     queHacer: "Nada: ya se completaron.",
   },
   outlier_amount: {
     clase: "informativo",
+    origen: "migracion",
     titulo: "Un monto muy fuera de rango",
     queEs: "Una revisión con un cobro muy distinto al resto.",
     queHacer: "Nada: se verificó y era correcto.",
@@ -153,6 +187,9 @@ export const CATALOGO: Record<string, Entrada> = {
 /** Para un tipo que nadie clasificó: pide acción, y se dice que falta clasificarlo. */
 const SIN_CATALOGAR: Entrada = {
   clase: "accion",
+  /* Sin catalogar va a `sistema`: es donde se mira. Mandarlo a un cajón que la
+     pantalla esconde por defecto sería esconder justo lo que nadie revisó. */
+  origen: "sistema",
   titulo: "Tipo de aviso sin clasificar",
   queEs: "Apareció un tipo de aviso que todavía no describimos.",
   queHacer: "Avisarnos: hay que decidir si pide acción o es esperado.",
@@ -161,6 +198,8 @@ const SIN_CATALOGAR: Entrada = {
 const tipoRow = v.object({
   issueType: v.string(),
   clase: v.string(),
+  /** `sistema` | `airtable` | `migracion` — de qué habla el aviso (A131). */
+  origen: v.string(),
   titulo: v.string(),
   queEs: v.string(),
   queHacer: v.string(),
@@ -187,6 +226,16 @@ export const calidadReturns = v.object({
     accion: v.number(),
     informativo: v.number(),
     esperado: v.number(),
+  }),
+  /**
+   * Los mismos avisos repartidos por **de qué hablan** (A131). Es el eje que
+   * contesta la pregunta de Esteban —«¿esto mide mi sistema?»— y el que decide
+   * qué se muestra por defecto.
+   */
+  porOrigen: v.object({
+    sistema: v.number(),
+    airtable: v.number(),
+    migracion: v.number(),
   }),
   tipos: v.array(tipoRow),
   /** Tipos que aparecieron y no están en el catálogo. Vacío es lo esperado. */
@@ -258,6 +307,7 @@ export async function calidadImpl(ctx: QueryCtx) {
       return {
         issueType,
         clase: e.clase,
+        origen: e.origen,
         titulo: e.titulo,
         queEs: e.queEs,
         queHacer: e.queHacer,
@@ -276,8 +326,10 @@ export async function calidadImpl(ctx: QueryCtx) {
     });
 
   const porClase = { accion: 0, informativo: 0, esperado: 0 };
+  const porOrigen = { sistema: 0, airtable: 0, migracion: 0 };
   for (const t of tipos) {
     porClase[t.clase as Clase] += t.sinResolver;
+    porOrigen[t.origen as Origen] += t.sinResolver;
   }
 
   /* --- Cobertura: qué tan completos están los datos ---------------------- */
@@ -326,6 +378,7 @@ export async function calidadImpl(ctx: QueryCtx) {
     sinResolver,
     resueltos: totalIssues - sinResolver,
     porClase,
+    porOrigen,
     tipos,
     sinCatalogar,
     cobertura,

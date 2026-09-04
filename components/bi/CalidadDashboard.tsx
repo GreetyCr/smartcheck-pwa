@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CheckCircle2, CircleAlert, Info, TriangleAlert } from "lucide-react";
 import { BiCard } from "@/components/bi/BiCard";
 import { BiKpiCard } from "@/components/bi/BiKpiCard";
@@ -10,9 +11,11 @@ export type CalidadData = {
   sinResolver: number;
   resueltos: number;
   porClase: { accion: number; informativo: number; esperado: number };
+  porOrigen: { sistema: number; airtable: number; migracion: number };
   tipos: Array<{
     issueType: string;
     clase: string;
+    origen: string;
     titulo: string;
     queEs: string;
     queHacer: string;
@@ -49,6 +52,12 @@ const CLASE = {
   },
 } as const;
 
+/** Rótulo corto de cada origen, para la etiqueta al lado del título. */
+const ORIGEN_LABEL: Record<string, string> = {
+  airtable: "Airtable",
+  migracion: "Migración",
+};
+
 type ClaveClase = keyof typeof CLASE;
 const claseDe = (c: string): ClaveClase =>
   c === "accion" || c === "informativo" || c === "esperado" ? c : "accion";
@@ -68,7 +77,29 @@ const claseDe = (c: string): ClaveClase =>
  * estuvimos tapando 1.869 problemas.
  */
 export function CalidadDashboard({ data }: { data: CalidadData }) {
-  const porClase = (c: ClaveClase) => data.tipos.filter((t) => claseDe(t.clase) === c);
+  /**
+   * **Por defecto la pantalla mide el sistema, no las herramientas — A131.**
+   *
+   * Se muestra lo que produce el panel hoy (`origen: "sistema"`) y **todo lo
+   * accionable venga de donde venga**, que es lo que impide que el filtro
+   * esconda justo lo que hay que hacer: el único aviso accionable de hoy es un
+   * `malformed_row` de la migración.
+   *
+   * Lo demás queda a un clic, no borrado. Ocultarlo del todo sería peor que el
+   * ruido: la primera vez que alguien viera el número crudo en otro lado
+   * pensaría que le tapamos dos mil problemas.
+   */
+  const [verTodo, setVerTodo] = useState(false);
+  const visible = (t: CalidadData["tipos"][number]) =>
+    verTodo || t.origen === "sistema" || claseDe(t.clase) === "accion";
+
+  const porClase = (c: ClaveClase) =>
+    data.tipos.filter((t) => claseDe(t.clase) === c && visible(t));
+
+  /** Los que el filtro está dejando fuera, para poder decir cuántos son. */
+  const ocultos = data.tipos
+    .filter((t) => !visible(t))
+    .reduce((a, t) => a + t.sinResolver, 0);
 
   return (
     <div className="space-y-5">
@@ -86,25 +117,67 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
         />
         <BiKpiCard
           index={1}
-          label="Para saber"
-          value={formatInt(data.porClase.informativo)}
-          hint="Se registran para poder auditar; no se arreglan"
+          label="Del panel"
+          value={formatInt(data.porOrigen.sistema)}
+          hint="Lo que genera el sistema hoy — lo que esta pantalla mide"
           tone="warn"
         />
         <BiKpiCard
           index={2}
-          label="Ruido esperado"
-          value={formatInt(data.porClase.esperado)}
-          hint="Duplicados que se marcan a propósito"
+          label="De Airtable"
+          value={formatInt(data.porOrigen.airtable)}
+          hint="Hechos del CRM de contactos; se van cuando se retire"
           tone="neutral"
         />
         <BiKpiCard
           index={3}
-          label="Ya resueltos"
-          value={formatInt(data.resueltos)}
-          hint={`De ${formatInt(data.totalIssues)} avisos en total`}
-          tone="utilidad"
+          label="De la migración"
+          value={formatInt(data.porOrigen.migracion)}
+          hint="El CRM viejo y la contabilidad anterior; no puede crecer"
+          tone="neutral"
         />
+      </div>
+
+      {/*
+        El interruptor y su explicación. Va arriba de las listas porque cambia
+        lo que se ve abajo, y dice el número que esconde: un filtro que no dice
+        cuánto oculta es indistinguible de un dato que no existe.
+      */}
+      <div className="rounded-2xl border border-[var(--bi-ring)] bg-[var(--bi-surface)] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[13.5px] font-semibold text-[var(--bi-ink)]">
+            {verTodo ? "Se está mostrando todo" : "Se muestra lo del panel"}
+          </p>
+          <button
+            type="button"
+            onClick={() => setVerTodo((v) => !v)}
+            className="min-h-11 rounded-xl border border-[var(--bi-ring)] px-3.5 text-[13px] font-medium text-[var(--bi-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]"
+          >
+            {verTodo ? "Ver solo lo del panel" : "Ver también Airtable y la migración"}
+          </button>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--bi-ink-2)]">
+          {verTodo ? (
+            <>
+              Están a la vista los{" "}
+              <b className="text-[var(--bi-ink)]">
+                {formatInt(data.sinResolver)}
+              </b>{" "}
+              avisos sin resolver, incluidos los de Airtable y los de la
+              migración.
+            </>
+          ) : (
+            <>
+              Se ocultan{" "}
+              <b className="text-[var(--bi-ink)]">{formatInt(ocultos)}</b> avisos
+              que <b>no hablan de tu operación</b>: son hechos del CRM de
+              contactos y del sistema viejo —la misma persona escribiendo dos
+              veces, gente sin teléfono de Costa Rica, meses cerrados de la
+              contabilidad anterior—. No se borraron y{" "}
+              <b>lo accionable nunca se esconde</b>, venga de donde venga.
+            </>
+          )}
+        </p>
       </div>
 
       {data.sinCatalogar.length > 0 ? (
@@ -149,6 +222,14 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
                       />
                       <span className="min-w-0 text-[14px] font-medium text-[var(--bi-ink)]">
                         {t.titulo}
+                        {/* El origen al lado del título: con el interruptor en
+                            «ver todo» conviven avisos del panel y de Airtable, y
+                            sin rótulo no hay forma de distinguirlos. */}
+                        {t.origen !== "sistema" ? (
+                          <span className="ml-2 whitespace-nowrap rounded-md border border-[var(--bi-ring)] px-1.5 py-0.5 align-middle text-[10.5px] font-normal uppercase tracking-wide text-[var(--bi-ink-3)]">
+                            {ORIGEN_LABEL[t.origen] ?? t.origen}
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                     <span className="bi-num shrink-0 tabular-nums text-[14px] text-[var(--bi-ink)]">
