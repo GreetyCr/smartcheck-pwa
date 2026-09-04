@@ -9,10 +9,8 @@ import {
   withImageMimeForUpload,
 } from "@/lib/images";
 import {
-  enqueuePhotoQueue,
   listPhotoQueueForSection,
   removePhotoQueue,
-  type PhotoQueueRow,
 } from "@/lib/offline/photo-queue";
 import { useUploadThing } from "@/lib/uploadthing";
 import { normalizePublicPhotoUrl } from "@/lib/photoUrls";
@@ -267,7 +265,9 @@ export function usePhotoUpload({
 
       await Promise.all(newEntries.map((entry) => runUpload(entry)));
     },
-    [inspectionId, maxPerItem, runUpload, sectionTable],
+    // `inspectionId`/`sectionTable` no se leen acá; entran igual por
+    // `runUpload`, así que como dependencias solo recreaban el callback de más.
+    [maxPerItem, runUpload],
   );
 
   /** Espera a que no queden fotos en cola (p. ej. antes de guardar y navegar). */

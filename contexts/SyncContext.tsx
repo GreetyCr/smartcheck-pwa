@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { countAutoSyncPendingInspections, countPendingInspections, listUnsyncedInspections, normalizeEmbeddedInspectionPhotos } from "@/lib/offline/db";
 import { runRetentionSweep } from "@/lib/offline/retention";
 import { syncPendingToConvex } from "@/lib/offline/sync";

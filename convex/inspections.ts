@@ -6,7 +6,6 @@ import {
   canAccessInspection,
   canAccessInspectionByClientId,
   inspectionByClientId,
-  requireAdmin,
   requireUser,
   userHasFullAccess,
 } from "./lib/auth";

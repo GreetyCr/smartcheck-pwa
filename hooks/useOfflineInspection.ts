@@ -112,7 +112,6 @@ export function useOfflineInspection({
           await patchM({ id, patch: data });
           if (localRow) {
             const next = { ...localRow, data, updatedAt: Date.now() };
-            const db = await getDB();
             await putPendingInspectionRow(next);
             setLocalRow(next);
           }
@@ -183,7 +182,6 @@ export function useOfflineInspection({
         updatedAt: Date.now(),
         syncStatus: row.syncStatus === "synced" ? "synced" : "pending",
       };
-      const db = await getDB();
       await putPendingInspectionRow(next);
       setLocalRow(next);
       void refreshPendingCount();
