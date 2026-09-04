@@ -29,6 +29,7 @@
  */
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 
 /**
@@ -187,14 +188,14 @@ export const reconcileLeads = internalMutation({
 
 /** `bi_meta` key `leads_reconcile` — frescura + estado para el tablero (RF-09). */
 async function setReconcileMeta(
-  ctx: { db: any },
+  ctx: MutationCtx,
   status: "ok" | "drift",
   rowsProcessed: number,
   message: string,
 ): Promise<void> {
   const existing = await ctx.db
     .query("bi_meta")
-    .withIndex("by_key", (q: any) => q.eq("key", "leads_reconcile"))
+    .withIndex("by_key", (q) => q.eq("key", "leads_reconcile"))
     .unique();
   const row = {
     key: "leads_reconcile",

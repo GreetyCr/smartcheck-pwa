@@ -26,7 +26,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { isoDate, yearMonth } from "./lib/dates";
 
 /* -------------------------------------------------------------------------- */
@@ -495,14 +495,14 @@ export const rebuildMatches = internalMutation({
 /* -------------------------------------------------------------------------- */
 
 async function setMeta(
-  ctx: { db: any },
+  ctx: MutationCtx,
   status: "ok" | "error",
   rowsProcessed: number,
   message?: string,
 ): Promise<void> {
   const existing = await ctx.db
     .query("bi_meta")
-    .withIndex("by_key", (q: any) => q.eq("key", "matches_rebuild"))
+    .withIndex("by_key", (q) => q.eq("key", "matches_rebuild"))
     .unique();
   const doc = {
     key: "matches_rebuild",
@@ -921,10 +921,15 @@ export async function matchesStatsImpl(ctx: QueryCtx) {
       (i) => i.entity === "bi_matches" && i.issueType === "ambiguous_match",
     ).length;
 
-    const toArr = (m: Map<string, number>, key: string) =>
+    // Genérica en `key` para que la clave computada conserve su nombre y el
+    // resultado calce con `matchesStatsReturns` sin pasar por `any`.
+    const toArr = <K extends string>(m: Map<string, number>, key: K) =>
       [...m.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([k, rows]) => ({ [key]: k, rows }) as any);
+        .map(
+          ([k, rows]) =>
+            ({ [key]: k, rows }) as Record<K, string> & { rows: number },
+        );
 
     return {
       totalMatches: matches.length,

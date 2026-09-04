@@ -496,7 +496,7 @@ function isJunk(name: string, phoneDigits: string, amount: number | undefined): 
  * junk excluido, solapes deduplicados (era-app autoritativa). Devuelve también las
  * cuentas de diagnóstico.
  */
-export async function buildInspectionsAll(ctx: { db: any }): Promise<{
+export async function buildInspectionsAll(ctx: QueryCtx): Promise<{
   all: UnifiedRow[];
   diag: {
     legacyRaw: number;
@@ -1228,10 +1228,8 @@ export async function executiveSummaryImpl(ctx: QueryCtx, args: FilterArgs) {
     const utilidad = income - expense;
 
     const leads = await ctx.db.query("leads_contacts").collect();
-    const leadsTotal = leads.filter((l: any) => !l.isDeleted).length;
-    const leadsWithPhone = leads.filter(
-      (l: any) => !l.isDeleted && l.phone8,
-    ).length;
+    const leadsTotal = leads.filter((l) => !l.isDeleted).length;
+    const leadsWithPhone = leads.filter((l) => !l.isDeleted && l.phone8).length;
     /**
      * **La misma regla de recompra que Leads — A125.**
      *
@@ -1346,8 +1344,19 @@ export const cutoverDiagnostic = internalQuery({
     let uniqueVsLegacy = 0;
     let dupByPhone = 0;
     let dupByNameDate = 0;
-    const samplesUnique: any[] = [];
-    const samplesDup: any[] = [];
+    // La forma la fija el validador `returns` de esta query.
+    const samplesUnique: Array<{
+      dateISO: string;
+      clientName?: string;
+      phone8?: string;
+      amountCRC?: number;
+    }> = [];
+    const samplesDup: Array<{
+      dateISO: string;
+      clientName?: string;
+      phone8?: string;
+      matchedBy: string;
+    }> = [];
 
     for (const r of eraRows) {
       eraAppTotal++;

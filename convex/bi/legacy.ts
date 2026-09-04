@@ -14,6 +14,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
 import { yearMonth as ymFromMs } from "./lib/dates";
 
 /** Canales conocidos del CRM (Fuente). Fuera de lista → issue `unmapped_channel` (info), pero se carga. */
@@ -467,7 +468,7 @@ const RESOLVED_MARK = " | WP-L2:";
 
 /** Marca resueltos los issues abiertos de un ref/tipo (idempotente). */
 async function resolveIssuesFor(
-  ctx: { db: any },
+  ctx: MutationCtx,
   sourceRowId: string,
   issueTypes: string[],
   note: string,
@@ -585,7 +586,7 @@ export const applyLegacyCorrections = internalMutation({
         );
         // asegurar exactamente un pending_date abierto (idempotente)
         const existing = (await ctx.db.query("bi_quality_issues").collect()).filter(
-          (it: any) =>
+          (it) =>
             it.entity === "inspections_legacy" &&
             it.entityRef === c.sourceRowId &&
             it.issueType === "pending_date",

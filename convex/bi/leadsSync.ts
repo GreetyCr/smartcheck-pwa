@@ -61,26 +61,50 @@ const F: Record<string, string> = {
 };
 
 /* ------------------------------ Normalizadores ---------------------------- */
-const str = (val: any): string | undefined => {
+
+/**
+ * Lo único que este módulo usa de un record REST de Airtable. No se tipa
+ * Airtable entero a propósito: el sync es interino y se retira en el cutover a
+ * full-Convex (A35); los campos crudos entran como `unknown` y cada
+ * normalizador los estrecha.
+ */
+type AirtableRecord = {
+  id: string;
+  createdTime?: string;
+  fields?: Record<string, unknown>;
+};
+
+/** Aviso crudo tal como lo devuelven los normalizadores, antes de ser `Issue`. */
+type RawIssue = { type: string; sev: Issue["severity"]; detail: string } | null;
+
+/** Vocabularios cerrados: los manda el validador de `loadLeadsBatch`, no este archivo. */
+type PaymentStatus = NonNullable<LeadRowArg["paymentStatus"]>;
+type LeadChannel = NonNullable<LeadRowArg["channel"]>;
+
+const str = (val: unknown): string | undefined => {
   if (val == null) return undefined;
   const s = String(val).trim();
   return s.length ? s : undefined;
 };
-const cb = (val: any): boolean => val === true;
-const num = (val: any): number | undefined =>
+const cb = (val: unknown): boolean => val === true;
+const num = (val: unknown): number | undefined =>
   typeof val === "number" && Number.isFinite(val) ? val : undefined;
-const dateMs = (val: any): number | undefined => {
+const dateMs = (val: unknown): number | undefined => {
   if (val == null) return undefined;
   const ms = Date.parse(String(val));
   return Number.isNaN(ms) ? undefined : ms;
 };
 /** singleSelect: REST devuelve string; MCP devolvía {name}. Soporta ambos. */
-const selName = (val: any): string =>
-  typeof val === "string" ? val : val && val.name ? String(val.name) : "";
+const selName = (val: unknown): string => {
+  if (typeof val === "string") return val;
+  if (val && typeof val === "object" && "name" in val && val.name)
+    return String(val.name);
+  return "";
+};
 
-function mapPaymentStatus(sel: any): string | undefined {
+function mapPaymentStatus(sel: unknown): PaymentStatus | undefined {
   const n = selName(sel).trim().toLowerCase();
-  const m: Record<string, string> = {
+  const m: Record<string, PaymentStatus> = {
     esperando: "esperando",
     recibido: "recibido",
     expirado: "expirado",
@@ -89,13 +113,13 @@ function mapPaymentStatus(sel: any): string | undefined {
   };
   return m[n];
 }
-function mapChatbot(sel: any): boolean | undefined {
+function mapChatbot(sel: unknown): boolean | undefined {
   const n = selName(sel).trim().toLowerCase();
   if (n === "encendido") return true;
   if (n === "apagado") return false;
   return undefined;
 }
-const CHANNEL_VOCAB: Record<string, string> = {
+const CHANNEL_VOCAB: Record<string, LeadChannel> = {
   publicidad: "mercadeo",
   mercadeo: "mercadeo",
   tiktok: "tiktok",
@@ -104,7 +128,10 @@ const CHANNEL_VOCAB: Record<string, string> = {
   recompra: "recompra",
   referido: "referido",
 };
-function mapChannel(fuente: any, origen: any): { channel?: string; issue: any } {
+function mapChannel(
+  fuente: unknown,
+  origen: unknown,
+): { channel?: LeadChannel; issue: RawIssue } {
   const raw = str(fuente) ?? str(origen);
   if (!raw) return { channel: undefined, issue: null };
   const key = raw.trim().toLowerCase();
@@ -120,11 +147,11 @@ function mapChannel(fuente: any, origen: any): { channel?: string; issue: any } 
 }
 
 /** Normaliza teléfono (limpia `+`/`+506`/espacios/invisibles → solo dígitos). */
-export function normalizePhone(raw: any): {
+export function normalizePhone(raw: unknown): {
   rawPhone?: string;
   phone8?: string;
   phoneValid: boolean;
-  issue: any;
+  issue: RawIssue;
 } {
   const rawPhone = str(raw);
   if (rawPhone === undefined)
@@ -169,7 +196,7 @@ export function normalizePhone(raw: any): {
   const placeholder = phone8 ? /^(\d)\1{7}$/.test(phone8) : false;
   const crFirstOk = phone8 ? /^[2-8]/.test(phone8) : false;
   let phoneValid = false;
-  let issue: any = null;
+  let issue: RawIssue = null;
   if (!phone8) {
     issue = { type: "anomalous_phone", sev: "warn", detail: `no normalizable a 8 díg (${digits.length} díg)` };
   } else if (placeholder) {
@@ -187,13 +214,17 @@ export function normalizePhone(raw: any): {
 }
 
 /** Mapea un record de la REST API (`{id, createdTime, fields}`) a la fila rawLead. */
-function mapRecord(rec: any): { row: Record<string, any>; phoneIssue: any; channelIssue: any } {
+function mapRecord(rec: AirtableRecord): {
+  row: RawLeadRow;
+  phoneIssue: RawIssue;
+  channelIssue: RawIssue;
+} {
   const c = rec.fields || {};
   const { rawPhone, phone8, phoneValid, issue: phoneIssue } = normalizePhone(c[F.whatsapp]);
   const { channel, issue: channelIssue } = mapChannel(c[F.fuente], c[F.origen]);
   const yr = num(c[F.anio]);
   const vehicleYear = yr !== undefined && yr > 1900 && yr <= 2100 ? yr : undefined;
-  const row: Record<string, any> = {
+  const row: RawLeadRow = {
     airtableId: rec.id,
     manychatId: str(c[F.manychat]),
     phone8,
@@ -223,7 +254,10 @@ function mapRecord(rec: any): { row: Record<string, any>; phoneIssue: any; chann
     appointmentAt: dateMs(c[F.revision]),
     paymentPendingAt: dateMs(c[F.pendientePago]),
   };
-  for (const k of Object.keys(row)) if (row[k] === undefined) delete row[k];
+  // El borrado de claves `undefined` es por clave dinámica; se hace sobre una
+  // vista indexable de la misma fila para no volver `any` el tipo de `row`.
+  const bag: Record<string, unknown> = row;
+  for (const k of Object.keys(bag)) if (bag[k] === undefined) delete bag[k];
   return { row, phoneIssue, channelIssue };
 }
 
@@ -325,6 +359,13 @@ type LeadRowArg = FunctionArgs<
   typeof internal.bi.leads.loadLeadsBatch
 >["rows"][number];
 
+/**
+ * La fila tal como sale de `mapRecord`: parcial porque las claves `undefined`
+ * se borran en caliente. El validador de `loadLeadsBatch` es la autoridad en
+ * tiempo de ejecución y rechaza cualquier desvío.
+ */
+type RawLeadRow = Partial<LeadRowArg> & { airtableId: string };
+
 export const syncLeadsFromAirtable = internalAction({
   args: { mode: v.optional(v.union(v.literal("full"), v.literal("incremental"))) },
   returns: v.object({
@@ -359,7 +400,7 @@ export const syncLeadsFromAirtable = internalAction({
     const runId = `leads_sync_${isFull ? "full" : "inc"}_${startedAt}`;
 
     // 1) Traer de Airtable (paginado, read-only, ~4 req/s < límite 5)
-    const records: any[] = [];
+    const records: AirtableRecord[] = [];
     let offset: string | undefined = undefined;
     do {
       const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${AIRTABLE_TABLE}`);
@@ -375,7 +416,10 @@ export const syncLeadsFromAirtable = internalAction({
         });
         throw new Error(`Airtable API ${res.status}`);
       }
-      const data: any = await res.json();
+      const data = (await res.json()) as {
+        records?: AirtableRecord[];
+        offset?: string;
+      };
       for (const r of data.records ?? []) records.push(r);
       offset = data.offset;
       if (offset) await new Promise((r) => setTimeout(r, 250));
