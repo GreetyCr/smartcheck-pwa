@@ -60,6 +60,7 @@ export type PlanillaGuardada = {
     detalle: Array<{
       fecha: string;
       nombre: string;
+      tipo: "obligatorio" | "no_obligatorio";
       tecnico: string;
       revisiones: number;
     }>;
@@ -178,7 +179,10 @@ export function PayrollMonthCard({
    * una sorpresa.
    */
   const vigencia = guardado?.vigencia;
-  const detectados = guardado?.feriadosDetectados.detalle ?? [];
+  const todosLosFeriados = guardado?.feriadosDetectados.detalle ?? [];
+  const detectados = todosLosFeriados.filter((f) => f.tipo === "obligatorio");
+  /** Trabajados pero **de pago no obligatorio**: no generan recargo. */
+  const noObligatorios = todosLosFeriados.filter((f) => f.tipo !== "obligatorio");
   /** Mes ya registrado cuyo `feriadosDias` es `null`: se grabó antes de A129. */
   const registradoSinFeriados =
     !!guardado?.insumos && guardado.insumos.feriadosDias === null;
@@ -388,6 +392,29 @@ export function PayrollMonthCard({
                   pago obligatorio</b>. Si aun así trabajó uno, escribilo acá.
                 </p>
               )}
+              {/* El feriado trabajado que NO genera recargo se nombra igual. Si
+                  se omite, un día que el técnico sí trabajó queda invisible y la
+                  pregunta «¿y el 31 de agosto?» aparece igual, pero sin
+                  respuesta en pantalla (A64/A88). */}
+              {noObligatorios.length > 0 ? (
+                <div className="mt-2 border-t border-[var(--bi-ring)] pt-2">
+                  <p className="text-[var(--bi-ink-2)]">
+                    También se trabajó{" "}
+                    {noObligatorios.map((f, i) => (
+                      <span key={`${f.fecha}|${f.tecnico}`}>
+                        {i > 0 ? ", " : ""}
+                        <b className="text-[var(--bi-ink)]">{f.nombre}</b> (
+                        {formatIsoDateCR(f.fecha)})
+                      </span>
+                    ))}
+                    , pero {noObligatorios.length === 1 ? "es" : "son"} de{" "}
+                    <b>pago no obligatorio</b>: se{" "}
+                    {noObligatorios.length === 1 ? "paga" : "pagan"} sencillo
+                    salvo que tengas otro acuerdo, así que no suma
+                    {noObligatorios.length === 1 ? "" : "n"} días acá.
+                  </p>
+                </div>
+              ) : null}
               <p className="mt-2 border-t border-[var(--bi-ring)] pt-2 text-[var(--bi-ink-3)]">
                 Cada día suma <b>un salario diario</b> (salario ÷ 30) — el que
                 falta para llegar al doble, porque el salario del mes ya paga ese

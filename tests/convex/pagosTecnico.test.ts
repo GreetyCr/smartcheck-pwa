@@ -276,10 +276,25 @@ describe("detecta los feriados de pago obligatorio trabajados (A129)", () => {
     expect(r.feriados[0].tecnico).toBe("Sergio Smartcheck");
   });
 
-  test("un feriado NO obligatorio no cuenta", async () => {
-    // Trabajarlo se paga sencillo salvo acuerdo: no genera recargo.
+  test("un feriado NO obligatorio no cuenta, pero SÍ se lista", async () => {
+    // Trabajarlo se paga sencillo salvo acuerdo: no genera recargo. Pero
+    // omitirlo dejaría invisible un día que el técnico sí trabajó — Sergio
+    // trabajó el 31-ago-2026 y esa ausencia provocó la pregunta «¿y el día de
+    // la persona negra?». Se lista rotulado, no se esconde.
     const t = await setup([{ iso: "2026-08-31" }]);
-    expect((await pedir(t, "2026-08")).feriadosDias).toBe(0);
+    const r = await pedir(t, "2026-08");
+
+    expect(r.feriadosDias).toBe(0);
+    expect(r.feriados).toHaveLength(1);
+    expect(r.feriados[0].tipo).toBe("no_obligatorio");
+  });
+
+  test("un mes con los dos tipos cuenta solo el obligatorio", async () => {
+    const t = await setup([{ iso: "2026-08-15" }, { iso: "2026-08-31" }]);
+    const r = await pedir(t, "2026-08");
+
+    expect(r.feriadosDias).toBe(1); // solo el Día de la Madre
+    expect(r.feriados).toHaveLength(2); // pero los dos quedan a la vista
   });
 
   test("un día común no cuenta", async () => {

@@ -444,6 +444,7 @@ export const planillaDelMes = query({
         v.object({
           fecha: v.string(),
           nombre: v.string(),
+          tipo: v.union(v.literal("obligatorio"), v.literal("no_obligatorio")),
           tecnico: v.string(),
           revisiones: v.number(),
         }),
@@ -510,6 +511,7 @@ export const planillaDelMes = query({
         detalle: pagos.feriados.map((f) => ({
           fecha: f.fecha,
           nombre: f.nombre,
+          tipo: f.tipo,
           tecnico: f.tecnico,
           revisiones: f.revisiones,
         })),

@@ -83,6 +83,8 @@ const feriadoTrabajadoRow = v.object({
   fecha: v.string(),
   /** Nombre del feriado, para poder nombrarlo en pantalla. */
   nombre: v.string(),
+  /** Solo `obligatorio` genera recargo; el otro se lista para no ocultarlo. */
+  tipo: v.union(v.literal("obligatorio"), v.literal("no_obligatorio")),
   clerkId: v.string(),
   tecnico: v.string(),
   /** Cuántas revisiones hizo ese día. No cambia el pago: el recargo es por día. */
@@ -162,7 +164,14 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
    */
   const feriadosTrabajados = new Map<
     string,
-    { fecha: string; nombre: string; clerkId: string; tecnico: string; revisiones: number }
+    {
+      fecha: string;
+      nombre: string;
+      tipo: "obligatorio" | "no_obligatorio";
+      clerkId: string;
+      tecnico: string;
+      revisiones: number;
+    }
   >();
 
   for (const r of await ctx.db.query("inspections").collect()) {
@@ -172,7 +181,12 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
     if (t && ymDe(fecha) === yearMonth) {
       const dia = isoDate(fecha);
       const fer = feriadoDe(dia);
-      if (fer && fer.tipo === "obligatorio") {
+      /* Se recogen **los dos tipos**, y solo los obligatorios suman días. Los de
+         pago no obligatorio no generan recargo, pero omitirlos los volvería
+         invisibles: Sergio trabajó el 31-ago-2026 y la pantalla no lo nombraba,
+         que es justo la pregunta que eso provoca. Van listados y rotulados
+         (A64/A88). */
+      if (fer) {
         const clave = `${dia}|${r.clerkUserId}`;
         const ya = feriadosTrabajados.get(clave);
         if (ya) ya.revisiones++;
@@ -180,6 +194,7 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
           feriadosTrabajados.set(clave, {
             fecha: dia,
             nombre: fer.nombre,
+            tipo: fer.tipo,
             clerkId: r.clerkUserId as string,
             tecnico: t.nombre,
             revisiones: 1,
@@ -244,7 +259,7 @@ export async function pagosTecnicoImpl(ctx: QueryCtx, { yearMonth }: { yearMonth
      * Un día por cada par fecha×técnico. Es el número que la planilla propone,
      * y el que Esteban confirma antes de que se guarde.
      */
-    feriadosDias: feriados.length,
+    feriadosDias: feriados.filter((f) => f.tipo === "obligatorio").length,
     feriados,
     tecnicos: filas,
     comisionTotalCRC: filas.reduce((a, t) => a + t.comisionCRC, 0),

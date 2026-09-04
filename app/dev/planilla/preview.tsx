@@ -120,11 +120,19 @@ export function PlanillaPreview() {
               /* Un feriado detectado, para poder revisar el bloque con
                  contenido; en setiembre el 15 cae en el mes. */
               feriadosDetectados: {
-                dias: 1,
+                dias: 1, // solo el obligatorio suma
                 detalle: [
                   {
                     fecha: "2026-09-15",
                     nombre: "Independencia",
+                    tipo: "obligatorio" as const,
+                    tecnico: "Sergio Smartcheck",
+                    revisiones: 2,
+                  },
+                  {
+                    fecha: "2026-09-01",
+                    nombre: "Día de la Persona Negra y la Cultura Afrocostarricense",
+                    tipo: "no_obligatorio" as const,
                     tecnico: "Sergio Smartcheck",
                     revisiones: 2,
                   },
