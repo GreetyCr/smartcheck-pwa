@@ -117,33 +117,27 @@ export function LeadsDashboard({
 }) {
   const phonePct = pctOf(leads.phone8Present, leads.total);
 
-  // Embudo en tres pasos. El paso intermedio no es decorativo: el teléfono es
-  // la llave del cruce, así que un lead sin teléfono no puede convertir aunque
-  // haya comprado.
-  const funnelRows = useMemo(
-    () => [
-      {
-        key: "leads",
-        label: "Leads recibidos",
-        value: funnel.leadsTotal,
-        meta: "100%",
-      },
-      {
-        key: "phone",
-        label: "Con teléfono usable",
-        value: funnel.leadsWithPhone,
-        meta: formatPct(pctOf(funnel.leadsWithPhone, funnel.leadsTotal)),
-      },
-      {
-        key: "converted",
-        label: "Convirtieron (revisión pagada)",
-        value: funnel.converted,
-        // El porcentaje viene del backend, no se recalcula: es LA cifra.
-        meta: formatPct(funnel.convertedRatePct, 2),
-      },
-    ],
-    [funnel],
-  );
+  /**
+   * **«De cada 100» en vez de un embudo de tres barras — A138.**
+   *
+   * Era un embudo: 9.290 (100%), 9.218 (99,2%), 220 (2,37%). Dos barras llenas
+   * y una astilla invisible. Y el paso del medio **no es un paso del negocio**:
+   * que un contacto traiga teléfono es un hecho de la calidad del dato, no algo
+   * que la persona hizo. Dibujarlo como escalón sugiere que ahí se pierde
+   * gente, y no se pierde nadie.
+   *
+   * Cuando la historia es **un solo número**, la forma correcta es decirlo, no
+   * graficarlo. Y «2 de cada 100» se entiende sin saber leer un porcentaje, que
+   * es exactamente el lector de este panel.
+   *
+   * Por debajo del 1% se pasa a «de cada 1.000»: con una tasa de 0,32% —la de
+   * diciembre de 2025— «0 de cada 100» diría que nadie compró, y sí compraron.
+   */
+  const deCadaCuantos = useMemo(() => {
+    const pct = funnel.convertedRatePct;
+    const base = pct >= 1 ? 100 : 1000;
+    return { base, cuantos: Math.round((pct / 100) * base) };
+  }, [funnel.convertedRatePct]);
 
   const methodRows = useMemo(() => {
     const byMethod = new Map(funnel.byMethod.map((m) => [m.method, m.rows]));
@@ -381,17 +375,34 @@ export function LeadsDashboard({
             lo lleva en su columna de contenido. */}
         <BiCard
           className="min-w-0"
-          title="Del lead al cliente"
-          subtitle="Cada paso sobre el total de leads recibidos"
+          title="Del contacto al cliente"
+          subtitle="Cuánta de la gente que escribe termina haciendo la revisión"
         >
-          <BiCountBars rows={funnelRows} total={funnel.leadsTotal} />
-          <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs text-[var(--bi-ink-3)]">
-            El teléfono es la llave del cruce: un lead sin número no se puede
-            emparejar con una revisión aunque haya comprado. En este periodo,{" "}
+          <p className="text-[20px] font-semibold leading-snug text-[var(--bi-ink)] sm:text-[24px]">
+            De cada{" "}
             <span className="bi-num tabular-nums">
-              {formatPct(funnel.convertedRatePct, 2)}
+              {formatInt(deCadaCuantos.base)}
             </span>{" "}
-            de quienes escriben termina pagando una revisión.
+            personas que escriben,{" "}
+            <span className="bi-num tabular-nums text-[var(--bi-income)]">
+              {formatInt(deCadaCuantos.cuantos)}
+            </span>{" "}
+            {deCadaCuantos.cuantos === 1 ? "hace" : "hacen"} la revisión.
+          </p>
+          <p className="bi-num mt-2 text-[13px] tabular-nums text-[var(--bi-ink-2)]">
+            {formatInt(funnel.leadsTotal)} escribieron ·{" "}
+            {formatInt(funnel.converted)} pagaron una revisión ·{" "}
+            {formatPct(funnel.convertedRatePct, 2)}
+          </p>
+          <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+            El teléfono es lo que permite ligar a una persona con su revisión: de
+            un contacto sin número no hay forma de saber si compró.{" "}
+            <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+              {formatInt(funnel.leadsTotal - funnel.leadsWithPhone)}
+            </span>{" "}
+            de los {formatInt(funnel.leadsTotal)} están en ese caso —
+            {formatPct(pctOf(funnel.leadsTotal - funnel.leadsWithPhone, funnel.leadsTotal))}
+            —, así que si alguno hizo una revisión, no aparece acá.
           </p>
           {/* Se comparó «Convirtieron» contra el total de revisiones de Canales
               y no cuadraba. No tiene por qué: cuentan cosas distintas. Decirlo
