@@ -111,7 +111,9 @@ export function PlanillaPreview() {
                 salarioCRC: 430_000,
                 comisionesCRC: 73_000,
                 baseImponibleCRC: 1_000_000,
-                feriadosDias: 1,
+                /* `null` reproduce un mes registrado ANTES de A129, que es el
+                   caso que hay hoy en producción y el que trae el aviso. */
+                feriadosDias: null,
                 tasas: tasasDelMes(mes),
                 updatedAt: Date.parse("2026-08-24T09:00:00-06:00"),
               },

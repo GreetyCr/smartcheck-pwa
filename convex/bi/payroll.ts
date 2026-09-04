@@ -421,7 +421,13 @@ export const planillaDelMes = query({
         salarioCRC: v.number(),
         comisionesCRC: v.number(),
         baseImponibleCRC: v.number(),
-        feriadosDias: v.number(),
+        /**
+         * `null` = el mes se registró **antes de que la planilla mirara
+         * feriados**, no «cero feriados». La distinción importa: un cero
+         * deliberado hay que respetarlo, y un `null` hay que rellenarlo con lo
+         * detectado, o el recargo no aparecería nunca en los meses viejos.
+         */
+        feriadosDias: v.union(v.number(), v.null()),
         tasas: tasasValidator,
         updatedAt: v.number(),
       }),
@@ -478,16 +484,20 @@ export const planillaDelMes = query({
           salarioCRC: fila.salarioCRC,
           comisionesCRC: fila.comisionesCRC,
           baseImponibleCRC: fila.baseImponibleCRC,
-          /* Los meses registrados antes de A129 no lo traen: se leen como 0, y
-             al volver a confirmar el mes toman el valor detectado. */
-          feriadosDias: fila.feriadosDias ?? 0,
+          feriadosDias: fila.feriadosDias ?? null,
           tasas: fila.tasas,
           updatedAt: fila.updatedAt,
         }
       : null;
 
+    /* Las líneas reflejan **lo que está registrado**, así que un mes viejo se
+       calcula sin recargo aunque haya feriados detectados: el gasto solo cambia
+       cuando Esteban vuelve a confirmar el mes. */
     const lineas = insumos
-      ? calcularPlanilla(insumos, insumos.tasas)
+      ? calcularPlanilla(
+          { ...insumos, feriadosDias: insumos.feriadosDias ?? 0 },
+          insumos.tasas,
+        )
       : [];
 
     const pagos = await pagosTecnicoImpl(ctx, { yearMonth: ym });

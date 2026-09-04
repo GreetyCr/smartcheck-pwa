@@ -49,7 +49,8 @@ export type PlanillaGuardada = {
     salarioCRC: number;
     comisionesCRC: number;
     baseImponibleCRC: number;
-    feriadosDias: number;
+    /** `null` = el mes se registró antes de que la planilla mirara feriados. */
+    feriadosDias: number | null;
     tasas: Tasas;
     updatedAt: number;
   } | null;
@@ -116,11 +117,18 @@ export function PayrollMonthCard({
     setSalario(i ? String(i.salarioCRC) : "");
     setComisiones(i ? String(i.comisionesCRC) : "");
     setBase(i ? String(i.baseImponibleCRC) : "");
-    /* Un mes sin registrar arranca con **lo detectado**, no en blanco: es el
-       número que casi siempre va, y dejarlo vacío obligaría a contar feriados a
-       mano teniéndolos ahí. Un mes ya registrado conserva LO SUYO — recalcularlo
-       le pisaría una corrección que Esteban pudo haber hecho a propósito. */
-    setFeriados(String(i ? i.feriadosDias : guardado.feriadosDetectados.dias));
+    /* Tres casos, y el del medio es el que importa:
+       · mes sin registrar → lo detectado (dejarlo vacío obligaría a contar
+         feriados a mano teniéndolos ahí);
+       · mes registrado ANTES de A129 (`null`) → lo detectado. Ese `null` no es
+         una decisión de nadie: el campo no existía. Respetarlo como cero haría
+         que el recargo **no apareciera nunca** en los meses viejos, que es
+         justo donde ya hay un pago corto;
+       · mes registrado CON el campo → lo suyo, aunque sea cero, porque ahí sí
+         hubo una decisión y recalcularla le pisaría una corrección. */
+    setFeriados(
+      String(i?.feriadosDias ?? guardado.feriadosDetectados.dias),
+    );
     setOk(null);
     setError(null);
   }, [guardado?.yearMonth, guardado?.insumos?.updatedAt]);
@@ -171,6 +179,9 @@ export function PayrollMonthCard({
    */
   const vigencia = guardado?.vigencia;
   const detectados = guardado?.feriadosDetectados.detalle ?? [];
+  /** Mes ya registrado cuyo `feriadosDias` es `null`: se grabó antes de A129. */
+  const registradoSinFeriados =
+    !!guardado?.insumos && guardado.insumos.feriadosDias === null;
   const avisoINS = guardado?.avisoPolizaINS ?? null;
 
   // Se publica una vez el setter del campo de comisiones (ver la prop).
@@ -382,6 +393,18 @@ export function PayrollMonthCard({
                 falta para llegar al doble, porque el salario del mes ya paga ese
                 día se trabaje o no.
               </p>
+              {/* El hueco va ruidoso (A64/A88): un mes que quedó corto y no lo
+                  dice se queda corto para siempre. */}
+              {registradoSinFeriados && detectados.length > 0 ? (
+                <p className="mt-2 rounded-lg bg-[var(--bi-surface-2)] p-2.5 text-[var(--bi-ink-2)]">
+                  <b className="text-[var(--bi-ink)]">
+                    Este mes se registró antes de que la planilla mirara los
+                    feriados
+                  </b>
+                  , así que hoy <b>no incluye el recargo</b>. Apretá «Actualizar
+                  el mes» para agregarlo.
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
