@@ -15,15 +15,21 @@
  * feriado de pago obligatorio. No es un agujero de plata, es un aviso: sirve
  * para no llegar tarde, no para recuperar nada.
  *
- * ## Lo que NO hace, y por qué
+ * ## Quién calcula el recargo
  *
- * **No calcula cuánto pagar de más.** Sabe qué revisiones cayeron en feriado
- * obligatorio, pero el doble se aplica sobre la jornada, y acá el técnico cobra
- * viático por revisión más comisión a partir de la 46 del mes: cómo se traduce
- * eso a «doble» es una decisión de Esteban con su contador, no nuestra. La
- * pantalla pone los hechos —qué día, cuántas, quién— y deja la cuenta a quien
- * corresponde. Inventar la fórmula sería el tipo de número que se copia a una
- * planilla y nadie vuelve a cuestionar.
+ * **Lo calcula Planilla, no esta pantalla** (A129). Cada feriado obligatorio
+ * trabajado suma un día de salario —`salario / 30`, que es lo que falta para
+ * llegar al doble porque el salario del mes ya paga ese día— y Esteban confirma
+ * el número de días, con medio día si la jornada fue parcial.
+ *
+ * Este módulo sigue haciendo **solo el cruce**: qué día, cuántas revisiones y de
+ * dónde salieron. Es el insumo, no la cuenta.
+ *
+ * > Hasta el 4-set-2026 acá decía que el recargo **no** se calculaba «y es a
+ * > propósito». Era cierto hasta que A129 lo construyó, y el comentario quedó
+ * > atrás: A132 corrigió el texto de la pantalla y **este no**, que es la misma
+ * > deuda una carpeta más allá. Lo encontró la lectura para el manual, no una
+ * > prueba — un comentario que miente no rompe nada y por eso sobrevive.
  */
 
 import { v } from "convex/values";
