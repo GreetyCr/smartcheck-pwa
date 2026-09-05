@@ -195,12 +195,33 @@ function PriceBreakdownTooltip({
   );
 }
 
+/**
+ * Los nombres de estado **en las palabras del panel** — A146.
+ *
+ * `getInspectionUiStatus` lo comparten las dos superficies, y su vocabulario
+ * —«PENDIENTE SYNC», «SINCRONIZADO»— es el del técnico, que sí sabe qué es
+ * sincronizar porque es su flujo de trabajo. En el panel lo lee Esteban, y ahí
+ * «sync» es palabra ajena.
+ *
+ * A136 tradujo estos nombres en la portada y **no llegó acá**: la misma pantalla
+ * mostraba «Falta subirla» en un lado y «PENDIENTE SYNC» en el otro. Se traduce
+ * solo del lado del panel para no tocar la app del técnico, que está bien como
+ * está.
+ */
+const ETIQUETA_BI: Record<string, string> = {
+  BORRADOR: "SIN TERMINAR",
+  COMPLETADO: "TERMINADA",
+  "PENDIENTE SYNC": "FALTA SUBIRLA",
+  SINCRONIZADO: "YA SUBIDA",
+};
+
 export function InspectionTableRow({
   inspection,
   technicianName,
   pdfInfo,
 }: InspectionTableRowProps) {
-  const { kind, label } = getInspectionUiStatus(inspection);
+  const { kind, label: labelTecnico } = getInspectionUiStatus(inspection);
+  const label = ETIQUETA_BI[labelTecnico] ?? labelTecnico;
   const breakdown = buildInspectionPriceBreakdown(inspection);
   const totalLabel = formatCrc(inspection.totalAmountCharged);
 

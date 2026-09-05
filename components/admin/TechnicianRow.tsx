@@ -38,16 +38,27 @@ export function TechnicianRow({
   const demote = useMutation(api.users.demoteToTechnician);
   const approve = useMutation(api.users.approveTechnician);
 
+  const [error, setError] = useState<string | null>(null);
   const isAdmin = user.role === "admin";
   const isPendingApproval =
     user.role !== "admin" && user.approvalStatus === "pending";
 
+  /**
+   * **El error se muestra, no solo se loguea — A146.**
+   *
+   * Iba únicamente a `console.error`, así que un rechazo legítimo del servidor
+   * —«Debe existir al menos un administrador»— **no llegaba nunca a la
+   * pantalla**: el botón se apagaba, volvía a encenderse y no pasaba nada. Un
+   * usuario que ve eso concluye que la pantalla está rota, cuando el sistema lo
+   * estaba protegiendo de quedarse sin admin y tenía una buena razón que decir.
+   */
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
+    setError(null);
     try {
       await fn();
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : "No se pudo completar la acción.");
     } finally {
       setBusy(false);
     }
@@ -171,6 +182,14 @@ export function TechnicianRow({
             </button>
           )}
         </div>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-2 text-[12px] leading-snug text-[var(--bi-expense)]"
+          >
+            {error}
+          </p>
+        ) : null}
       </td>
     </tr>
   );

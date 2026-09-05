@@ -37,10 +37,11 @@ const SOPORTA = [
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos los estados" },
-  { value: "draft", label: "Borrador" },
-  { value: "completed", label: "Completado" },
-  { value: "pending_sync", label: "Pendiente sync" },
-  { value: "synced", label: "Sincronizado" },
+  /* Las palabras del panel, no las del sistema (A136 · A146). */
+  { value: "draft", label: "Sin terminar" },
+  { value: "completed", label: "Terminada" },
+  { value: "pending_sync", label: "Falta subirla" },
+  { value: "synced", label: "Ya subida" },
   { value: "report_delivered", label: "Informe entregado" },
 ] as const;
 
@@ -94,14 +95,10 @@ export default function AdminInspeccionesPage() {
       : "skip",
   );
 
-  const chargedTotal = useMemo(() => {
-    if (!rows) return null;
-    return rows.reduce((sum, row) => {
-      const amount = row.inspection.totalAmountCharged;
-      if (amount == null || !Number.isFinite(amount)) return sum;
-      return sum + amount;
-    }, 0);
-  }, [rows]);
+  /* El total lo suma el backend sobre TODAS las filas del filtro, no sobre las
+     que llegaron: con el tope puesto, sumarlas acá daba el total de las 400
+     pintadas rotulado como el del filtro (A146). */
+  const chargedTotal = listado?.totalChargedCRC ?? null;
 
   const hasFilters =
     status !== "" || technicianClerkId !== "" || dateFrom !== "" || dateTo !== "";

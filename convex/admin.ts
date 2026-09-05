@@ -170,6 +170,23 @@ export const listAllInspections = query({
      * sabe cuántas hay de verdad y puede decir que está mostrando una parte.
      */
     const totalMatched = rows.length;
+    /**
+     * **El cobro total del filtro, ANTES de recortar — A146.**
+     *
+     * La pantalla lo sumaba del lado del cliente sobre las filas recibidas, que
+     * son a lo sumo `cap`. Con el tope alcanzado mostraba el total **de las 400
+     * pintadas** rotulado «Total cobrado», que se lee como el total del filtro.
+     * Es el mismo error que A114 arregló para el conteo de filas, sobreviviendo
+     * en el monto — y un monto equivocado se copia a una hoja y nadie lo vuelve
+     * a cuestionar.
+     *
+     * Se suma acá, donde están todas las filas que pasaron el filtro.
+     */
+    const totalChargedCRC = rows.reduce((sum, r) => {
+      const amount = r.totalAmountCharged;
+      return amount != null && Number.isFinite(amount) ? sum + amount : sum;
+    }, 0);
+
     const cap = Math.min(Math.max(args.limit ?? 100, 1), 1000);
     rows = rows.slice(0, cap);
 
@@ -178,6 +195,7 @@ export const listAllInspections = query({
 
     return {
       totalMatched,
+      totalChargedCRC,
       truncated: totalMatched > rows.length,
       rows: rows.map((insp) => {
         const tech = insp.clerkUserId
