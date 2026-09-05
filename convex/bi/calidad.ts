@@ -137,7 +137,10 @@ export const CATALOGO: Record<string, Entrada> = {
     titulo: "Fichas sin forma de identificar a la persona",
     queEs: "No tienen ni teléfono ni identificador de chat.",
     queHacer:
-      "Nada de nuestro lado. Si querés depurar Airtable, son estas 31 fichas.",
+      /* Sin el «31»: el catálogo es texto fijo y el conteo se mueve con cada
+         sync, así que una cifra escrita acá envejece sola y contradice al
+         número que la propia fila muestra al lado (A145). */
+      "Nada de nuestro lado. Si querés depurar Airtable, son las fichas que se listan acá.",
   },
   ambiguous_match: {
     clase: "informativo",

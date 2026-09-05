@@ -515,7 +515,10 @@ export function LeadsDashboard({
                         scope="col"
                         className={cn(
                           "bi-num px-4 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--bi-ink-3)]",
-                          h === "Emparejamientos" && "text-right",
+                          /* La columna de números va a la derecha. Comparaba
+                             contra «Emparejamientos», que se renombró en A136 y
+                             dejó el encabezado desalineado de su columna. */
+                          h === "Cuántos" && "text-right",
                         )}
                       >
                         {h}

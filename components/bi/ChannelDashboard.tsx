@@ -6,13 +6,11 @@ import {
   formatCRC,
   formatInt,
   formatMonthAbbr,
-  formatMonthLong,
   formatPct,
 } from "@/lib/bi-format";
 import { BiCard } from "./BiCard";
 import { CanalesPorMesChart } from "./CanalesPorMesChart";
 import { BiKpiCard } from "./BiKpiCard";
-import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
 /* Tipos — espejo del retorno de `bi/public:channelRevenue`                    */
@@ -301,19 +299,6 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Small multiples: una fila por canal                                        */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Una fila de barras por canal, con **escala propia por fila**.
- *
- * Con escala compartida, Mercadeo —tres cuartas partes de todo— aplasta al resto
- * y las filas de TikTok o Buscador quedan en una línea plana de 1px: se perdería
- * justo lo que hay que ver, que es si un canal chico está subiendo o murió. La
- * magnitud ya la da la tarjeta de arriba; acá se lee **forma**, y por eso el
- * subtítulo declara la escala en vez de dejarla implícita.
- */
 /* -------------------------------------------------------------------------- */
 /* Pauta: gasto y costo por revisión, mes a mes                               */
 /* -------------------------------------------------------------------------- */

@@ -42,9 +42,13 @@ import type { CanalMes, CanalRow } from "./ChannelDashboard";
  *
  * ## Decisiones de la guía de dataviz
  *
- *  - **Orden fijo por entidad, nunca por tamaño.** El orden y el color salen de
- *    `COLOR_CANAL`, que es un mapa por nombre. Un canal no cambia de color
- *    porque otro mes venda más.
+ *  - **El color sigue a la entidad, no a su puesto.** Sale de `COLOR_CANAL`, un
+ *    mapa por nombre: un canal no cambia de color porque otro venda más, ni
+ *    porque un filtro saque a un tercero. El **orden** sí es por ingreso
+ *    (`channels.ts:227`) y eso está bien —pone el canal grande al fondo, contra
+ *    el eje— pero es distinto del color y conviene no confundirlos: el que no
+ *    puede depender del ranking es el color, porque es lo que el lector aprende
+ *    de memoria.
  *  - **Leyenda siempre presente**: con seis series la identidad no puede
  *    depender solo del color.
  *  - **2px entre segmentos**, para que el corte se vea sin depender de que dos

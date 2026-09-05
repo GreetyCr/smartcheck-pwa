@@ -103,10 +103,25 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {/**
+       * **Un titular y tres que reparten el total — A145.**
+       *
+       * Eran cuatro tarjetas del mismo tamaño en fila, y **mezclaban dos ejes**:
+       * la primera cuenta por *qué hacer* (pide acción) y las otras tres por *de
+       * qué habla* (panel, Airtable, migración). Cuatro cajas iguales seguidas se
+       * leen como partes de un total, y estas **no suman**: los tres orígenes ya
+       * reparten los 2.165 completos, y el «pide acción» está adentro de ellos.
+       * Quien las sumara obtendría 2.166.
+       *
+       * Separarlas por tamaño arregla las dos cosas de una vez: dice cuál mirar
+       * primero —que es la única accionable— y deja de sugerir una suma que no
+       * existe. Los tres de abajo sí son un reparto, y ahora lo dicen.
+       */}
+      <div className="grid gap-3 lg:grid-cols-[1fr_2fr]">
         <BiKpiCard
           index={0}
           label="Piden acción"
+          destacada
           value={formatInt(data.porClase.accion)}
           hint={
             data.porClase.accion === 0
@@ -115,28 +130,36 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
           }
           tone={data.porClase.accion > 0 ? "expense" : "utilidad"}
         />
-        <BiKpiCard
-          index={1}
-          label="Del panel"
-          value={formatInt(data.porOrigen.sistema)}
-          hint="Lo que genera el sistema hoy — lo que esta pantalla mide"
-          tone="warn"
-        />
-        <BiKpiCard
-          index={2}
-          label="De Airtable"
-          value={formatInt(data.porOrigen.airtable)}
-          hint="Hechos del CRM de contactos; se van cuando se retire"
-          tone="neutral"
-        />
-        <BiKpiCard
-          index={3}
-          label="De la migración"
-          value={formatInt(data.porOrigen.migracion)}
-          hint="El CRM viejo y la contabilidad anterior; no puede crecer"
-          tone="neutral"
-        />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <BiKpiCard
+            index={1}
+            label="Del panel"
+            value={formatInt(data.porOrigen.sistema)}
+            hint="Lo que genera el sistema hoy"
+            tone="warn"
+          />
+          <BiKpiCard
+            index={2}
+            label="De Airtable"
+            value={formatInt(data.porOrigen.airtable)}
+            hint="Se van cuando Airtable se retire"
+            tone="neutral"
+          />
+          <BiKpiCard
+            index={3}
+            label="De la migración"
+            value={formatInt(data.porOrigen.migracion)}
+            hint="Del sistema viejo; no puede crecer"
+            tone="neutral"
+          />
+        </div>
       </div>
+      <p className="mt-2 text-[12.5px] text-[var(--bi-ink-3)]">
+        Estos tres reparten los{" "}
+        <b className="text-[var(--bi-ink-2)]">{formatInt(data.sinResolver)}</b>{" "}
+        avisos sin resolver. Los que piden acción están contados adentro, no
+        aparte.
+      </p>
 
       {/*
         El interruptor y su explicación. Va arriba de las listas porque cambia
@@ -285,7 +308,7 @@ export function CalidadDashboard({ data }: { data: CalidadData }) {
           {data.cobertura.map((c) => (
             <li key={c.campo}>
               <div className="flex items-baseline justify-between gap-3">
-                {/* Envuelve en vez de truncar: son ocho etiquetas fijas y
+                {/* Envuelve en vez de truncar: son etiquetas fijas y
                     cortas, y la palabra que se perdía era la que decidía el
                     sentido — «Contactos con teléfono utiliz…» y «Contactos con
                     identificador d…». Medido a 375 px: 219 y 238 px de texto en
