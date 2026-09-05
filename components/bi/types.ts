@@ -249,7 +249,13 @@ export type FinanceEntry = {
   note?: string;
   tecnico?: string;
   localidad?: string;
-  source: "sheet" | "manual" | "inspection";
+  /**
+   * De dónde salió la fila. **`"planilla"` faltaba acá — A144**: el backend ya lo
+   * devolvía desde A123, pero el tipo no lo listaba, así que esas filas se
+   * pintaban sin píldora —como si fueran manuales— y llegaban con
+   * `editable:false`. El resultado eran botones grises sin explicación.
+   */
+  source: "sheet" | "manual" | "inspection" | "planilla";
   /** false en las filas que genera el sistema al entregar el reporte. */
   editable: boolean;
   createdAt: number;

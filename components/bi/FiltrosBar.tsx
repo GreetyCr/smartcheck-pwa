@@ -56,6 +56,7 @@ export function FiltrosBar({
   soporta,
   onCambiar,
   onLimpiar,
+  notaPeriodo,
 }: {
   filtros: FiltrosBi;
   opciones: OpcionesFiltro | undefined;
@@ -63,6 +64,17 @@ export function FiltrosBar({
   soporta: readonly (DimensionKey | "periodo")[];
   onCambiar: (f: FiltrosBi) => void;
   onLimpiar: () => void;
+  /**
+   * Qué decir cuando la barra no lleva periodo — **A144**.
+   *
+   * El texto por defecto, «Esta pantalla no se filtra por periodo», es cierto de
+   * la **barra** y falso de la **pantalla** en la portada, que tiene su propio
+   * selector de periodo tres centímetros más abajo. Leídos juntos se
+   * contradicen, y el que pierde es el selector: parece roto.
+   *
+   * Una pantalla que tiene el control en otro lado dice dónde está.
+   */
+  notaPeriodo?: string;
 }) {
   const [abierto, setAbierto] = useState(false);
   const activos = contarActivos(filtros);
@@ -102,7 +114,7 @@ export function FiltrosBar({
           </div>
         ) : (
           <span className="text-[12px] text-[var(--bi-ink-3)]">
-            Esta pantalla no se filtra por periodo.
+            {notaPeriodo ?? "Esta pantalla no se filtra por periodo."}
           </span>
         )}
 

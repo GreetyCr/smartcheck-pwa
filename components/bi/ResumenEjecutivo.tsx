@@ -155,6 +155,32 @@ export function ResumenEjecutivo({
         }
       />
       {/**
+       * **La plata NO se recorta por marca, provincia ni canal — A144.**
+       *
+       * `executiveSummaryImpl` filtra las revisiones con todos los filtros, pero
+       * `finance_entries` **solo por fecha**. Con un filtro de marca puesto,
+       * «Revisiones» se angosta y la utilidad no, y hasta hoy **nada lo decía**:
+       * la caja de salvedad de más abajo solo hablaba de las cuatro tarjetas de
+       * contactos.
+       *
+       * No es un olvido que haya que implementar: **un alquiler no tiene marca**.
+       * La mayoría de los gastos no pertenece a ninguna dimensión, así que una
+       * «utilidad de Toyota» no existe y calcularla sería inventarla. Lo que
+       * faltaba era decirlo donde el número está, que es la misma regla de B44,
+       * A126 y A133.
+       */}
+      {hayDimension ? (
+        <p className="mb-3 rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-surface)] px-4 py-3 text-[12.5px] leading-relaxed text-[var(--bi-ink-2)]">
+          <b className="text-[var(--bi-ink)]">Con un filtro puesto, de estas cuatro
+          solo «Revisiones» se recorta.</b>{" "}
+          Ingresos, gastos y utilidad siguen mostrando el total del periodo,
+          porque la mayoría de los gastos —el alquiler, el contador, la
+          publicidad— no pertenece a una marca ni a una provincia. Una utilidad
+          «de Toyota» no existiría: habría que inventar cómo repartirle el
+          alquiler.
+        </p>
+      ) : null}
+      {/**
        * **Un titular y tres de apoyo, no cuatro iguales — A135.**
        *
        * La portada tenía doce tarjetas del mismo tamaño en tres filas de cuatro.

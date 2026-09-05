@@ -54,7 +54,7 @@ const FORMATO_MES = /^\d{4}-(0[1-9]|1[0-2])$/;
 /* -------------------------------------------------------------------------- */
 
 /**
- * ¿Esta etiqueta de la hoja es una de las seis líneas que derivamos acá?
+ * ¿Esta etiqueta de la hoja es una de las líneas que derivamos acá?
  *
  * Se compara por **patrón** y no contra una lista cerrada porque la hoja no usa
  * un vocabulario fijo: además de las cinco que conocíamos apareció
@@ -125,7 +125,7 @@ const lineaPreexistenteValidator = v.object({
 /**
  * Las líneas de planilla que ese mes **ya tiene cargadas por otra vía**.
  *
- * El problema que resuelve (**B34**): marzo a julio de 2026 ya traen las seis
+ * El problema que resuelve (**B34**): marzo a julio de 2026 ya traen las
  * líneas desde la hoja de Esteban, con llave `sheet:<MES> 2026:<etiqueta>:<n>`.
  * Esta pantalla escribe con llave `planilla:<mes>:<línea>`, que es **otra**
  * llave, así que registrar uno de esos meses no corregiría nada: **duplicaría**
@@ -222,7 +222,7 @@ const resultadoValidator = v.object({
   yearMonth: v.string(),
   lineas: v.array(lineaCalculadaValidator),
   totalCRC: v.number(),
-  /** Cuántas de las seis se crearon y cuántas se actualizaron. */
+  /** Cuántas líneas se crearon y cuántas se actualizaron. */
   creadas: v.number(),
   actualizadas: v.number(),
 });
@@ -230,9 +230,9 @@ const resultadoValidator = v.object({
 /**
  * Registra (o corrige) la planilla de un mes.
  *
- * **Idempotente por mes**: volver a confirmar el mismo mes **actualiza** las seis
+ * **Idempotente por mes**: volver a confirmar el mismo mes **actualiza** las
  * líneas en vez de duplicarlas, igual que F5-auto. Es lo que hace seguro
- * corregir un salario mal escrito: se cambia el dato de arriba y las seis se
+ * corregir un salario mal escrito: se cambia el dato de arriba y todas se
  * recalculan solas, sin que quede una provisión con un número viejo.
  */
 export const registrarPlanilla = mutation({

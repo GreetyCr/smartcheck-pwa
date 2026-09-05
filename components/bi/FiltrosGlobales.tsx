@@ -66,8 +66,11 @@ export function useFiltrosBi(soporta: readonly (DimensionKey | "periodo")[]) {
 
 export function FiltrosGlobales({
   soporta,
+  notaPeriodo,
 }: {
   soporta: readonly (DimensionKey | "periodo")[];
+  /** Ver `FiltrosBar`: qué decir cuando el periodo se elige en otro control. */
+  notaPeriodo?: string;
 }) {
   const { filtros, setFiltros } = useFiltrosBi(soporta);
   const opciones = useQuery(api.bi.public.filterOptions, {});
@@ -79,6 +82,7 @@ export function FiltrosGlobales({
       soporta={soporta}
       onCambiar={setFiltros}
       onLimpiar={() => setFiltros({ periodo: "todo" })}
+      notaPeriodo={notaPeriodo}
     />
   );
 }

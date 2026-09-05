@@ -6,8 +6,11 @@
  * Esteban escribe. Tenerlo dos veces sería la forma más fácil de que un día
  * el número de la pantalla y el que se guarda dejen de coincidir.
  *
- * Esteban escribe **tres** datos una vez al mes y el sistema deriva **seis**
- * líneas. Hoy hace esas seis cuentas a mano en su hoja, y ya nos costó una vez:
+ * Esteban escribe **cuatro** datos una vez al mes —salario, comisiones, base a
+ * reportar y días de feriado trabajados— y el sistema deriva el resto: **ocho**
+ * líneas, o **nueve** en un mes con feriado obligatorio trabajado.
+ *
+ * Hoy hace esas cuentas a mano en su hoja, y ya nos costó una vez:
  * cuando importamos julio, las comisiones estaban en cero, después las llenó y
  * las tres provisiones se recalcularon solas — pero el sistema se había quedado
  * con la foto vieja. Eran ₡98.599 de los que faltaban.
@@ -125,7 +128,7 @@ export function tasasDelMes(yearMonth: string): Tasas {
  */
 export const TASAS_POR_DEFECTO: Tasas = VIGENCIAS[VIGENCIAS.length - 1].tasas;
 
-/** Las seis líneas derivadas, en el orden en que se muestran. */
+/** Las líneas de la planilla, en el orden en que se muestran. */
 export const LINEAS = [
   /**
    * **Los dos pagos, primero — A123.**
@@ -233,7 +236,8 @@ function aColones(n: number): number {
 
 /**
  * Las líneas de la planilla, a partir de los tres datos: **los dos pagos**
- * (salario y comisiones) y **las seis derivadas** (cargas y provisiones).
+ * (salario y comisiones), el recargo por feriado si lo hay, y **las derivadas**
+ * (cargas y provisiones).
  *
  * Pura y exportada: es la única regla del cálculo y se prueba sin base de datos,
  * contra los números reales de julio.

@@ -294,13 +294,19 @@ export function FeriadosDashboard({
         </p>
       </BiCard>
 
-      <p className="mt-4 text-xs text-[var(--bi-ink-3)]">
+      {/* **Estos dos no siguen al selector de año — A144.** Suman todos los
+          años cubiertos, y el selector de arriba no los mueve. El texto ya decía
+          «de toda la historia», así que no mentía; lo que faltaba era decir que
+          por eso **no cambian al cambiar de año**, porque un número que se queda
+          quieto mientras el resto de la pantalla cambia se lee como congelado. */}
+      <p className="mt-4 text-xs leading-relaxed text-[var(--bi-ink-3)]">
         En total, {formatInt(panel.revisionesEnObligatorio)}{" "}
         {panel.revisionesEnObligatorio === 1 ? "revisión" : "revisiones"} de toda
         la historia {panel.revisionesEnObligatorio === 1 ? "cayó" : "cayeron"} en
         un feriado de pago obligatorio, y{" "}
         {formatInt(panel.revisionesEnNoObligatorio)} en uno de pago no
-        obligatorio.
+        obligatorio. <b>Estos dos cuentan todos los años</b>, así que no cambian
+        al elegir otro arriba.
       </p>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   formatMonthLong,
   formatMonthShort,
   formatPct,
+  categoryLabel,
   variacion,
 } from "@/lib/bi-format";
 import { BiCard } from "./BiCard";
@@ -97,9 +98,13 @@ export function FinanceDashboard({
     const labels: Record<FinanceEntry["source"], string> = {
       inspection: "Automáticos",
       manual: "Manuales",
+      planilla: "De planilla",
       sheet: "Sheet",
     };
-    return (["inspection", "manual", "sheet"] as const)
+    /* «De planilla» faltaba: sus filas existían desde A123 y **no había forma de
+       aislarlas** con ningún filtro. Lo destapó el compilador al ensanchar el
+       tipo de `source` (A144), no una lectura del código. */
+    return (["inspection", "manual", "planilla", "sheet"] as const)
       // El origen elegido se queda aunque el mes filtrado no tenga filas suyas:
       // si el botón desapareciera, la tabla quedaría vacía sin explicación.
       .filter((s) => (sourceCounts.get(s) ?? 0) > 0 || s === sourceFilter)
@@ -508,7 +513,9 @@ export function FinanceDashboard({
               registrado y es reversible desde el backend.
             </p>
             <p className="bi-num mt-3 rounded-xl border border-[var(--bi-ring)] bg-[var(--bi-plane)] px-3 py-2 text-[13px] text-[var(--bi-ink-2)]">
-              {formatCRC(confirm.amountCRC)} · {confirm.category}
+              {/* La etiqueta, no la llave interna: decía «servicios_profesionales»
+                  en el diálogo que confirma dar de baja plata (A144). */}
+              {formatCRC(confirm.amountCRC)} · {categoryLabel(confirm.category)}
             </p>
             <div className="mt-4 flex gap-2">
               <button

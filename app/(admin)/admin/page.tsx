@@ -84,7 +84,10 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
-      <FiltrosGlobales soporta={SOPORTA} />
+      <FiltrosGlobales
+        soporta={SOPORTA}
+        notaPeriodo="El periodo se elige abajo, en el resumen."
+      />
 
       {resumenListo ? (
         <ResumenEjecutivo

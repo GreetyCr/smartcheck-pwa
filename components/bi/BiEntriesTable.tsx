@@ -111,6 +111,18 @@ export function BiEntriesTable({
                         automático
                       </span>
                     ) : null}
+                    {/* **A144.** Sin esta píldora, las líneas de la planilla se
+                        veían iguales a una anotada a mano pero con los botones
+                        de editar y borrar apagados: el usuario ve que no puede
+                        y no sabe por qué. La píldora es la explicación. */}
+                    {e.source === "planilla" ? (
+                      <span
+                        title="Generado al confirmar la planilla del mes. Se corrige desde Planilla."
+                        className="rounded-full border border-[var(--bi-ring)] px-1.5 py-px text-[10px] text-[var(--bi-ink-3)]"
+                      >
+                        planilla
+                      </span>
+                    ) : null}
                   </span>
                 </td>
                 <td className="max-w-[220px] px-4 py-3 text-[13px] text-[var(--bi-ink-3)]">

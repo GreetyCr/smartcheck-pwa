@@ -21,7 +21,9 @@ function mesActual(): string {
 /**
  * Planilla del mes — los gastos que se calculan solos (B28).
  *
- * Esteban escribe **tres** datos y el sistema deriva **seis** líneas. Hoy hace
+ * Esteban escribe **cuatro** datos —salario, comisiones, base a reportar y días de
+ * feriado trabajados— y el sistema deriva el resto: **ocho líneas**, o nueve en
+ * un mes con feriado. Hoy hace
  * esas cuentas a mano en su hoja, y el error más caro que tuvimos —₡98.599 de
  * julio— salió justo de ahí: llenó las comisiones después, la hoja recalculó
  * sola y el sistema se quedó con la foto vieja.
@@ -165,9 +167,22 @@ export function PayrollMonthCard({
           baseImponibleCRC: num(base),
           feriadosDias: numDias(feriados),
         },
-        guardado?.insumos?.tasas ?? guardado?.tasasPorDefecto ?? TASAS_POR_DEFECTO,
+        /**
+         * **La tasa vigente, no la guardada — A144.**
+         *
+         * Esto usaba `insumos.tasas` (la que quedó grabada) mientras la mutation
+         * escribe con `tasasDelMes(mes)`, porque la pantalla nunca manda tasas.
+         * Hoy coinciden y por eso no se notaba; el día que se corrija una
+         * vigencia, **la vista previa mostraría un número y el botón grabaría
+         * otro** — y la vista previa existe precisamente para que lo que se ve
+         * sea lo que se guarda.
+         *
+         * `tasasPorDefecto` viene de `vigenciaDelMes(mes)`, que es la misma
+         * función que usa la mutation.
+         */
+        guardado?.tasasPorDefecto ?? TASAS_POR_DEFECTO,
       ),
-    [salario, comisiones, base, feriados, guardado?.tasasPorDefecto, guardado?.insumos?.tasas],
+    [salario, comisiones, base, feriados, guardado?.tasasPorDefecto],
   );
 
   const total = preview.reduce((a, l) => a + l.amountCRC, 0);

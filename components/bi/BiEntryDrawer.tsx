@@ -9,21 +9,27 @@ import {
   categoryLabel,
   toDateInputValue,
 } from "@/lib/bi-format";
+import { FORCE_NON_VIATICO } from "@/convex/bi/lib/financeRules";
 import type { FinanceEntry, FinanceEntryInput } from "./types";
 
 /**
- * Espejo de la regla B22 del backend (`lib/financeRules.FORCE_NON_VIATICO`),
+ * La regla B22 del backend (`lib/financeRules.FORCE_NON_VIATICO`),
  * solo para la experiencia del formulario: en estas categorías el viático no
  * aplica y el control se desactiva. **La autoridad es el backend**, que vuelve
  * a forzarlo al guardar.
  */
-const FORCED_NON_VIATICO = new Set([
-  "salario",
-  "impuestos",
-  "seguro",
-  "mantenimiento",
-  "publicidad",
-]);
+/**
+ * **La misma lista que el servidor, importada — A144.**
+ *
+ * Estaba copiada y se había quedado corta: el formulario desactivaba cinco
+ * categorías y el backend fuerza siete. En `Comisión` la casilla se dejaba
+ * marcar y **el servidor la apagaba en silencio al guardar** — el usuario elige
+ * algo, el sistema hace otra cosa y nadie se lo dice.
+ *
+ * Dos copias de la misma regla en dos capas es la forma más fácil de que se
+ * separen; ya pasó con la definición de conversión (A125 · A128).
+ */
+const FORCED_NON_VIATICO = FORCE_NON_VIATICO;
 
 const LABEL =
   "block text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--bi-ink-3)]";

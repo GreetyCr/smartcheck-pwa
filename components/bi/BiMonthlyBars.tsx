@@ -249,9 +249,15 @@ export function BiMonthlyBars({
         </div>
 
       </div>
-      <p className="mt-3 text-[11px] text-[var(--bi-ink-3)]">
-        Clic en un mes para ver sus movimientos.
-      </p>
+      {/* **Solo si el clic hace algo — A144.** En la portada este gráfico se
+          usa sin `onSelect`, y el pie invitaba igual a hacer clic: una promesa
+          que la pantalla no cumple enseña a desconfiar del resto de lo que
+          promete. En Finanzas sí hay `onSelect` y ahí el pie sigue. */}
+      {onSelect ? (
+        <p className="mt-3 text-[11px] text-[var(--bi-ink-3)]">
+          Clic en un mes para ver sus movimientos.
+        </p>
+      ) : null}
     </div>
   );
 }
