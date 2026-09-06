@@ -41,6 +41,9 @@ const DATOS: Operacion = {
   "hallazgos": {
     "evaluadas": 144,
     "fueraDelRanking": 2,
+    "conHallazgos": 31,
+    "elegibles": 29,
+    "tope": 12,
     "itemsSinCatalogar": [],
     "minEvaluaciones": 10,
     "porSeccion": [
@@ -295,7 +298,6 @@ const DATOS: Operacion = {
     ],
     "total": 731
   },
-  "nota": "Hallazgos: la polaridad de cada ítem sale de SECTIONS_CONFIG (`findingWhenNo`), la MISMA que usa el PDF — 18 de los 44 ítems sí/no son hallazgo cuando la respuesta es NO. «No aplica» nunca cuenta. El % de cada ítem va sobre las veces que ese ítem SE EVALUÓ, no sobre el total de revisiones. SLA: solo revisiones entregadas con fecha de inicio y de entrega; `sinFechaInicio` dice cuántas quedaron fuera y `inconsistentes` cuántas traen entrega anterior al inicio. Condición: `biVehicleCondition`, que anota el técnico; los porcentajes van sobre las que tienen dato.",
   "revisiones": {
     "conChecklist": 144,
     "entregadas": 142,
@@ -322,7 +324,6 @@ const DATOS: Operacion = {
         "ym": "2026-08"
       }
     ],
-    "sinFechaEntrega": 0,
     "sinFechaInicio": 49
   }
 };

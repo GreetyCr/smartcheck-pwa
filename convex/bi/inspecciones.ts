@@ -10,8 +10,8 @@
  * ## Por qué el total es el de la vista unificada y no el de `inspections`
  *
  * La pantalla de Inspecciones listaba solo la tabla `inspections` —lo que se
- * hizo **en la app**— y ese número (163) no se puede cruzar con nada: ni con las
- * 904 de la portada ni con los convertidos de Leads. El pedido era justamente
+ * hizo **en la app**— y ese número no se puede cruzar con nada: ni con el total
+ * de la portada ni con los convertidos de Leads. El pedido era justamente
  * poder **corroborar** contra Leads, así que el titular sale de
  * `buildInspectionsAll` (A30): unión de legacy ∪ era-app, basura excluida,
  * solapes deduplicados. Es el mismo número que el resto del tablero **porque es
@@ -20,17 +20,18 @@
  * ## El hueco de «quién», que no se puede tapar
  *
  * `inspections_legacy` **no tiene campo de técnico**. El CRM viejo nunca lo
- * registró, así que de las 904 solo **163 se pueden atribuir** y las 741
- * restantes no van a poder atribuirse nunca — no es un dato pendiente de cargar,
+ * registró, así que **la mayor parte del histórico no se puede atribuir** —al
+ * 6-set-2026, 741 de 912— y esas filas no van a poder atribuirse nunca — no es un dato pendiente de cargar,
  * es un dato que no se tomó. Se devuelve en `sinTecnico`, con su propio número,
  * y la tarjeta lo dice: repartirlas entre los dos técnicos que sí existen sería
- * inventar historia, y esconderlas haría leer «102 y 62» como si fueran todas.
+ * inventar historia, y esconderlas haría leer el reparto de la app como si
+ * fuera el de todas.
  *
  * ## La fecha
  *
  * Se usa la de la vista unificada, que para la app es
- * `inspectionStartAt ?? _creationTime`. Medido sobre las 164 filas de PROD el
- * 1-set: 52 no traen `inspectionStartAt`, y de las 112 que sí, la diferencia
+ * `inspectionStartAt ?? _creationTime`. Medido sobre las 164 filas que había en
+ * PROD el 1-set-2026: 52 no traen `inspectionStartAt`, y de las 112 que sí, la diferencia
  * contra `_creationTime` **nunca pasa de 3 horas y ninguna cambia de mes**. Es
  * decir: el respaldo no mueve ningún mes, y por eso el desglose mensual de acá
  * cuadra con el de Finanzas y el de la portada.
@@ -80,8 +81,9 @@ export const inspeccionesReturns = v.object({
       /**
        * `admin` | `tecnico` | `desconocido` — **A127**.
        *
-       * No todas las revisiones de la app las hace un técnico: **62 de las 165
-       * las hizo Esteban desde su propia cuenta de admin**. La tarjeta las
+       * No todas las revisiones de la app las hace un técnico: **una buena
+       * parte las hizo Esteban desde su propia cuenta de admin** (62 de 165 al
+       * 1-set-2026). La tarjeta las
        * listaba como si fueran de un técnico más, y eso importa porque la regla
        * de pago dice justamente lo contrario: las suyas **no generan viático ni
        * comisión** (B36). Sin el rol al lado, el reparto se lee como la

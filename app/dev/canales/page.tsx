@@ -83,7 +83,6 @@ const MUESTRA: ChannelRevenue = {
         "ultimaRevisionISO": "2026-03-02"
       }
     ],
-    "nota": "Datos reales de producción, leídos el 24-ago-2026 y congelados para la revisión visual.",
     "porMes": [
       {
         "canales": [

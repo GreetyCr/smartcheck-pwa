@@ -126,7 +126,14 @@ const LEGACY_TO_CURRENT: Record<
 
 /**
  * Normaliza `inspections.countryOfOrigin` al catálogo nuevo.
- * Ejecutar una vez como admin (Convex Dashboard → Functions → run).
+ *
+ * **Se corre desde el botón de `/admin/configuracion` — A151.** Este comentario
+ * decía «Convex Dashboard → Functions → run», y no es solo que quedara viejo
+ * cuando se construyó el botón: **seguirlo falla siempre**, porque el handler
+ * llama a `requireAdmin` y el Dashboard no manda JWT de Clerk. Mandaba a un
+ * camino que no existe para hacer algo que ya se hace con un clic. Si hiciera
+ * falta correrla sin sesión, habría que agregarle una gemela `*Internal` como
+ * las de más abajo — hoy no hace falta.
  */
 export const migrateLegacyCountryOfOrigin = mutation({
   args: {},

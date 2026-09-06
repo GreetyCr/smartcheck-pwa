@@ -55,7 +55,6 @@ export type ChannelRevenue = {
     costoPorRevisionCRC: number;
     retornoPorColon: number;
   };
-  nota: string;
 };
 
 /**
@@ -97,7 +96,7 @@ const MESES_PARA_APAGADO = 2;
  * Y dos cosas que **no** dice, declaradas en pantalla en vez de omitidas:
  * los ingresos de acá salen de las revisiones y **no cuadran con el P&L**
  * (A16), y **no hay embudo de leads por canal** porque en Airtable el origen
- * está vacío en las 9.096 fichas.
+ * está vacío en las 9.290 fichas (al 6-set-2026, y en todas las anteriores).
  */
 export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
   const { canales, porMes, publicidad } = data;

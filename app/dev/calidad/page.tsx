@@ -113,7 +113,6 @@ const MUESTRA: CalidadData = {
     { campo: "Revisiones con canal anotado", presentes: 877, total: 882, pct: 99.4, faltan: 5 },
     { campo: "Revisiones con monto", presentes: 882, total: 882, pct: 100, faltan: 0 },
   ],
-  nota: "Datos reales de producción al 24-ago-2026.",
 };
 
 export default function DevCalidadPage() {

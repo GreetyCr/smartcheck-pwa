@@ -40,7 +40,8 @@ export default function AdminTecnicosPage() {
                   { label: "Usuario", cls: "" },
                   { label: "Rol", cls: "" },
                   { label: "Inspecciones", cls: "" },
-                  { label: "Última actividad", cls: "hidden lg:table-cell" },
+                  /* No es «última vez que entró»: es su revisión más reciente (A151). */
+                  { label: "Última revisión", cls: "hidden lg:table-cell" },
                   { label: "Acciones", cls: "text-right" },
                 ].map((h) => (
                   <th

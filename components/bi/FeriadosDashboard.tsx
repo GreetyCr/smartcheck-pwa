@@ -174,12 +174,31 @@ export function FeriadosDashboard({
                   {formatInt(f.revisiones)}{" "}
                   {f.revisiones === 1 ? "revisión" : "revisiones"}
                 </span>
-                {f.revisionesApp > 0 && f.revisionesHistorico > 0 ? (
-                  <span className="text-[12px] text-[var(--bi-ink-3)]">
-                    ({formatInt(f.revisionesApp)} en la app,{" "}
-                    {formatInt(f.revisionesHistorico)} del CRM viejo)
-                  </span>
-                ) : null}
+                {/**
+                 * **De dónde salió, siempre — A151.**
+                 *
+                 * La condición era `app > 0 && historico > 0`, así que el
+                 * desglose solo aparecía cuando el feriado tenía revisiones de
+                 * **las dos** procedencias. Medido en producción el 6-set: de
+                 * los cuatro feriados trabajados de 2026 **ninguno cumple eso**
+                 * —tres son puro app y uno puro CRM viejo—, o sea que el
+                 * desglose no se pintaba nunca, justo en el caso en que decir la
+                 * procedencia es lo único que importa.
+                 *
+                 * Y sí importa: una revisión del CRM viejo no trae técnico, así
+                 * que **no entra en el recargo que calcula Planilla** (A129).
+                 * Ver «1 revisión» sin saber de dónde viene lleva a esperar un
+                 * recargo que no va a aparecer.
+                 */}
+                <span className="text-[12px] text-[var(--bi-ink-3)]">
+                  {f.revisionesApp > 0 && f.revisionesHistorico > 0
+                    ? `(${formatInt(f.revisionesApp)} en la app, ${formatInt(
+                        f.revisionesHistorico,
+                      )} del CRM viejo)`
+                    : f.revisionesHistorico > 0
+                      ? "(del CRM viejo, sin técnico: no entra en el recargo)"
+                      : "(en la app)"}
+                </span>
               </li>
             ))}
           </ul>

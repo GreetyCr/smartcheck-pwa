@@ -329,7 +329,7 @@ export type UnifiedRow = {
    * es el texto crudo normalizado y lo usa el dedupe débil (nombre + fecha +
    * vehículo). Canonicalizarlo ahí haría que «Hyundai» de la app y «Hyundai
    * Tucson 2017» del CRM pasen a ser iguales, y **fusionaría revisiones que hoy
-   * cuentan aparte** — o sea movería las 887. Este campo es solo para filtrar.
+   * cuentan aparte** — o sea movería el total histórico entero. Este campo es solo para filtrar.
    */
   brand: string;
   /** `particular` | `concesionaria`. Solo la app lo tiene; en legacy es undefined. */
@@ -340,7 +340,7 @@ export type UnifiedRow = {
    * Quién hizo la revisión (`clerkUserId`), o `undefined` si no se puede saber.
    *
    * **Solo existe del lado app.** `inspections_legacy` no tiene campo de técnico
-   * —el CRM viejo nunca lo registró—, así que las 741 filas históricas son
+   * —el CRM viejo nunca lo registró—, así que las filas históricas son
    * `undefined` para siempre y no hay forma de rellenarlas. No es un dato que
    * falte por cargar: es un dato que nunca se tomó. Por eso la pantalla lo
    * cuenta en un balde visible en vez de repartirlo o esconderlo (A64/A88).
@@ -379,16 +379,16 @@ type FilterArgs = {
  * honrar. Son **ocho de las nueve** que pide el requerimiento.
  *
  * **La novena, «estado de pago», no está y es a propósito.** Se verificó contra
- * producción: de las 887 revisiones, **ninguna** tiene monto ₡0 ni ₡1.000 — o
+ * producción el 25-ago-2026: de las 887 revisiones de entonces, **ninguna** tenía monto ₡0 ni ₡1.000 — o
  * sea que hoy *todas* están cobradas y el filtro tendría un solo valor. Un
  * control que no puede separar nada es peor que no tenerlo (A64), así que en
  * vez de un desplegable inútil la barra dice por qué falta. El día que aparezca
  * una revisión sin cobrar, la dimensión se agrega acá y ya.
  *
  * **`sellerType` solo existe en la app**: el CRM viejo no registraba si el
- * vendedor era particular o agencia. Filtrar por él deja fuera las 742
+ * vendedor era particular o agencia. Filtrar por él deja fuera las
  * revisiones legacy, y por eso la barra lo advierte en vez de dejar que el
- * total caiga de 887 a 146 sin explicación.
+ * total caiga a la fracción de la app sin explicación.
  */
 export const filterValidator = {
   fromMs: v.optional(v.number()),
@@ -414,7 +414,7 @@ export function passesFilters(r: UnifiedRow, f: FilterArgs): boolean {
   if (f.agency != null && norm(r.agency) !== norm(f.agency)) return false;
   if (f.brand != null && norm(r.brand) !== norm(f.brand)) return false;
   // `sellerType` ausente NO pasa el filtro: si pasara, filtrar por
-  // «particular» incluiría las 742 legacy —que no dicen nada al respecto— y el
+  // «particular» incluiría las legacy —que no dicen nada al respecto— y el
   // resultado sería mayor que el universo de revisiones que tienen el dato.
   if (f.sellerType != null && norm(r.sellerType) !== norm(f.sellerType))
     return false;

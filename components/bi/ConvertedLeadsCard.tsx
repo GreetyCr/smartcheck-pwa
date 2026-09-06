@@ -28,9 +28,9 @@ const THEAD =
 /**
  * La lista completa de quienes convirtieron, consultable.
  *
- * Antes eran 12 filas de 180 sin forma de ver el resto. Se pagina y se filtra
- * **del lado del cliente** a propósito: con 180 filas, ir al servidor por cada
- * página agrega latencia y no ahorra nada.
+ * Antes eran 12 filas sin forma de ver el resto. Se pagina y se filtra **del
+ * lado del cliente** a propósito: con unos cientos de filas —299 al
+ * 6-set-2026— ir al servidor por cada página agrega latencia y no ahorra nada.
  *
  * El resumen del paginador siempre dice cuántas filas se ven, cuántas quedaron
  * tras el filtro y cuántas hay en total. Sin eso, un filtro puesto se confunde

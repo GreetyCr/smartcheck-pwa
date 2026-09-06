@@ -180,7 +180,7 @@ export const listAllInspections = query({
      *
      * La página pedía 150 filas y mostraba «Suma de N inspecciones del filtro
      * actual» con el largo de lo que recibía. Al pasar de 150 revisiones en la
-     * app (hoy 164) empezó a informar 150 como si fuera el total: no era una
+     * app —eran 164 el 1-set-2026 y 172 el 6-set— empezó a informar 150 como si fuera el total: no era una
      * lista incompleta, era un **número equivocado**, y encima uno que se
      * quedaba quieto mientras el negocio crecía. El tope sigue existiendo
      * porque la tabla no puede pintar miles de filas, pero ahora la pantalla
@@ -228,7 +228,11 @@ export const listAllInspections = query({
   },
 });
 
-/** Usuarios con conteo de inspecciones y última actividad (inspección más reciente). */
+/**
+ * Usuarios con su conteo de revisiones y la fecha de su **revisión más
+ * reciente** — no un ingreso al sistema, que no se registra en ningún lado
+ * (A151). La columna se llama «Última revisión» por eso.
+ */
 export const getTechniciansWithStats = query({
   args: { refresh: v.optional(v.number()) },
   handler: async (ctx) => {

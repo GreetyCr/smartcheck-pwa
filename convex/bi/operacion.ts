@@ -121,9 +121,22 @@ export const operacionReturns = v.object({
       }),
     ),
     top: v.array(itemRow),
+    /**
+     * **El universo del ranking, entero — A151.**
+     *
+     * `fueraDelRanking` solo contaba el recorte por el piso de evaluaciones, y
+     * la pantalla declaraba ese —«quedaron fuera 1 punto»— **callando el corte
+     * al top 12**, que es el que de verdad esconde. Un hueco declarado chico al
+     * lado de uno grande y mudo se lee como «están casi todos».
+     */
+    conHallazgos: v.number(),
+    /** Los que pasaron el piso. `top` es a lo sumo `TOP_HALLAZGOS` de éstos. */
+    elegibles: v.number(),
     /** Ítems que no llegaron al piso de evaluaciones. Se cuentan, no se esconden. */
     fueraDelRanking: v.number(),
     minEvaluaciones: v.number(),
+    /** Cuántos pinta el ranking como mucho. La pantalla lo dice. */
+    tope: v.number(),
     /** Claves del formulario que NO están en el catálogo. Debe estar vacío. */
     itemsSinCatalogar: v.array(v.string()),
   }),
@@ -148,11 +161,7 @@ export const operacionReturns = v.object({
         medianaHoras: v.number(),
       }),
     ),
-    /** Entregadas sin fecha de entrega — no deberían existir. */
-    sinFechaEntrega: v.number(),
   }),
-
-  nota: v.string(),
 });
 
 export const operacion = internalQuery({
@@ -332,16 +341,20 @@ export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
   /* ------------------------------- SLA ------------------------------------- */
   let sinFechaInicio = 0;
   let inconsistentes = 0;
-  let sinFechaEntrega = 0;
   const horas: number[] = [];
   const horasPorMes = new Map<string, number[]>();
 
+  /**
+   * **Se cayó el contador de «entregadas sin fecha de entrega» — A151.**
+   *
+   * Contaba las filas con `reportDeliveredAt == null` **dentro de `entregadas`**,
+   * que es justamente `inspecciones.filter(r => r.reportDeliveredAt != null)`:
+   * no podía dar otra cosa que cero, y daba cero. Viajaba al frontend, ningún
+   * JSX lo pintaba, y su comentario decía «no deberían existir» — o sea que
+   * parecía una guarda cuando era una imposibilidad.
+   */
   for (const r of entregadas) {
-    const fin = r.reportDeliveredAt;
-    if (fin == null) {
-      sinFechaEntrega++;
-      continue;
-    }
+    const fin = r.reportDeliveredAt!;
     const ini = r.inspectionStartAt;
     if (ini == null) {
       sinFechaInicio++;
@@ -384,8 +397,11 @@ export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
       sinHallazgos,
       porSeccion,
       top,
+      conHallazgos: candidatos.length,
+      elegibles: elegibles.length,
       fueraDelRanking: candidatos.length - elegibles.length,
       minEvaluaciones: MIN_EVALUACIONES,
+      tope: TOP_HALLAZGOS,
       itemsSinCatalogar: [...sinCatalogar].sort(),
     },
     sla: {
@@ -399,8 +415,16 @@ export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
       dentroDe24h: horas.filter((h) => h <= 24).length,
       dentroDe48h: horas.filter((h) => h <= 48).length,
       porMes,
-      sinFechaEntrega,
     },
-    nota: "Hallazgos: la polaridad de cada ítem sale de SECTIONS_CONFIG (`findingWhenNo`), la MISMA que usa el PDF — 18 de los 44 ítems sí/no son hallazgo cuando la respuesta es NO. «No aplica» nunca cuenta. El % de cada ítem va sobre las veces que ese ítem SE EVALUÓ, no sobre el total de revisiones. SLA: solo revisiones entregadas con fecha de inicio y de entrega; `sinFechaInicio` dice cuántas quedaron fuera y `inconsistentes` cuántas traen entrega anterior al inicio. Condición: `biVehicleCondition`, que anota el técnico; los porcentajes van sobre las que tienen dato.",
   };
 }
+
+/*
+ * Acá viajaba un campo `nota` con un párrafo de procedencia que **ningún JSX
+ * pintaba** — A151. Se borró entero en vez de dejarlo comentado: un texto
+ * apagado envejece igual que uno vivo y nadie lo actualiza. Lo que decía
+ * —cómo sale la polaridad de cada ítem, sobre qué va cada porcentaje, qué
+ * entra en el SLA— está en los docblocks de este mismo archivo, al lado del
+ * código que lo hace, que es donde se busca.
+ */
+

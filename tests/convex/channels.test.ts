@@ -375,13 +375,18 @@ describe("bordes", () => {
     for (const c of res.canales) expect(Number.isFinite(c.pctIngresos)).toBe(true);
   });
 
-  test("la nota dice que estos ingresos no son los del P&L", async () => {
-    // El número va a diferir del titular de Finanzas. Si la pantalla no lo
-    // explica, la primera reacción razonable es pensar que uno de los dos está
-    // mal — y ninguno lo está.
-    const t = await conFilas([]);
-    const res = await t.query(internal.bi.channels.channelRevenue, {});
-    expect(res.nota).toMatch(/finance_entries/);
-    expect(res.nota).toMatch(/leads/i);
-  });
+  /*
+   * Acá había una prueba que afirmaba el CONTENIDO del campo `nota` — que
+   * mencionara `finance_entries` y `leads`. Se cayó con el campo (A151), y vale
+   * anotar por qué no se reemplaza por otra igual:
+   *
+   * **la prueba pasaba y el usuario no veía nada.** `nota` viajaba del backend
+   * y ningún JSX la pintaba, así que lo único verificado era que un string
+   * existiera. Una prueba verde sobre un texto que nadie muestra da la
+   * sensación de que la salvedad está cubierta, y es justo lo contrario.
+   *
+   * La salvedad sigue viva y **sí se ve**: el pie de `ChannelDashboard` dice que
+   * estos ingresos no son los del tablero de Finanzas y que los dos números son
+   * correctos. Donde se lee, que es donde tiene que estar.
+   */
 });

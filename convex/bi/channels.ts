@@ -5,7 +5,7 @@
  * *revisiones*, no en los leads: `captureSource` de la app y `Fuente` del CRM
  * viejo, unificados a un vocabulario title-case en **A34** (Mercadeo, TikTok,
  * Buscador, Recompra, Referido, Otro). En Airtable el origen **está vacío en las
- * 9.096 fichas** —verificado en PROD—, así que **no existe un embudo de leads por
+ * 9.290 fichas de PROD al 6-set-2026** —y en todas las anteriores—, así que **no existe un embudo de leads por
  * canal** y este tablero no lo finge. Es la limitación que ya anotaba el plan, y
  * se dice en pantalla en vez de dejar a Esteban buscando la sección que falta.
  *
@@ -123,7 +123,6 @@ export const channelRevenueReturns = v.object({
     /** Colones de ingreso por cada colón de pauta. 0 si no hubo pauta. */
     retornoPorColon: v.number(),
   }),
-  nota: v.string(),
 });
 
 /** Distancia en meses entre dos `AAAA-MM`. Negativa si `b` es anterior a `a`. */
@@ -304,8 +303,10 @@ export async function channelRevenueImpl(
           ? redondear(ingresosAtribuidosCRC / publicidadTotal, 2)
           : 0,
     },
-    nota:
-      "Ingresos de REVISIONES (inspections_all, A30) — no son los titulares del P&L, que salen de finance_entries (A16). El canal solo existe en las revisiones: en Airtable el origen está vacío, así que no hay desglose de leads por canal. La pauta es una sola bolsa en la hoja y se atribuye completa a Mercadeo, lo que sobreestima su costo por revisión si otro canal también lleva pauta.",
+    /* La `nota` que viajaba acá no la pintaba ningún JSX — A151. Lo que decía
+       («los ingresos son de revisiones, no del P&L»; «la pauta se atribuye
+       completa a Mercadeo») **ya está en pantalla** en el pie de esta misma
+       tarjeta y en el docblock de arriba, así que no se perdió nada. */
   };
 }
 

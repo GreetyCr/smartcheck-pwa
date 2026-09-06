@@ -244,7 +244,6 @@ export const calidadReturns = v.object({
   /** Tipos que aparecieron y no están en el catálogo. Vacío es lo esperado. */
   sinCatalogar: v.array(v.string()),
   cobertura: v.array(coberturaRow),
-  nota: v.string(),
 });
 
 const pct = (x: number, d: number) => (d > 0 ? Math.round((x / d) * 1000) / 10 : 0);
@@ -385,8 +384,9 @@ export async function calidadImpl(ctx: QueryCtx) {
     tipos,
     sinCatalogar,
     cobertura,
-    nota:
-      "Los avisos se clasifican por un catálogo escrito, no por su severidad: la severidad la puso quien programó el detector, la clase dice para qué sirve mirarlo. Un tipo que no esté en el catálogo cae en «pide acción» a propósito, para que no se esconda.",
+    /* La `nota` que viajaba acá no la pintaba ningún JSX — A151. Su contenido
+       —por qué el catálogo clasifica por clase y no por severidad— vive en el
+       docblock del catálogo, que es donde se busca. */
   };
 }
 

@@ -31,7 +31,6 @@ export type CalidadData = {
     pct: number;
     faltan: number;
   }>;
-  nota: string;
 };
 
 const CLASE = {

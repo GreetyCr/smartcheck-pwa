@@ -809,9 +809,10 @@ export const convertedLeadsReturns = v.array(
  * TODOS los que convirtieron, no una muestra.
  *
  * `conversionFunnel.sampleWhoConverts` devuelve las 25 más recientes, que sirve
- * para la portada pero no para consultar. Esto devuelve la lista completa —hoy
- * 180 filas— para que el tablero pagine y filtre del lado del cliente: con ese
- * volumen, paginar contra el servidor agrega latencia sin ahorrar nada.
+ * para la portada pero no para consultar. Esto devuelve la lista completa —del
+ * orden de unos cientos de filas; 299 al 6-set-2026— para que el tablero pagine
+ * y filtre del lado del cliente: con ese volumen, paginar contra el servidor
+ * agrega latencia sin ahorrar nada.
  *
  * Mismo criterio que la métrica titular (A29): solo `validIncome` y bandas
  * alta+media. Los emparejamientos por nombre (banda baja) **no entran**, igual

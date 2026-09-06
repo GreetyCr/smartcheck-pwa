@@ -41,8 +41,9 @@ export type OpcionesFiltro = {
  * ignora en silencio es peor que no tenerlo**.
  *
  * **3. Las dimensiones que pierden filas lo advierten.** «Tipo de vendedor»
- * solo lo registra la app: al elegirlo, las 742 revisiones del CRM viejo
- * quedan fuera y el total cae de 887 a 145. Eso se dice **antes** de aplicarlo,
+ * solo lo registra la app: al elegirlo, **las revisiones del CRM viejo quedan
+ * fuera** y el total cae a la fracción que hizo la app (741 de 912 al
+ * 6-set-2026). Eso se dice **antes** de aplicarlo,
  * no se descubre mirando un número que se desplomó.
  *
  * Y la novena dimensión del requerimiento, **estado de pago**, no está: hoy no

@@ -18,6 +18,27 @@ function mesActual(): string {
   return toDateInputValue(Date.now()).slice(0, 7);
 }
 
+/** «línea» o «líneas» según toque: el mensaje decía «1 líneas». */
+const lineas = (n: number) => `${n} ${n === 1 ? "línea" : "líneas"}`;
+
+/**
+ * Qué pasó al guardar, con las dos mitades — A151.
+ *
+ * Se separa del componente para poder probarlo: es la única lógica del archivo
+ * que se puede equivocar en silencio, porque un mensaje mal armado no rompe
+ * nada y nadie lo mira dos veces.
+ */
+export function resumen(creadas: number, actualizadas: number): string {
+  if (creadas > 0 && actualizadas > 0) {
+    return `Listo: ${lineas(creadas)} nuevas en Finanzas y ${actualizadas} corregidas.`;
+  }
+  if (creadas > 0) return `Listo: ${lineas(creadas)} entraron a Finanzas.`;
+  if (actualizadas > 0) {
+    return `Listo: se corrigieron ${lineas(actualizadas)} del mes; ninguna nueva.`;
+  }
+  return "Listo: no hubo nada que cambiar, el mes ya estaba así.";
+}
+
 /**
  * Planilla del mes — los gastos que se calculan solos (B28).
  *
@@ -231,11 +252,16 @@ export function PayrollMonthCard({
         baseImponibleCRC: num(base),
         feriadosDias: numDias(feriados),
       });
-      setOk(
-        res.creadas > 0
-          ? `Listo: ${res.creadas} líneas entraron a Finanzas.`
-          : `Listo: se actualizaron las ${res.actualizadas} líneas del mes.`,
-      );
+      /**
+       * **Dice las dos cosas, no solo una — A151.**
+       *
+       * Decía «N líneas entraron a Finanzas» en cuanto se creaba **alguna**, y
+       * callaba las corregidas. Corregir un mes ya registrado suele crear una y
+       * actualizar ocho: el mensaje informaba la de menos y escondía el trabajo
+       * real, que es justo lo que el usuario quiere confirmar. Y con `creadas`
+       * en 1 decía «1 líneas».
+       */
+      setOk(resumen(res.creadas, res.actualizadas));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar.");
     } finally {

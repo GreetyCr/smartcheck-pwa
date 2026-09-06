@@ -8,6 +8,13 @@ import { cn } from "@/lib/utils";
 import type { Operacion } from "@/components/bi/types";
 
 /**
+ * Cuántas partes del carro pinta la lista. Era un `8` suelto dentro del
+ * `slice`, y por eso el pie no podía decir «8 de 17»: el número no tenía nombre
+ * en ningún lado — A151.
+ */
+const SECCIONES_VISIBLES = 8;
+
+/**
  * Hallazgos, condición y tiempos de respuesta — **RF-07**.
  *
  * Es el requerimiento que dábamos por entregado y no lo estaba: el tablero que
@@ -146,11 +153,45 @@ export function OperacionDashboard({ data }: { data: Operacion }) {
             </ul>
           )}
 
-          {hallazgos.fueraDelRanking > 0 ? (
+          {/**
+           * **La lista dice cuántos de cuántos — A151.**
+           *
+           * Antes declaraba **un solo recorte** —«quedaron fuera N puntos con
+           * menos de 10 revisiones»— y en producción ese N es **1**, mientras el
+           * corte al top 12 esconde muchos más y no se mencionaba. Un hueco
+           * declarado chico al lado de uno grande y callado **enseña que están
+           * casi todos**, que es peor que no declarar nada.
+           *
+           * Ahora se dice el universo entero: cuántos puntos tuvieron algún
+           * hallazgo, cuántos se pintan y por qué faltan los otros dos grupos.
+           */}
+          {hallazgos.top.length > 0 ? (
             <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-[11.5px] leading-relaxed text-[var(--bi-ink-3)]">
-              Quedaron fuera <b>{formatInt(hallazgos.fueraDelRanking)}</b> puntos
-              con menos de {hallazgos.minEvaluaciones} revisiones. Con tan pocas,
-              uno solo daría 100% y encabezaría la lista sin querer decir nada.
+              Se muestran los <b>{formatInt(hallazgos.top.length)}</b> más
+              frecuentes de{" "}
+              <b>{formatInt(hallazgos.conHallazgos)}</b> puntos que tuvieron
+              algún hallazgo.
+              {hallazgos.elegibles > hallazgos.top.length ? (
+                <>
+                  {" "}
+                  Otros{" "}
+                  <b>
+                    {formatInt(hallazgos.elegibles - hallazgos.top.length)}
+                  </b>{" "}
+                  fallan menos y no caben en la lista.
+                </>
+              ) : null}
+              {hallazgos.fueraDelRanking > 0 ? (
+                <>
+                  {" "}
+                  Y <b>{formatInt(hallazgos.fueraDelRanking)}</b>{" "}
+                  {hallazgos.fueraDelRanking === 1
+                    ? "quedó fuera por revisarse"
+                    : "quedaron fuera por revisarse"}{" "}
+                  menos de {hallazgos.minEvaluaciones} veces: con tan pocas, uno
+                  solo daría 100% y encabezaría la lista sin querer decir nada.
+                </>
+              ) : null}
             </p>
           ) : null}
 
@@ -212,19 +253,38 @@ export function OperacionDashboard({ data }: { data: Operacion }) {
           </BiCard>
 
           {/* ---------- por sección ---------- */}
+          {/**
+           * **Cada porcentaje con su «de N», y el corte declarado — A151.**
+           *
+           * Dos cosas medidas en producción el 6-set:
+           *
+           * 1. **Los denominadores NO son el mismo.** Hay cinco distintos —63,
+           *    151, 161, 168 y 170— porque una parte solo se evalúa cuando
+           *    aplica: «Tracción 1,6%» es 1 de **63** y «Sistema de motor 62,4%»
+           *    es 106 de **170**. Dibujadas como barras alineadas se leen como
+           *    comparables, y no lo son. La tarjeta de al lado ya declara esta
+           *    misma regla —«el "de N" va SIEMPRE al lado del porcentaje»— y
+           *    acá no se cumplía: **el panel se contradecía contra sí mismo a
+           *    dos dedos de distancia.**
+           * 2. **Se pintaban 8 de 17 secciones** sin decirlo.
+           */}
           <BiCard
             title="Qué parte del carro falla más"
             subtitle="Revisiones con al menos un hallazgo en esa parte"
           >
             <ul className="space-y-2.5">
-              {data.hallazgos.porSeccion.slice(0, 8).map((s) => (
+              {data.hallazgos.porSeccion.slice(0, SECCIONES_VISIBLES).map((s) => (
                 <li key={s.seccion}>
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="truncate text-[13px] text-[var(--bi-ink-2)]">
                       {s.etiqueta}
                     </span>
                     <span className="bi-num shrink-0 text-[12.5px] tabular-nums text-[var(--bi-ink)]">
-                      {formatPct(s.pct)}
+                      {formatPct(s.pct)}{" "}
+                      <span className="text-[var(--bi-ink-3)]">
+                        ({formatInt(s.revisionesConAlguno)} de{" "}
+                        {formatInt(s.revisionesEvaluadas)})
+                      </span>
                     </span>
                   </div>
                   <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-[var(--bi-surface-2)]">
@@ -239,6 +299,28 @@ export function OperacionDashboard({ data }: { data: Operacion }) {
                 </li>
               ))}
             </ul>
+            <p className="mt-3 border-t border-[var(--bi-ring)] pt-3 text-[11.5px] leading-relaxed text-[var(--bi-ink-3)]">
+              {data.hallazgos.porSeccion.length > SECCIONES_VISIBLES ? (
+                <>
+                  Las{" "}
+                  <b>
+                    {formatInt(
+                      Math.min(
+                        SECCIONES_VISIBLES,
+                        data.hallazgos.porSeccion.length,
+                      ),
+                    )}
+                  </b>{" "}
+                  que más fallan, de{" "}
+                  <b>{formatInt(data.hallazgos.porSeccion.length)}</b> partes.{" "}
+                </>
+              ) : null}
+              <b className="text-[var(--bi-ink-2)]">
+                Cada parte tiene su propio total
+              </b>
+              : algunas solo se revisan cuando aplican, así que los porcentajes
+              se comparan con cuidado — el «de cuántas» va al lado por eso.
+            </p>
           </BiCard>
         </div>
       </div>

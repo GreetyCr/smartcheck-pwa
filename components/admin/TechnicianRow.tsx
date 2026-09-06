@@ -14,8 +14,17 @@ type TechnicianRowProps = {
   lastActivityAt: number | null;
 };
 
+/**
+ * **Es la fecha de la última REVISIÓN, no un ingreso al sistema — A151.**
+ *
+ * `lastActivityAt` sale de `_creationTime` de la inspección más reciente de esa
+ * persona. La columna se llamaba «Última actividad», que suena a última vez que
+ * entró, y el vacío decía «Sin actividad» — o sea que **Esteban, que usa el
+ * panel todos los días y no hace revisiones, aparecía como si nunca hubiera
+ * entrado**. El dato está bien; el rótulo prometía otro.
+ */
 function formatWhen(ts: number | null): string {
-  if (ts === null) return "Sin actividad";
+  if (ts === null) return "Ninguna todavía";
   return new Date(ts).toLocaleString("es-CR", {
     day: "numeric",
     month: "short",

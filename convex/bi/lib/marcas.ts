@@ -8,11 +8,13 @@
  *  - **La app** tiene una lista cerrada de 14 opciones (`Hyundai`, `Toyota`,
  *    …, `Otro`). Limpia.
  *  - **El CRM viejo** tiene **texto libre con marca, modelo y año pegados**:
- *    «Hyundai Tucson 2017», «Toyota Rav4», «Honda CRV». En producción son
- *    **530 valores distintos** para 742 filas.
+ *    «Hyundai Tucson 2017», «Toyota Rav4», «Honda CRV». En producción eran
+ *    **530 valores distintos para 742 filas** al 25-ago-2026.
  *
- * Un filtro por marca sobre 530 opciones no es un filtro. Y quedarse solo con
- * la app dejaría fuera 742 de las 887 revisiones.
+ * Un filtro por marca sobre cientos de opciones no es un filtro. Y quedarse solo
+ * con la app dejaría fuera **la mayor parte del histórico**: las filas del CRM
+ * viejo son 741 de 912 al 6-set-2026, y ese reparto casi no se mueve porque el
+ * histórico está congelado.
  *
  * ## Qué hace este módulo
  *

@@ -97,10 +97,11 @@ const pctOf = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
  * Mismo lenguaje visual que Finanzas: superficie grafito, acento cian para la
  * serie principal, tinta neutra para lo que no es titular.
  *
- * La regla que ordena todo el tablero: **la conversión son 180 (2,07%)** y los
- * 58 empates débiles por nombre viven aparte, rotulados como estimación. Cada
- * bloque dice sobre qué universo habla, porque acá conviven dos: los 180
- * titulares y los 275 emparejamientos con ingreso válido.
+ * La regla que ordena todo el tablero: **la conversión son los emparejamientos
+ * de banda alta y media con ingreso válido**, y los empates débiles por nombre
+ * viven aparte, rotulados como estimación. Cada bloque dice sobre qué universo
+ * habla, porque acá conviven dos —los titulares y el total de emparejamientos
+ * con ingreso válido— y las dos cifras se mueven cada lunes con el sync.
  */
 export function LeadsDashboard({
   funnel,

@@ -157,8 +157,14 @@ export type Operacion = {
       evaluados: number;
       pct: number;
     }>;
+    /** Puntos con al menos un hallazgo. El universo del ranking (A151). */
+    conHallazgos: number;
+    /** Los que además pasaron el piso de evaluaciones. */
+    elegibles: number;
     fueraDelRanking: number;
     minEvaluaciones: number;
+    /** Cuántos pinta el ranking como mucho. */
+    tope: number;
     /** Debe estar vacío. Si trae algo, hay un punto del formulario sin catalogar. */
     itemsSinCatalogar: string[];
   };
@@ -173,9 +179,7 @@ export type Operacion = {
     dentroDe24h: number;
     dentroDe48h: number;
     porMes: Array<{ ym: string; rows: number; medianaHoras: number }>;
-    sinFechaEntrega: number;
   };
-  nota: string;
 };
 
 /** Espejo de `contrasteReturns` (`convex/bi/contraste.ts`) — A56.
