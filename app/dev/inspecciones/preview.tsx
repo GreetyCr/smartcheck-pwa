@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  *
  * Los **agregados son literales** porque el punto de esta vista es aprobar el
  * diseño con las magnitudes reales: 18 meses no se rotulan como 6, y un reparto
- * de 101/62 sobre 163 atribuibles se ve muy distinto a uno parejo. La forma de
+ * de 109/62 sobre 171 atribuibles se ve muy distinto a uno parejo. La forma de
  * la serie tampoco se puede inventar — el traspaso del CRM viejo a la app
  * (56 → 66 → 30 → 0) es justo lo que hay que poder leer de un vistazo.
  *
@@ -21,10 +21,10 @@ import { cn } from "@/lib/utils";
  * también van cambiados.
  */
 const PANEL: InspeccionesPanel = {
-  total: 904,
-  totalHistorico: 904,
+  total: 912,
+  totalHistorico: 912,
   conFiltros: false,
-  deLaApp: 163,
+  deLaApp: 171,
   delHistorico: 741,
   porMes: [
     { yearMonth: "2025-04", total: 7, app: 0, legacy: 7 },
@@ -44,14 +44,14 @@ const PANEL: InspeccionesPanel = {
     { yearMonth: "2026-06", total: 85, app: 19, legacy: 66 },
     { yearMonth: "2026-07", total: 76, app: 46, legacy: 30 },
     { yearMonth: "2026-08", total: 87, app: 87, legacy: 0 },
-    { yearMonth: "2026-09", total: 3, app: 3, legacy: 0 },
+    { yearMonth: "2026-09", total: 11, app: 11, legacy: 0 },
   ],
   porTecnico: [
     {
       technicianId: "user_muestra_a",
       nombre: "Técnico de muestra A",
       rol: "tecnico",
-      rows: 101,
+      rows: 109,
       primeraMs: Date.parse("2026-07-16T10:00:00-06:00"),
       ultimaMs: Date.parse("2026-09-01T10:00:00-06:00"),
       porMes: [
@@ -92,7 +92,7 @@ const PANEL_FILTRADO: InspeccionesPanel = {
   delHistorico: 30,
   porMes: PANEL.porMes.filter((m) => m.yearMonth >= "2026-07"),
   porTecnico: [
-    { ...PANEL.porTecnico[0], rows: 101 },
+    { ...PANEL.porTecnico[0], rows: 109 },
     { ...PANEL.porTecnico[1], rows: 35, porMes: [
       { yearMonth: "2026-07", rows: 13 },
       { yearMonth: "2026-08", rows: 22 },
