@@ -120,6 +120,30 @@ describe("capítulo 2 · los diez pasos de «Cómo anotar un movimiento»", () =
   });
 });
 
+describe("lo que la tabla dice que hay", () => {
+  test("el total de movimientos del periodo NO es el tope de la consulta", async () => {
+    // La tabla de «Movimientos» rotulaba «Todo el histórico · 200 filas» con
+    // 663 vivos: contaba lo que había llegado, no lo que hay (A155). La cifra
+    // correcta sale de `financeSummary`, que recorre todas las filas.
+    const asAdmin = await setup();
+    for (let i = 0; i < 5; i++) {
+      await asAdmin.mutation(api.bi.financeForm.createFinanceEntry, {
+        ...DE_PRUEBA,
+        note: `movimiento ${i}`,
+      });
+    }
+
+    const conTope = await asAdmin.query(
+      api.bi.financeForm.listFinanceEntries,
+      { yearMonth: "2026-09", limit: 2 },
+    );
+    const resumen = await asAdmin.query(api.bi.public.financeSummary, {});
+
+    expect(conTope).toHaveLength(2);
+    expect(resumen.totals.rows).toBe(5);
+  });
+});
+
 describe("capítulo 2 · «Cómo corregir o dar de baja un movimiento»", () => {
   test("dar de baja lo saca de los totales pero NO lo borra", async () => {
     // «El movimiento deja de contar en los totales, pero no se borra. Queda

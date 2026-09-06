@@ -204,6 +204,11 @@ export function FinanceDashboard({
   /** Cuántos movimientos de gasto sostienen el reparto. Va en el subtítulo. */
   const gastosContados = (catsDelServidor ?? []).reduce((n, c) => n + c.rows, 0);
 
+  /** Cuántos hay de verdad en el periodo — para que la tabla no diga su tope. */
+  const totalFilas = selectedMonth
+    ? (mesElegido?.rows ?? 0)
+    : totals.rows;
+
   const showFlash = (msg: string, ok = true) => {
     setFlash({ msg, ok });
     window.setTimeout(() => setFlash(null), 2400);
@@ -423,10 +428,26 @@ export function FinanceDashboard({
                 Cargando…
               </span>
             ) : (
+              /**
+               * **El conteo dice cuántas hay, no cuántas llegaron — A155.**
+               *
+               * Decía `entries.length`, y sin mes elegido `entries` viene con
+               * tope de 200. Con 663 movimientos vivos la tarjeta rotulada
+               * «Todo el histórico» anunciaba **200 filas**: el mismo error de
+               * A114 (el conteo de Inspecciones) y A146 (el monto cobrado).
+               *
+               * Y es el mismo de **A153**, en esta misma tarjeta, tres horas
+               * antes: ahí se arreglaron el desglose por categoría y el total de
+               * viáticos y **este contador quedó**. El patrón del arreglo que no
+               * se propaga, dentro del componente que se estaba arreglando. Lo
+               * destapó Greety mandando la foto de su propia pantalla.
+               */
               <span className="bi-num text-xs text-[var(--bi-ink-3)]">
-                {sourceFilter === "todos"
-                  ? `${formatInt(entries.length)} filas`
-                  : `${formatInt(visibleEntries.length)} de ${formatInt(entries.length)} filas`}
+                {sourceFilter !== "todos"
+                  ? `${formatInt(visibleEntries.length)} de ${formatInt(entries.length)} filas`
+                  : entries.length < totalFilas
+                    ? `${formatInt(entries.length)} de ${formatInt(totalFilas)} filas`
+                    : `${formatInt(entries.length)} filas`}
               </span>
             )
           }
