@@ -12,7 +12,8 @@ import type {
   ExecutiveSummary,
   FinanceMonth,
 } from "@/components/bi/types";
-import { DevAdminShell } from "./shell";
+import { ADMIN_CONTENT_PADDING, ADMIN_THEME_CLASS } from "@/lib/admin-theme";
+import { cn } from "@/lib/utils";
 
 /**
  * Datos de MUESTRA (no salen de Convex) con magnitudes creíbles para juzgar el
@@ -151,8 +152,24 @@ export function AdminShellPreview() {
   const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
   return (
-    <DevAdminShell activePath="/admin">
-      <div>
+    /**
+     * **Sin el marco del menú, igual que las otras diez muestras — A154.**
+     *
+     * Usaba `DevAdminShell` y era la única: al juntar las once capturas para el
+     * manual, Inicio salía con barra lateral y las demás sin ella. La barra es
+     * idéntica en las once y se lleva ~300 px —el 20%— de cada imagen sin decir
+     * nada nuevo, así que el bloque «Cómo llegar» de cada capítulo se resuelve
+     * con **una sola captura del menú** (`00-menu`), marcando el ítem distinto.
+     *
+     * El marco sigue teniendo dónde revisarse: `/dev/admin/tablas` lo usa, y de
+     * ahí sale justamente esa captura del menú.
+     */
+    <>
+      <div className="bg-amber-500/15 px-4 py-2 text-center text-[13px] text-amber-900">
+        <strong>Vista de revisión visual</strong> — datos de muestra, sin sesión.
+        No existe en producción.
+      </div>
+      <div className={cn(ADMIN_THEME_CLASS, ADMIN_CONTENT_PADDING, "min-h-dvh")}>
         <ResumenEjecutivo
           periodo={RESUMEN}
           historico={RESUMEN}
@@ -182,6 +199,6 @@ export function AdminShellPreview() {
           <AdminDashboard metrics={METRICS} revisionesHistorico={912} />
         </div>
       </div>
-    </DevAdminShell>
+    </>
   );
 }

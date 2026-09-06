@@ -66,6 +66,8 @@ export function BotSwitchCard({ estado }: { estado: Estado }) {
   return (
     <BiCard
       title="Bot de WhatsApp"
+      /* Se pinta ANTES del h1 de Leads: sin esto son dos h2 antes del h1 (A157). */
+      titleAs="p"
       subtitle="Encender o apagar la atención automática"
     >
       <div className="space-y-4">

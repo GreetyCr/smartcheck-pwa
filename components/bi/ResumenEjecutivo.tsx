@@ -316,9 +316,25 @@ export function ResumenEjecutivo({
           label="Conversión"
           tone="utilidad"
           value={formatPct(historico.conversionPct)}
-          // Pista corta: la tarjeta trunca lo que no cabe, y en 4 columnas cabe
-          // poco. El detalle largo vive en el tablero de Leads.
-          hint={`${formatPct(historico.conversionPctOfPhoned)} con teléfono`}
+          /**
+           * **La pista lleva el denominador, no otro porcentaje — A157.**
+           *
+           * Decía «2,4% con teléfono» al lado de un titular que dice «2,4%»:
+           * `conversionPct` es 2,42 y `conversionPctOfPhoned` 2,44, y a un
+           * decimal **las dos bases dan la misma cadena**. La salvedad existe
+           * para decir sobre qué universo corre el número, y así se leía como
+           * una repetición sin sentido — que es peor que no ponerla, porque
+           * entrena a ignorar las pistas de las otras tres tarjetas.
+           *
+           * Con el denominador se ve la diferencia sin depender del redondeo, y
+           * es lo que ya hace la tarjeta de «Contactos» dos lugares a la
+           * izquierda.
+           *
+           * (Acá decía además que «la tarjeta trunca lo que no cabe». **A149 le
+           * quitó el truncado al `hint`** y este comentario sobrevivió — §4.2
+           * cometido dentro de la jornada que cerró §4.2.)
+           */
+          hint={`sobre ${formatInt(historico.leadsWithPhone)} con teléfono`}
         />
       </div>
 

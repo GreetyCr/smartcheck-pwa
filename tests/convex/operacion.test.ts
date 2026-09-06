@@ -174,16 +174,42 @@ describe("los denominadores", () => {
   });
 
   test("el % de condición va sobre las que TIENEN dato", async () => {
+    const conChecklist = { section_motor: { nivel_aceite: { value: "bien" } } };
     const t = await montar([
-      ...Array.from({ length: 3 }, () => ({ insp: { biVehicleCondition: 1 } })),
-      ...Array.from({ length: 1 }, () => ({ insp: { biVehicleCondition: 2 } })),
-      ...Array.from({ length: 6 }, () => ({})), // sin dato
+      ...Array.from({ length: 3 }, () => ({
+        insp: { biVehicleCondition: 1 },
+        secciones: conChecklist,
+      })),
+      { insp: { biVehicleCondition: 2 }, secciones: conChecklist },
+      // Con checklist pero sin la nota de condición: ésas SÍ son «sin dato».
+      ...Array.from({ length: 2 }, () => ({ secciones: conChecklist })),
     ]);
     const res = await correr(t);
 
-    expect(res.condicion.sinDato).toBe(6);
-    expect(res.condicion.niveles[0].pct).toBe(75); // 3 de 4, no 3 de 10
+    expect(res.condicion.sinDato).toBe(2);
+    expect(res.condicion.niveles[0].pct).toBe(75); // 3 de 4, no 3 de 6
     expect(res.condicion.niveles[1].pct).toBe(25);
+  });
+
+  test("una revisión SIN checklist no entra en la tarjeta de condición", async () => {
+    /**
+     * **A157.** La tarjeta corría sobre TODAS las revisiones mientras el
+     * encabezado de la pantalla declara «N con checklist». En producción eran
+     * 172 contra 170: la tarjeta decía «166 con dato» y «6 sin nota» bajo un
+     * título que dice 170, así que quien restara obtenía 164.
+     */
+    const t = await montar([
+      {
+        insp: { biVehicleCondition: 1 },
+        secciones: { section_motor: { nivel_aceite: { value: "bien" } } },
+      },
+      ...Array.from({ length: 4 }, () => ({})), // sin checklist: fuera
+    ]);
+    const res = await correr(t);
+
+    const conDato = res.condicion.niveles.reduce((n, x) => n + x.rows, 0);
+    expect(conDato + res.condicion.sinDato).toBe(res.revisiones.conChecklist);
+    expect(res.condicion.sinDato).toBe(0);
   });
 });
 

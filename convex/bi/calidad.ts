@@ -2,11 +2,11 @@
  * Calidad de los datos (F3 · tablero 4 de 5).
  *
  * **El problema que resuelve es de lectura, no de datos.** En producción hay
- * **2.158 issues** registrados. Puesto así, el tablero diría que el sistema está
+ * **miles de avisos** registrados (2.158 al 24-ago-2026). Puesto así, el tablero diría que el sistema está
  * en llamas. No lo está: **1.869 de esos son `lead_dup`**, que se marcan a
  * propósito y **no se fusionan** (A26) — Airtable trae la misma persona varias
  * veces y esa duplicación es un hecho del dato, no un error nuestro. Mostrar los
- * 2.158 juntos entrena a ignorar el tablero entero, que es la peor forma de
+ * todos juntos entrena a ignorar el tablero entero, que es la peor forma de
  * perder los pocos que sí importan.
  *
  * Así que cada tipo se declara en un **catálogo explícito** con tres cosas: en
@@ -34,7 +34,8 @@ export type Clase = "accion" | "informativo" | "esperado";
  *
  * Medir el reparto real en producción cambió el diseño. La intuición era
  * separar por época (viejo/nuevo), pero los números dicen otra cosa: de los
- * **2.165 sin resolver, 2.118 (97,8%) hablan de los contactos que sincroniza
+ * **la enorme mayoría de los sin resolver —2.118 de 2.165 al 4-set-2026, un 97,8%—
+ * hablan de los contactos que sincroniza
  * Airtable** — la misma persona escribiendo varias veces, gente sin teléfono de
  * Costa Rica, fichas sin identificador. Eso no es historia: **crece todos los
  * lunes** con el sync, así que un corte por fecha no lo habría tocado.

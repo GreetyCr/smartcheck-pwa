@@ -138,6 +138,25 @@ export function BiMonthlyBars({
                 )}. ${m.rows} movimientos. Ver detalle del mes.`}
                 className={cn(
                   "group relative flex h-full flex-1 cursor-pointer flex-col justify-end rounded-md pb-6 transition-opacity duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bi-surface)]",
+                  /**
+                   * **El área que se puede tocar se estira al hueco vecino — A157.**
+                   *
+                   * Medido a 375 px con 14 meses: cada botón mide **12,5 px** de
+                   * ancho con 6 px de separación. WCAG 2.2 SC 2.5.8 pide 24×24
+                   * o, en su defecto, que un círculo de 24 px centrado en cada
+                   * objetivo no toque el del vecino — con paso de 18,5 px se
+                   * solapan, así que **falla AA**.
+                   *
+                   * Este `::after` se come la mitad del hueco de cada lado sin
+                   * mover el dibujo: el objetivo pasa de 12,5 a 18,5 px. No llega
+                   * a 24, porque para eso habría que dibujar menos meses; llega
+                   * a lo máximo que la grilla permite sin cambiar el gráfico.
+                   *
+                   * Importa porque el clic **abre los movimientos de ese mes**:
+                   * con 12,5 px se abre el mes equivocado y se lee el número
+                   * equivocado sin notarlo. Greety usa el panel en el teléfono.
+                   */
+                  "after:absolute after:inset-y-0 after:-inset-x-[3px] after:content-['']",
                   dim && "opacity-55",
                 )}
               >

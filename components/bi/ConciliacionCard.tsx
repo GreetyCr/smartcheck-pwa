@@ -125,12 +125,17 @@ export function ConciliacionCard({ data }: { data: Reconciliation }) {
             <span className="bi-num text-[var(--bi-ink)]">
               {formatCRC(Math.abs(totals.gapAbsMesesCerrados))}
             </span>{" "}
+            {/* **El porcentaje va sobre la contabilidad, no sobre las
+                revisiones — A157.** La frase decía «₡X más que las revisiones …
+                un 10,9%» y ese porcentaje es gap ÷ contabilidad. Leído como
+                estaba escrito daría 11,3%: el denominador era el otro número de
+                la misma frase. */}
             {totals.gapAbsMesesCerrados >= 0 ? "más" : "menos"} que las
             revisiones en los meses cerrados —un{" "}
             <span className="bi-num text-[var(--bi-ink)]">
               {pctTexto(totals.gapPctMesesCerrados)}
-            </span>
-            —. {enCurso ? "El mes en curso va aparte, abajo." : null}
+            </span>{" "}
+            de lo que registra la contabilidad—. {enCurso ? "El mes en curso va aparte, abajo." : null}
           </p>
         </div>
       </div>
@@ -138,16 +143,23 @@ export function ConciliacionCard({ data }: { data: Reconciliation }) {
       {/* ---------- tabla por mes ---------- */}
       <div className="-mx-1 mt-4 overflow-x-auto">
         <table className="w-full border-collapse text-[13px] sm:min-w-[440px]">
+          {/* `caption` y `scope`, como la tabla de Movimientos — A157. Ésta los
+              tenía en cero y la otra los seis: mismo patrón, la de al lado sin
+              arreglar. */}
+          <caption className="sr-only">
+            Mes a mes: lo que suman las revisiones, lo que registra la
+            contabilidad, y la diferencia entre las dos
+          </caption>
           <thead>
             <tr className="text-[10px] uppercase tracking-[0.12em] text-[var(--bi-ink-3)]">
-              <th className="px-1 py-2 text-left font-medium">Mes</th>
-              <th className="hidden px-1 py-2 text-right font-medium sm:table-cell">
+              <th scope="col" className="px-1 py-2 text-left font-medium">Mes</th>
+              <th scope="col" className="hidden px-1 py-2 text-right font-medium sm:table-cell">
                 Revisiones
               </th>
-              <th className="hidden px-1 py-2 text-right font-medium sm:table-cell">
+              <th scope="col" className="hidden px-1 py-2 text-right font-medium sm:table-cell">
                 Contabilidad
               </th>
-              <th className="px-1 py-2 text-right font-medium">Diferencia</th>
+              <th scope="col" className="px-1 py-2 text-right font-medium">Diferencia</th>
             </tr>
           </thead>
           <tbody>

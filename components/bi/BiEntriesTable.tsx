@@ -125,8 +125,17 @@ export function BiEntriesTable({
                     ) : null}
                   </span>
                 </td>
-                <td className="max-w-[220px] px-4 py-3 text-[13px] text-[var(--bi-ink-3)]">
-                  <span className="block truncate">
+                {/**
+                  * **Envuelve, no trunca — A157.** Medido a 375 px: «Hyundai
+                  * Tucson 2021 — al entregar el reporte» necesita 295 px y tenía
+                  * 188, o sea que se ocultaba el 36% **de la única columna que
+                  * dice cuál carro generó el ingreso**. Es la misma decisión que
+                  * A135 tomó para la etiqueta de variación y A149 para el hint
+                  * de las tarjetas: cuando lo que se corta es lo que da sentido
+                  * a la fila, se parte en dos líneas.
+                  */}
+                <td className="max-w-[220px] px-4 py-3 text-[13px] leading-snug text-[var(--bi-ink-3)]">
+                  <span className="block break-words">
                     {[e.tecnico, e.localidad, e.note]
                       .filter(Boolean)
                       .join(" · ") || "—"}

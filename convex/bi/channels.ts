@@ -247,12 +247,27 @@ export async function channelRevenueImpl(
   let rowsAtribuidas = 0;
   let ingresosAtribuidosCRC = 0;
   let mesesSinPautaRegistrada = 0;
+  /**
+   * **La pauta del numerador es la de los MISMOS meses del denominador — A157.**
+   *
+   * `publicidadTotal` sumaba **todos** los meses con gasto anotado, y
+   * `rowsAtribuidas` solo acumula los meses en que Mercadeo **además** tuvo
+   * revisiones. Un mes con pauta y sin revisiones de Mercadeo entraba al
+   * numerador y no al denominador, y al revés en `retornoPorColon`.
+   *
+   * **Hoy no dispara**: los 14 meses con pauta tienen todos revisiones de
+   * Mercadeo, y el cálculo correcto da los mismos ₡9.402 y 6,61× que ya muestra
+   * la pantalla. Es deuda latente justo en el KPI que A149 acaba de rotular con
+   * su base — habría quedado un rótulo correcto sobre una cuenta que no lo es.
+   */
+  let pautaAtribuida = 0;
   for (const [ym, mes] of porMes) {
     const delCanal = mes.get(CANAL_CON_PAUTA);
     if (!delCanal) continue;
     if ((publicidadPorMes.get(ym) ?? 0) > 0) {
       rowsAtribuidas += delCanal.rows;
       ingresosAtribuidosCRC += delCanal.ingresosCRC;
+      pautaAtribuida += publicidadPorMes.get(ym) ?? 0;
     } else {
       mesesSinPautaRegistrada++;
     }
@@ -297,10 +312,10 @@ export async function channelRevenueImpl(
       ingresosAtribuidosCRC,
       rowsCanalTotal,
       costoPorRevisionCRC:
-        rowsAtribuidas > 0 ? Math.round(publicidadTotal / rowsAtribuidas) : 0,
+        rowsAtribuidas > 0 ? Math.round(pautaAtribuida / rowsAtribuidas) : 0,
       retornoPorColon:
-        publicidadTotal > 0
-          ? redondear(ingresosAtribuidosCRC / publicidadTotal, 2)
+        pautaAtribuida > 0
+          ? redondear(ingresosAtribuidosCRC / pautaAtribuida, 2)
           : 0,
     },
     /* La `nota` que viajaba acá no la pintaba ningún JSX — A151. Lo que decía

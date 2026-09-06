@@ -219,12 +219,23 @@ function signo(n: number, moneda: string): string {
   return `${s}${monto(Math.abs(n), moneda)}`;
 }
 
+/**
+ * **Los miles con punto, no con espacio — A157.**
+ *
+ * Esto usaba `toLocaleString("es-CR")`, que es **exactamente lo que prohíbe el
+ * docblock de `lib/bi-format`**: `Intl` con `es-CR` agrupa con un espacio fino
+ * (`₡941 000`) y en Costa Rica se escribe `₡941.000`. La tarjeta mezclaba las
+ * dos formas en la misma pantalla —`₡941 000` al lado de `₡3.747.000`— porque
+ * era una copia privada de `formatCRC` que se equivocó.
+ *
+ * No se llama a `formatCRC` directo porque acá hay dos monedas y hasta dos
+ * decimales; se reusa su agrupador.
+ */
 function monto(n: number, moneda: string): string {
   const simbolo = moneda === "USD" ? "$" : "₡";
-  const entero = Math.abs(n) >= 1000 ? Math.round(Math.abs(n)) : Math.abs(n);
-  const txt = entero.toLocaleString("es-CR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-  return `${simbolo}${txt}`;
+  const abs = Math.abs(n);
+  const entero = abs >= 1000 ? Math.round(abs) : abs;
+  const [ent, dec] = entero.toFixed(entero % 1 === 0 ? 0 : 2).split(".");
+  const conPuntos = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${simbolo}${conPuntos}${dec ? "," + dec : ""}`;
 }

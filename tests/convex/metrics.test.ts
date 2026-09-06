@@ -194,8 +194,19 @@ describe("los montos de ₡1.000", () => {
     expect(res.counts.unifiedTotal).toBe(2);
     expect(res.counts.unifiedSinPlaceholder).toBe(1);
     expect(res.counts.placeholderRows).toBe(1);
-    // El ingreso los suma igual: es lo que se cobró, aunque sea simbólico.
-    expect(res.totalAmountCRC).toBe(61_000);
+    /**
+     * **A157 — se resolvió una contradicción de tres puntas.** El docblock del
+     * módulo decía «cuentan como revisión pero **NO aportan ingreso**», el
+     * título de esta prueba decía lo mismo, y su assert decía lo contrario con
+     * un comentario que lo defendía («es lo que se cobró, aunque sea
+     * simbólico»). El código sumaba.
+     *
+     * Se resolvió a favor de lo documentado: un ₡1.000 del histórico **no es un
+     * cobro de ₡1.000**, es una fila a la que nunca se le anotó el monto. Por
+     * eso existe `unifiedSinPlaceholder`. Impacto hoy: **₡0** — en producción
+     * `placeholderRows` es 0.
+     */
+    expect(res.totalAmountCRC).toBe(60_000);
   });
 });
 

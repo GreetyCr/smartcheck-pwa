@@ -55,7 +55,8 @@ export const TOP_HALLAZGOS = 12;
  * Un ítem entra al ranking a partir de esta cantidad de evaluaciones.
  *
  * Sin un piso, un ítem evaluado **una vez** y con hallazgo esa vez encabeza la
- * lista con 100%. El umbral es bajo a propósito —hay 146 revisiones, no miles—
+ * lista con 100%. El umbral es bajo a propósito —son cientos de revisiones,
+ * no miles: 172 al 6-set-2026—
  * pero tiene que existir, y los que quedan fuera se cuentan para que el recorte
  * sea visible y no un silencio.
  */
@@ -197,7 +198,8 @@ const pct = (x: number, d: number) => (d > 0 ? redondear((x / d) * 100, 1) : 0);
  * Cómputo plano que recibe `ctx` (A41: una `query` no puede `ctx.runQuery`, así
  * que la internal y el wrapper público comparten este helper).
  *
- * Lee las 18 tablas de sección enteras. Es aceptable **hoy**: son 146 revisiones
+ * Lee las 18 tablas de sección enteras. Es aceptable **hoy**: son 172 revisiones
+ * al 6-set-2026
  * y ~1.900 documentos en total. Si la app llegara a decenas de miles habría que
  * materializar por revisión al guardar la sección, no al leer.
  */
@@ -214,27 +216,6 @@ export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
   );
   const permitidas = new Set(inspecciones.map((r) => String(r._id)));
   const entregadas = inspecciones.filter((r) => r.reportDeliveredAt != null);
-
-  /* ---------------------------- condición ---------------------------------- */
-  const porCondicion = new Map<number, number>();
-  let sinDato = 0;
-  for (const r of inspecciones) {
-    const c = r.biVehicleCondition;
-    if (c == null) sinDato++;
-    else porCondicion.set(c, (porCondicion.get(c) ?? 0) + 1);
-  }
-  const conCondicion = inspecciones.length - sinDato;
-  const niveles = [1, 2, 3].map((nivel) => {
-    const rows = porCondicion.get(nivel) ?? 0;
-    return {
-      nivel,
-      etiqueta: CONDICION[nivel] ?? `Nivel ${nivel}`,
-      rows,
-      // Sobre las que SÍ tienen dato: incluir las que no lo tienen en el
-      // denominador haría ver a todos los niveles más raros de lo que son.
-      pct: pct(rows, conCondicion),
-    };
-  });
 
   /* ---------------------------- hallazgos ---------------------------------- */
   type Acum = { hallazgos: number; evaluados: number };
@@ -297,6 +278,41 @@ export async function operacionImpl(ctx: QueryCtx, filtros: FilterArgs = {}) {
     SECTIONS_CONFIG.find((s) => s.table === table)?.items.find(
       (i) => i.key === key,
     )?.label ?? key;
+
+  /* ---------------------------- condición ---------------------------------- */
+  /**
+   * **Corre sobre las evaluadas, no sobre todas — A157.**
+   *
+   * Recorría `inspecciones` enteras mientras el encabezado de la pantalla
+   * declara `conChecklist`. En producción son 172 contra 170: la tarjeta decía
+   * «166 con dato» y «6 no traen esta nota» bajo un título que dice 170, así que
+   * quien restara obtenía 164.
+   *
+   * Son dos filas y el daño es chico. Lo que no lo es: **es el patrón del
+   * subconjunto sin su universo dentro de la misma pantalla que A151 acababa de
+   * arreglar por ese patrón** — se le puso el «de N» a cada barra de secciones y
+   * se dejó esta tarjeta corriendo sobre otro conjunto.
+   */
+  const porCondicion = new Map<number, number>();
+  let sinDato = 0;
+  for (const r of inspecciones) {
+    if (!revisionesEvaluadas.has(String(r._id))) continue;
+    const c = r.biVehicleCondition;
+    if (c == null) sinDato++;
+    else porCondicion.set(c, (porCondicion.get(c) ?? 0) + 1);
+  }
+  const conCondicion = revisionesEvaluadas.size - sinDato;
+  const niveles = [1, 2, 3].map((nivel) => {
+    const rows = porCondicion.get(nivel) ?? 0;
+    return {
+      nivel,
+      etiqueta: CONDICION[nivel] ?? `Nivel ${nivel}`,
+      rows,
+      // Sobre las que SÍ tienen dato: incluir las que no lo tienen en el
+      // denominador haría ver a todos los niveles más raros de lo que son.
+      pct: pct(rows, conCondicion),
+    };
+  });
 
   const evaluadas = revisionesEvaluadas.size;
   const totalHallazgos = [...hallazgosPorRevision.values()].reduce(

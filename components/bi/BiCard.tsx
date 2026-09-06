@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export function BiCard({
   title,
   subtitle,
+  titleAs = "h2",
   action,
   children,
   className,
@@ -13,6 +14,14 @@ export function BiCard({
 }: {
   title?: string;
   subtitle?: string;
+  /**
+   * Nivel del título. Por omisión `h2`, que es lo correcto **debajo** del `h1`
+   * de la pantalla. Se baja a `p` en las tarjetas que se pintan **antes** del
+   * `h1` —hoy solo el interruptor del bot en Leads—: dos `h2` antes del `h1`
+   * rompen el orden de encabezados y un lector de pantalla los anuncia como
+   * secciones de algo que todavía no empezó (A157, WCAG 1.3.1).
+   */
+  titleAs?: "h2" | "p";
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -40,9 +49,15 @@ export function BiCard({
               375 px, no supuesto. Con una base de 160 px el título se planta y
               la acción baja sola al renglón siguiente cuando no cabe. */}
           <div className="min-w-0 flex-1 basis-40">
-            <h2 className="text-[15px] font-semibold text-[var(--bi-ink)]">
-              {title}
-            </h2>
+            {titleAs === "p" ? (
+              <p className="text-[15px] font-semibold text-[var(--bi-ink)]">
+                {title}
+              </p>
+            ) : (
+              <h2 className="text-[15px] font-semibold text-[var(--bi-ink)]">
+                {title}
+              </h2>
+            )}
             {subtitle ? (
               <p className="mt-0.5 text-xs text-[var(--bi-ink-3)]">{subtitle}</p>
             ) : null}

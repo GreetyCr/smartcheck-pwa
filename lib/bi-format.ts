@@ -57,6 +57,7 @@ export function formatInt(n: number): string {
   return NUM.format(n);
 }
 
+/* En Costa Rica setiembre se abrevia «set», no «sep» ni «sept» (A157). */
 const MONTHS_SHORT = [
   "ene",
   "feb",
@@ -66,7 +67,7 @@ const MONTHS_SHORT = [
   "jun",
   "jul",
   "ago",
-  "sep",
+  "set",
   "oct",
   "nov",
   "dic",
@@ -106,14 +107,25 @@ export function formatMonthLong(yearMonth: string): string {
   return `${long[Number(m) - 1] ?? m} ${y}`;
 }
 
-/** epoch ms → `"15 jul 2026"` en zona de Costa Rica. */
+/**
+ * epoch ms → `"15 jul 2026"` en zona de Costa Rica.
+ *
+ * **El mes sale de `MONTHS_SHORT`, no de `Intl` — A157.** `Intl` con `es-CR`
+ * abrevia setiembre como **«sept»**, y el panel lo escribía de tres formas a la
+ * vez: «SEP» en los ejes, «sept» acá y «setiembre» en la prosa y en los cuatro
+ * documentos del cliente. En Costa Rica es **«set»**.
+ *
+ * El día y el año sí salen de `Intl`, que es quien sabe de zona horaria.
+ */
 export function formatDateCR(ms: number): string {
-  return new Intl.DateTimeFormat("es-CR", {
+  const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Costa_Rica",
-    day: "2-digit",
-    month: "short",
     year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(new Date(ms));
+  const [y, m, d] = partes.split("-");
+  return `${d} ${MONTHS_SHORT[Number(m) - 1] ?? m} ${y}`;
 }
 
 /** epoch ms → `"2026-07-15"` (valor para `<input type="date">`, zona CR). */

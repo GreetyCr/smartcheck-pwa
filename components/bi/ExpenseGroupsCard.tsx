@@ -181,6 +181,10 @@ export function ExpenseGroupsCard({
                 <span className="bi-num text-[14px] tabular-nums text-[var(--bi-ink)]">
                   {formatCRC(g.amountCRC)}
                 </span>
+                {/* El porcentaje es sobre el TOTAL; la barra está normalizada
+                    al grupo más grande, así que el primero siempre llena el
+                    carril. Las proporciones entre barras sí corresponden, pero
+                    sin decirlo la más larga se lee como «todo» (A157). */}
                 <span className="bi-num text-[11px] tabular-nums text-[var(--bi-ink-3)]">
                   {formatPct(g.pct)}
                 </span>
@@ -206,7 +210,10 @@ export function ExpenseGroupsCard({
                   key={e.etiqueta}
                   className="flex items-baseline justify-between gap-3 text-[12.5px]"
                 >
-                  <span className="min-w-0 truncate text-[var(--bi-ink-3)]">
+                  {/* Sin `truncate`: el nombre del proveedor es lo que dice a
+                      quién se le pagó, y a 375 px «PRIMER PAGO DASHBOARD»
+                      necesitaba 176 px en 165 (A157). Envuelve. */}
+                  <span className="min-w-0 break-words text-[var(--bi-ink-3)]">
                     {e.etiqueta}
                     {e.rows > 1 ? <span className="opacity-70"> ×{e.rows}</span> : null}
                   </span>
@@ -231,7 +238,13 @@ export function ExpenseGroupsCard({
       <p className="mt-4 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
         Es la misma plata, agrupada — no cambia la utilidad. Cada proveedor sale
         del renglón con que el gasto entró, así que el total de acá no es el de
-        una sola categoría del gráfico de arriba.
+        una sola categoría del gráfico de arriba.{" "}
+        <b className="text-[var(--bi-ink-2)]">
+          Las barras se miden contra el grupo más grande
+        </b>
+        , no contra el total: por eso el primero llena la barra entera. El
+        porcentaje de al lado sí es sobre el total, y dentro de cada grupo el de
+        cada proveedor es sobre su grupo.
       </p>
 
       {sinClasificar ? (

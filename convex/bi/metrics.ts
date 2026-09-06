@@ -30,6 +30,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
+import { isPlaceholderCharge } from "./lib/financeRules";
 import { yearMonth as ymFromMs, isoDate } from "./lib/dates";
 import { esRecompra } from "./matches";
 import { canonicalBrand } from "./lib/marcas";
@@ -523,7 +524,7 @@ export async function buildInspectionsAll(ctx: QueryCtx): Promise<{
     eraRich.push({
       date,
       amountCRC: amount,
-      isPlaceholderIncome: amount === 1000,
+      isPlaceholderIncome: isPlaceholderCharge(amount),
       province: eraLoc.province,
       agency: eraLoc.agency,
       engineType: normalizeEngine(r.engineType),
@@ -556,7 +557,7 @@ export async function buildInspectionsAll(ctx: QueryCtx): Promise<{
     legacyRich.push({
       date: r.inspectionDate,
       amountCRC: amount,
-      isPlaceholderIncome: amount === 1000,
+      isPlaceholderIncome: isPlaceholderCharge(amount),
       province: legLoc.province,
       agency: legLoc.agency,
       engineType: normalizeEngine(r.engineType),
@@ -697,8 +698,25 @@ export const inspectionsAll = internalQuery({
     let withAmount = 0;
     let totalAmountCRC = 0;
     let placeholderRows = 0;
+    /**
+     * **El placeholder no suma al ingreso — A157.**
+     *
+     * El docblock de este módulo lo afirma desde siempre («cuentan como revisión
+     * pero **NO aportan ingreso**») y el código lo sumaba igual: la bandera solo
+     * se contaba. Y se calculaba con `amount === 1000`, una igualdad exacta,
+     * mientras `financeRules` y `matches` usan `<= 1000` y `> 1000` — que sí son
+     * complementarios entre sí. Un cobro de ₡500 era placeholder para dos de los
+     * tres y un ingreso normal para éste.
+     *
+     * Hoy `placeholderRows` es 0 en producción, así que **el impacto es ₡0**;
+     * se activa en cuanto exista una fila placeholder, que es justo para lo que
+     * existe la bandera. Ahora los tres importan el mismo predicado.
+     */
     for (const r of filtered) {
-      if (r.isPlaceholderIncome) placeholderRows++;
+      if (r.isPlaceholderIncome) {
+        placeholderRows++;
+        continue;
+      }
       if (r.amountCRC !== undefined) {
         withAmount++;
         totalAmountCRC += r.amountCRC;
