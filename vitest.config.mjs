@@ -48,6 +48,29 @@ export default defineConfig({
         },
       },
       {
+        /**
+         * **La interfaz, que hasta el 6-set no tenía ni una prueba.**
+         *
+         * `components/**` y `app/**` no estaban en ningún glob, y eso explica el
+         * dato más incómodo de la semana: de los 38 defectos de la revisión y
+         * los 22 del QA, **las 681 pruebas encontraron cero**. No es que fueran
+         * malas — protegían reglas de negocio, que es su trabajo. Es que ninguno
+         * de esos defectos rompía una regla: rompían **la lectura**, y eso vive
+         * en el render.
+         *
+         * Lo que va acá no es cobertura por cobertura. Cada archivo fija un
+         * defecto que ya ocurrió, con su id, para que la próxima vez el error
+         * hable antes de llegar a la pantalla.
+         */
+        extends: true,
+        test: {
+          name: "ui",
+          environment: "happy-dom",
+          include: ["components/**/*.test.tsx"],
+          setupFiles: ["components/test-setup.ts"],
+        },
+      },
+      {
         extends: true,
         test: {
           name: "lib",
