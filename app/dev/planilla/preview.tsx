@@ -107,7 +107,22 @@ export function PlanillaPreview() {
             onMes={setMes}
             guardado={{
               yearMonth: mes,
-              insumos: {
+              /**
+               * **`insumos` solo cuando el mes NO está bloqueado — A153.**
+               *
+               * Antes iba siempre, así que en julio se pintaban a la vez el
+               * aviso «registrarlo acá **las duplicaría**» y el pie «confirmar
+               * otra vez **corrige**; no las duplica». **En producción eso no
+               * pasa** —`registrarPlanilla` lanza si el mes ya trae líneas de
+               * otra vía, así que un mes bloqueado no llega a tener insumos—,
+               * pero acá se veían las dos frases contradiciéndose sobre el único
+               * botón que Esteban aprieta cada mes.
+               *
+               * Lo encontró el QA de usuario cero y lo puso de primero. Importa
+               * el doble porque **las capturas del manual salen de estas
+               * páginas**: la foto habría enseñado una contradicción inexistente.
+               */
+              insumos: bloqueado ? null : {
                 salarioCRC: 430_000,
                 comisionesCRC: 73_000,
                 baseImponibleCRC: 1_000_000,
@@ -130,7 +145,10 @@ export function PlanillaPreview() {
                     revisiones: 2,
                   },
                   {
-                    fecha: "2026-09-01",
+                    /* 31 de agosto, no 1.º de setiembre. Estaba inventada acá y
+                       contradecía a `convex/bi/lib/feriados.ts` y al diccionario
+                       que ya recibió Esteban — A153. */
+                    fecha: "2026-08-31",
                     nombre: "Día de la Persona Negra y la Cultura Afrocostarricense",
                     tipo: "no_obligatorio" as const,
                     tecnico: "Sergio Smartcheck",

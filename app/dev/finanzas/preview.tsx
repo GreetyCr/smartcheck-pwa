@@ -182,26 +182,58 @@ import { cn } from "@/lib/utils";
  * verse igual en cada carga.
  */
 const MONTHS: FinanceSummary["months"] = [
-  { yearMonth: "2026-01", rows: 38, income: 3_180_000, expense: 1_940_500, utilidad: 1_239_500, marginPct: 38.98 },
-  { yearMonth: "2026-02", rows: 41, income: 3_640_000, expense: 2_120_800, utilidad: 1_519_200, marginPct: 41.74 },
-  { yearMonth: "2026-03", rows: 35, income: 2_910_000, expense: 2_305_400, utilidad: 604_600, marginPct: 20.78 },
-  { yearMonth: "2026-04", rows: 44, income: 4_120_000, expense: 2_260_100, utilidad: 1_859_900, marginPct: 45.14 },
-  { yearMonth: "2026-05", rows: 47, income: 4_385_000, expense: 2_480_600, utilidad: 1_904_400, marginPct: 43.43 },
-  { yearMonth: "2026-06", rows: 45, income: 5_396_633, expense: 2_636_670, utilidad: 2_759_963, marginPct: 51.14 },
-  { yearMonth: "2026-07", rows: 39, income: 3_747_000, expense: 2_636_670, utilidad: 1_110_330, marginPct: 29.63 },
+  { yearMonth: "2025-07", rows: 40, income: 4_011_000, expense: 1_927_710, utilidad: 2_083_290, marginPct: 51.94, viaticoAmountCRC: 282_000, porCategoria: [{ category: "salario", amountCRC: 644_000, rows: 9 }, { category: "publicidad", amountCRC: 481_510, rows: 6 }, { category: "otros", amountCRC: 475_200, rows: 7 }, { category: "gasolina", amountCRC: 282_000, rows: 8 }, { category: "seguro", amountCRC: 45_000, rows: 1 }] },
+  { yearMonth: "2025-08", rows: 33, income: 2_219_373, expense: 1_517_100, utilidad: 702_273, marginPct: 31.64, viaticoAmountCRC: 132_700, porCategoria: [{ category: "otros", amountCRC: 475_200, rows: 7 }, { category: "publicidad", amountCRC: 470_200, rows: 5 }, { category: "salario", amountCRC: 394_000, rows: 7 }, { category: "gasolina", amountCRC: 120_700, rows: 5 }, { category: "seguro", amountCRC: 45_000, rows: 1 }, { category: "comida", amountCRC: 12_000, rows: 1 }] },
+  { yearMonth: "2025-09", rows: 40, income: 3_673_650, expense: 1_977_539, utilidad: 1_696_111, marginPct: 46.17, viaticoAmountCRC: 295_008, porCategoria: [{ category: "otros", amountCRC: 614_636, rows: 7 }, { category: "salario", amountCRC: 596_239, rows: 9 }, { category: "publicidad", amountCRC: 426_314, rows: 6 }, { category: "gasolina", amountCRC: 279_177, rows: 9 }, { category: "seguro", amountCRC: 45_342, rows: 1 }, { category: "comida", amountCRC: 15_831, rows: 1 }] },
+  { yearMonth: "2025-10", rows: 35, income: 2_448_215, expense: 1_645_709, utilidad: 802_506, marginPct: 32.78, viaticoAmountCRC: 162_331, porCategoria: [{ category: "otros", amountCRC: 647_283, rows: 10 }, { category: "salario", amountCRC: 402_022, rows: 4 }, { category: "publicidad", amountCRC: 388_914, rows: 5 }, { category: "gasolina", amountCRC: 149_743, rows: 7 }, { category: "seguro", amountCRC: 45_159, rows: 1 }, { category: "comida", amountCRC: 12_588, rows: 1 }] },
+  { yearMonth: "2025-11", rows: 34, income: 3_328_975, expense: 1_648_420, utilidad: 1_680_555, marginPct: 50.48, viaticoAmountCRC: 160_407, porCategoria: [{ category: "otros", amountCRC: 641_893, rows: 10 }, { category: "salario", amountCRC: 408_549, rows: 5 }, { category: "publicidad", amountCRC: 392_788, rows: 5 }, { category: "gasolina", amountCRC: 152_868, rows: 7 }, { category: "seguro", amountCRC: 44_783, rows: 1 }, { category: "comida", amountCRC: 7_539, rows: 1 }] },
+  { yearMonth: "2025-12", rows: 23, income: 1_431_537, expense: 1_445_833, utilidad: -14_296, marginPct: -1, viaticoAmountCRC: 76_095, porCategoria: [{ category: "otros", amountCRC: 660_948, rows: 10 }, { category: "publicidad", amountCRC: 368_276, rows: 4 }, { category: "salario", amountCRC: 295_822, rows: 3 }, { category: "gasolina", amountCRC: 76_095, rows: 3 }, { category: "seguro", amountCRC: 44_692, rows: 1 }] },
+  { yearMonth: "2026-01", rows: 41, income: 3_913_872, expense: 2_003_327, utilidad: 1_910_545, marginPct: 48.81, viaticoAmountCRC: 245_529, porCategoria: [{ category: "otros", amountCRC: 642_671, rows: 13 }, { category: "publicidad", amountCRC: 460_051, rows: 5 }, { category: "salario", amountCRC: 426_792, rows: 1 }, { category: "impuestos", amountCRC: 158_806, rows: 1 }, { category: "gasolina", amountCRC: 123_340, rows: 4 }, { category: "bonos", amountCRC: 122_189, rows: 4 }, { category: "seguro", amountCRC: 44_664, rows: 1 }, { category: "mantenimiento", amountCRC: 24_814, rows: 1 }] },
+  { yearMonth: "2026-02", rows: 41, income: 3_737_538, expense: 1_791_344, utilidad: 1_946_194, marginPct: 52.07, viaticoAmountCRC: 145_042, porCategoria: [{ category: "otros", amountCRC: 634_787, rows: 13 }, { category: "publicidad", amountCRC: 458_195, rows: 5 }, { category: "salario", amountCRC: 404_983, rows: 1 }, { category: "gasolina", amountCRC: 98_892, rows: 4 }, { category: "bonos", amountCRC: 46_150, rows: 3 }, { category: "seguro", amountCRC: 42_382, rows: 1 }, { category: "impuestos", amountCRC: 42_382, rows: 1 }, { category: "comision", amountCRC: 40_027, rows: 2 }, { category: "mantenimiento", amountCRC: 23_546, rows: 1 }] },
+  { yearMonth: "2026-03", rows: 43, income: 3_227_500, expense: 2_786_017, utilidad: 441_483, marginPct: 13.68, viaticoAmountCRC: 328_383, porCategoria: [{ category: "salario", amountCRC: 1_138_756, rows: 6 }, { category: "otros", amountCRC: 674_000, rows: 13 }, { category: "publicidad", amountCRC: 459_878, rows: 5 }, { category: "gasolina", amountCRC: 313_833, rows: 5 }, { category: "comision", amountCRC: 86_000, rows: 2 }, { category: "mantenimiento", amountCRC: 50_000, rows: 1 }, { category: "seguro", amountCRC: 49_000, rows: 2 }, { category: "bonos", amountCRC: 14_550, rows: 2 }] },
+  { yearMonth: "2026-04", rows: 48, income: 3_971_750, expense: 3_072_113, utilidad: 899_637, marginPct: 22.65, viaticoAmountCRC: 159_500, porCategoria: [{ category: "salario", amountCRC: 1_114_166, rows: 7 }, { category: "otros", amountCRC: 685_500, rows: 14 }, { category: "publicidad", amountCRC: 485_957, rows: 5 }, { category: "impuestos", amountCRC: 483_990, rows: 1 }, { category: "gasolina", amountCRC: 106_000, rows: 4 }, { category: "bonos", amountCRC: 53_500, rows: 5 }, { category: "seguro", amountCRC: 53_000, rows: 2 }, { category: "mantenimiento", amountCRC: 50_000, rows: 1 }, { category: "comision", amountCRC: 40_000, rows: 1 }] },
+  { yearMonth: "2026-05", rows: 43, income: 4_376_000, expense: 2_676_086, utilidad: 1_699_914, marginPct: 38.85, viaticoAmountCRC: 140_000, porCategoria: [{ category: "salario", amountCRC: 1_116_641, rows: 7 }, { category: "otros", amountCRC: 701_500, rows: 14 }, { category: "publicidad", amountCRC: 474_045, rows: 5 }, { category: "gasolina", amountCRC: 130_000, rows: 4 }, { category: "impuestos", amountCRC: 91_000, rows: 1 }, { category: "seguro", amountCRC: 53_000, rows: 2 }, { category: "mantenimiento", amountCRC: 50_000, rows: 1 }, { category: "comision", amountCRC: 49_900, rows: 1 }, { category: "bonos", amountCRC: 10_000, rows: 1 }] },
+  { yearMonth: "2026-06", rows: 45, income: 5_618_000, expense: 2_858_037, utilidad: 2_759_963, marginPct: 49.13, viaticoAmountCRC: 132_000, porCategoria: [{ category: "salario", amountCRC: 1_496_037, rows: 7 }, { category: "otros", amountCRC: 578_500, rows: 14 }, { category: "publicidad", amountCRC: 301_000, rows: 4 }, { category: "impuestos", amountCRC: 130_000, rows: 1 }, { category: "gasolina", amountCRC: 110_000, rows: 4 }, { category: "comision", amountCRC: 87_500, rows: 1 }, { category: "seguro", amountCRC: 83_000, rows: 2 }, { category: "mantenimiento", amountCRC: 50_000, rows: 1 }, { category: "bonos", amountCRC: 22_000, rows: 4 }] },
+  { yearMonth: "2026-07", rows: 46, income: 4_546_000, expense: 3_035_269, utilidad: 1_510_731, marginPct: 33.23, viaticoAmountCRC: 143_000, porCategoria: [{ category: "salario", amountCRC: 1_492_413, rows: 7 }, { category: "otros", amountCRC: 779_356, rows: 16 }, { category: "publicidad", amountCRC: 272_000, rows: 4 }, { category: "impuestos", amountCRC: 130_000, rows: 1 }, { category: "gasolina", amountCRC: 110_000, rows: 4 }, { category: "seguro", amountCRC: 83_000, rows: 2 }, { category: "comision", amountCRC: 73_000, rows: 1 }, { category: "mantenimiento", amountCRC: 62_500, rows: 2 }, { category: "bonos", amountCRC: 33_000, rows: 4 }] },
+  { yearMonth: "2026-08", rows: 138, income: 5_557_000, expense: 2_994_835, utilidad: 2_562_165, marginPct: 46.11, viaticoAmountCRC: 169_000, porCategoria: [{ category: "salario", amountCRC: 1_726_076, rows: 9 }, { category: "impuestos", amountCRC: 402_109, rows: 3 }, { category: "otros", amountCRC: 353_500, rows: 18 }, { category: "gasolina", amountCRC: 181_000, rows: 6 }, { category: "comision", amountCRC: 103_600, rows: 4 }, { category: "comida", amountCRC: 83_350, rows: 6 }, { category: "seguro", amountCRC: 75_000, rows: 1 }, { category: "publicidad", amountCRC: 70_200, rows: 1 }] },
+  { yearMonth: "2026-09", rows: 13, income: 849_000, expense: 0, utilidad: 849_000, marginPct: 100, viaticoAmountCRC: 0, porCategoria: [] },
 ];
 
+/**
+ * Respuesta **literal** de `bi/metrics:financeSummary` en producción, **6-set-2026**.
+ *
+ * Antes esta muestra venía del 25-ago y las demás páginas de `/dev` de otras
+ * fechas: el QA de usuario cero comparó pantallas y concluyó que el panel se
+ * contradecía. **En producción los números cuadran** — lo que no cuadraba eran
+ * las muestras entre sí (A153).
+ *
+ * `porCategoria` es lo que arregla A153: el reparto del gasto ahora lo suma el
+ * servidor sobre TODAS las filas, no el cliente sobre las 200 que alcanzó a
+ * pedir. Su suma es exactamente `totals.expense`.
+ */
 const SUMMARY: FinanceSummary = {
   months: MONTHS,
   totals: {
-    rows: 505,
-    income: 45_704_410,
-    expense: 28_005_909,
-    utilidad: 17_698_501,
-    marginPct: 38.72,
-    viaticoCount: 97,
-    viaticoAmountCRC: 3_202_985,
+    rows: 663,
+    income: 52_909_410,
+    expense: 31_379_339,
+    utilidad: 21_530_071,
+    marginPct: 40.69,
+    viaticoCount: 100,
+    viaticoAmountCRC: 2_570_995,
   },
+  porCategoria: [
+    { category: "salario", amountCRC: 11_656_496, rows: 82 },
+    { category: "otros", amountCRC: 8_564_974, rows: 166 },
+    { category: "publicidad", amountCRC: 5_509_328, rows: 65 },
+    { category: "gasolina", amountCRC: 2_233_648, rows: 74 },
+    { category: "impuestos", amountCRC: 1_438_287, rows: 9 },
+    { category: "seguro", amountCRC: 753_022, rows: 19 },
+    { category: "comision", amountCRC: 480_027, rows: 12 },
+    { category: "mantenimiento", amountCRC: 310_860, rows: 8 },
+    { category: "bonos", amountCRC: 301_389, rows: 23 },
+    { category: "comida", amountCRC: 131_308, rows: 10 },
+  ],
 };
 
 /**

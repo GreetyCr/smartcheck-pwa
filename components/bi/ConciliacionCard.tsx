@@ -53,22 +53,40 @@ export function ConciliacionCard({ data }: { data: Reconciliation }) {
     primerAuto !== null && enCurso?.yearMonth === primerAuto;
   const autosCerrados = cerrados.filter((m) => m.autoCaptura);
 
-  const estado = faltantes.length > 0
+  /**
+   * **El titular cuenta lo mismo que el subtítulo marca — A153.**
+   *
+   * Antes, si había **algún** mes con gap negativo, el titular decía solo cuántos
+   * eran ésos y **nunca nombraba `conProblema`**. Medido en producción el
+   * 6-set: de 14 meses cerrados hay **10 marcados** por pasarse del 5% y **2**
+   * con signo negativo — o sea **«2 meses…» encima de una lista con 10 filas
+   * marcadas**, bajo un subtítulo que promete marcar a partir del 5%.
+   *
+   * Ninguna de las dos frases era falsa por separado: **el titular contestaba
+   * otra pregunta que la que hace el rótulo de arriba**, y el lector no tiene
+   * cómo saber que cambiaron de pregunta. Cuando conviven las dos, se dicen las
+   * dos, y en ese orden: primero cuántos se salieron, después cuántos de ésos
+   * son del tipo que preocupa.
+   */
+  const meses = (n: number) => `${n} ${n === 1 ? "mes" : "meses"}`;
+  const estado = conProblema.length === 0
     ? {
-        Icon: CircleAlert,
-        color: "var(--bi-expense)",
-        titulo: `${faltantes.length === 1 ? "Un mes tiene" : `${faltantes.length} meses tienen`} revisiones que no aparecen en la contabilidad`,
+        Icon: Sparkles,
+        color: "var(--bi-good)",
+        titulo: "Todos los meses cerrados quedan dentro del margen",
       }
-    : conProblema.length > 0
+    : faltantes.length > 0
       ? {
-          Icon: TriangleAlert,
-          color: "var(--bi-warn)",
-          titulo: `${conProblema.length} ${conProblema.length === 1 ? "mes se pasa" : "meses se pasan"} del ${thresholdPct}% de diferencia`,
+          Icon: CircleAlert,
+          color: "var(--bi-expense)",
+          titulo:
+            `${meses(conProblema.length)} se ${conProblema.length === 1 ? "pasa" : "pasan"} del ${thresholdPct}%` +
+            `, y en ${faltantes.length === 1 ? "uno" : meses(faltantes.length)} hay revisiones que no aparecen en la contabilidad`,
         }
       : {
-          Icon: Sparkles,
-          color: "var(--bi-good)",
-          titulo: "Todos los meses cerrados quedan dentro del margen",
+          Icon: TriangleAlert,
+          color: "var(--bi-warn)",
+          titulo: `${meses(conProblema.length)} se ${conProblema.length === 1 ? "pasa" : "pasan"} del ${thresholdPct}% de diferencia`,
         };
 
   return (

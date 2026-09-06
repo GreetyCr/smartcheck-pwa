@@ -160,24 +160,49 @@ export function FinanceDashboard({
   const delta = (now: number, before: number | undefined) =>
     variacion(now, before, contraMes);
 
-  // Desglose de gastos por categoría del periodo visible (calculado sobre los
-  // movimientos ya cargados: completo para un mes).
-  const expenseByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of entries) {
-      if (e.kind !== "expense") continue;
-      map.set(e.category, (map.get(e.category) ?? 0) + e.amountCRC);
-    }
-    return [...map.entries()]
-      .map(([category, amountCRC]) => ({ category, amountCRC }))
-      .sort((a, b) => b.amountCRC - a.amountCRC);
-  }, [entries]);
+  /**
+   * **El reparto del gasto se suma en el servidor — A153.**
+   *
+   * Se calculaba acá sobre `entries`, y la pantalla abre **sin mes elegido**
+   * pidiendo `limit: 200`. Con 663 movimientos vivos, el reparto salía sobre los
+   * tres meses más recientes —**≈₡6,2M de ₡31,4M, un 19,8%**— bajo un subtítulo
+   * que decía «Movimientos cargados»: ni una palabra del negocio, ni el número,
+   * ni el rango.
+   *
+   * El comentario que estaba acá decía «completo para un mes», y era cierto —
+   * **cuando hay un mes puesto**. El estado por defecto no lo tiene, así que la
+   * frase describía el caso que no era el de siempre. **Un borde declarado deja
+   * de revisarse** (A148): por eso sobrevivió a dos rondas.
+   *
+   * Mismo error que A114 (el conteo de filas) y A146 (el monto cobrado), ahora
+   * en la pantalla de la plata. `porCategoria` llega opcional por la ventana
+   * entre despliegues (A115); mientras no llegue, la tarjeta lo dice en vez de
+   * mostrar un reparto a medias.
+   */
+  const mesElegido = selectedMonth
+    ? months.find((m) => m.yearMonth === selectedMonth)
+    : undefined;
 
-  const viaticoTotal = useMemo(
+  const catsDelServidor = selectedMonth
+    ? mesElegido?.porCategoria
+    : summary.porCategoria;
+
+  const expenseByCategory = useMemo(
     () =>
-      entries.reduce((sum, e) => (e.isViatico ? sum + e.amountCRC : sum), 0),
-    [entries],
+      (catsDelServidor ?? []).map((c) => ({
+        category: c.category,
+        amountCRC: c.amountCRC,
+      })),
+    [catsDelServidor],
   );
+
+  /** Del servidor también: el del periodo, no el de lo que alcanzó a llegar. */
+  const viaticoTotal = selectedMonth
+    ? (mesElegido?.viaticoAmountCRC ?? 0)
+    : totals.viaticoAmountCRC;
+
+  /** Cuántos movimientos de gasto sostienen el reparto. Va en el subtítulo. */
+  const gastosContados = (catsDelServidor ?? []).reduce((n, c) => n + c.rows, 0);
 
   const showFlash = (msg: string, ok = true) => {
     setFlash({ msg, ok });
@@ -315,11 +340,21 @@ export function FinanceDashboard({
 
         <BiCard
           title="Gastos por categoría"
+          /* **El subtítulo dice sobre qué suma — A153.** Decía «Movimientos
+             cargados»: ni una palabra del negocio, ni el número, ni el rango, y
+             era lo único que se interponía entre Esteban y un reparto del 19,8%
+             del gasto rotulado como el histórico. */
           subtitle={
-            selectedMonth ? formatMonthLong(selectedMonth) : "Movimientos cargados"
+            catsDelServidor == null
+              ? "Cargando…"
+              : `${
+                  selectedMonth ? formatMonthLong(selectedMonth) : "Todo el periodo"
+                } · ${formatInt(gastosContados)} ${
+                  gastosContados === 1 ? "movimiento" : "movimientos"
+                } de gasto`
           }
         >
-          {loadingEntries ? (
+          {catsDelServidor == null ? (
             <div className="space-y-4">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="space-y-2">
@@ -396,7 +431,7 @@ export function FinanceDashboard({
             )
           }
         >
-          {loadingEntries ? (
+          {catsDelServidor == null ? (
             <div className="space-y-2 pt-4">
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="bi-skeleton h-10 w-full rounded-lg" />

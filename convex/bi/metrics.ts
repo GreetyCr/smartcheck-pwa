@@ -818,6 +818,14 @@ export const financeSummaryReturns = v.object({
       expense: v.number(),
       utilidad: v.number(),
       marginPct: v.number(),
+      /** El reparto del gasto DE ESE MES — A153. Opcional por A115. */
+      porCategoria: v.optional(
+        v.array(
+          v.object({ category: v.string(), amountCRC: v.number(), rows: v.number() }),
+        ),
+      ),
+      /** Viáticos de ese mes, para que la nota al pie siga al mes elegido. */
+      viaticoAmountCRC: v.optional(v.number()),
     }),
   ),
   totals: v.object({
@@ -829,6 +837,22 @@ export const financeSummaryReturns = v.object({
     viaticoCount: v.number(),
     viaticoAmountCRC: v.number(),
   }),
+  /**
+   * **El gasto por categoría, sumado donde están TODAS las filas — A153.**
+   *
+   * La pantalla lo calculaba en el cliente sobre las filas que había recibido, y
+   * abre pidiendo **200** (sin mes elegido). Con 663 movimientos vivos eso
+   * dejaba el reparto sobre los tres meses más recientes —**≈₡6,2M de ₡31,4M,
+   * un 19,8%**— rotulado «Todo el histórico». Es el mismo error de A114 y A146
+   * (un total sumado donde llegaron los datos recortados), esta vez en la
+   * pantalla de la plata.
+   *
+   * Va **opcional** para no romper la ventana entre el deploy de Convex y el del
+   * frontend (A115).
+   */
+  porCategoria: v.optional(
+    v.array(v.object({ category: v.string(), amountCRC: v.number(), rows: v.number() })),
+  ),
 });
 
 /**
@@ -842,12 +866,33 @@ export function computeFinanceSummary(
   fromMs?: number,
   toMs?: number,
 ) {
+  /**
+   * **El reparto por categoría se acumula acá, junto a los totales — A153.**
+   *
+   * Se calculaba en el cliente sobre las filas recibidas, y la pantalla abre
+   * pidiendo 200 de 663. Acumularlo en el MISMO recorrido que los totales es lo
+   * que hace imposible que vuelvan a hablar de conjuntos distintos: no hay dos
+   * caminos que puedan desincronizarse.
+   */
+  type Cat = Map<string, { amountCRC: number; rows: number }>;
+  const suma = (m: Cat, cat: string, monto: number) => {
+    const c = m.get(cat) ?? { amountCRC: 0, rows: 0 };
+    c.amountCRC += monto;
+    c.rows++;
+    m.set(cat, c);
+  };
+  const orden = (m: Cat) =>
+    [...m.entries()]
+      .map(([category, c]) => ({ category, ...c }))
+      .sort((a, b) => b.amountCRC - a.amountCRC);
+
   const byMonth = new Map<
     string,
-    { rows: number; income: number; expense: number }
+    { rows: number; income: number; expense: number; cats: Cat; viatico: number }
   >();
   let viaticoCount = 0;
   let viaticoAmountCRC = 0;
+  const porCategoria: Cat = new Map();
   for (const r of rows) {
     if (r.isDeleted) continue;
     if (fromMs != null && r.date < fromMs) continue;
@@ -856,10 +901,21 @@ export function computeFinanceSummary(
       viaticoCount++;
       viaticoAmountCRC += r.amountCRC;
     }
-    const m = byMonth.get(r.yearMonth) ?? { rows: 0, income: 0, expense: 0 };
+    const m = byMonth.get(r.yearMonth) ?? {
+      rows: 0,
+      income: 0,
+      expense: 0,
+      cats: new Map() as Cat,
+      viatico: 0,
+    };
     m.rows++;
+    if (r.isViatico) m.viatico += r.amountCRC;
     if (r.kind === "income") m.income += r.amountCRC;
-    else m.expense += r.amountCRC;
+    else {
+      m.expense += r.amountCRC;
+      suma(m.cats, r.category, r.amountCRC);
+      suma(porCategoria, r.category, r.amountCRC);
+    }
     byMonth.set(r.yearMonth, m);
   }
   const pct = (util: number, inc: number) =>
@@ -873,6 +929,8 @@ export function computeFinanceSummary(
       expense: m.expense,
       utilidad: m.income - m.expense,
       marginPct: pct(m.income - m.expense, m.income),
+      porCategoria: orden(m.cats),
+      viaticoAmountCRC: m.viatico,
     }));
   const t = months.reduce(
     (acc, m) => ({
@@ -894,6 +952,7 @@ export function computeFinanceSummary(
       viaticoCount,
       viaticoAmountCRC,
     },
+    porCategoria: orden(porCategoria),
   };
 }
 

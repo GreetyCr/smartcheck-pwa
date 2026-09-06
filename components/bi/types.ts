@@ -5,6 +5,13 @@
  * muestra) comparten exactamente el mismo render.
  */
 
+/** Una categoría del reparto de gasto, sumada en el servidor (A153). */
+export type GastoPorCategoria = {
+  category: string;
+  amountCRC: number;
+  rows: number;
+};
+
 export type FinanceMonth = {
   yearMonth: string;
   rows: number;
@@ -12,6 +19,9 @@ export type FinanceMonth = {
   expense: number;
   utilidad: number;
   marginPct: number;
+  /** Opcionales por la ventana entre el deploy de Convex y el del frontend (A115). */
+  porCategoria?: GastoPorCategoria[];
+  viaticoAmountCRC?: number;
 };
 
 export type FinanceTotals = {
@@ -27,6 +37,8 @@ export type FinanceTotals = {
 export type FinanceSummary = {
   months: FinanceMonth[];
   totals: FinanceTotals;
+  /** Reparto del gasto de TODO el rango pedido. Opcional por A115. */
+  porCategoria?: GastoPorCategoria[];
 };
 
 /**
