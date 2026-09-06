@@ -29,8 +29,14 @@ const THEAD =
  * La lista completa de quienes convirtieron, consultable.
  *
  * Antes eran 12 filas sin forma de ver el resto. Se pagina y se filtra **del
- * lado del cliente** a propósito: con unos cientos de filas —299 al
+ * lado del cliente** a propósito: con unos cientos de filas —225 al
  * 6-set-2026— ir al servidor por cada página agrega latencia y no ahorra nada.
+ *
+ * **Ojo con confundir dos cifras parecidas:** 225 son los convertidos titulares
+ * (bandas alta y media, A29) y 299 es `matchesStats.validIncome`, que además
+ * incluye la banda baja. Escribí 299 acá por error el 6-set justo mientras
+ * arreglaba las cifras duras de los comentarios (A151) — la segunda cifra
+ * plausible es la trampa de este patrón, no la cifra ausente.
  *
  * El resumen del paginador siempre dice cuántas filas se ven, cuántas quedaron
  * tras el filtro y cuántas hay en total. Sin eso, un filtro puesto se confunde

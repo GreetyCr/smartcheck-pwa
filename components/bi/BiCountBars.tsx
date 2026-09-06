@@ -16,7 +16,8 @@ export type CountBarRow = {
  * no hace falta tooltip para leer un número.
  *
  * La escala es común a todas las filas (`total` si se pasa, si no el máximo).
- * En el embudo eso deja la última barra casi invisible —217 sobre 9.096— y así
+ * En el embudo eso deja la última barra casi invisible —eran 217 sobre 9.096 al
+ * 25-ago-2026— y así
  * tiene que ser: la conversión ES una astilla, y suavizarla mentiría. El piso
  * de 2px garantiza que la barra exista aunque el valor sea diminuto.
  */

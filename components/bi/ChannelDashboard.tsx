@@ -298,9 +298,20 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
           <b className="text-[var(--bi-ink-2)]">
             No hay desglose de leads por canal.
           </b>{" "}
+          {/* **Sin la cifra, no con la cifra vieja — A152.** Decía «las 9.096
+              fichas» en pantalla: era el conteo de hace semanas, hoy son 9.290,
+              y **el PDF que ya tiene Esteban dice 9.290**, así que el panel
+              contradecía al documento en sus manos. Este componente no recibe el
+              total de leads y pedirlo solo para una frase sería atarle una query
+              a un pie de página: lo que la frase necesita afirmar es que el campo
+              está vacío **siempre**, no en cuántas.
+
+              Y es la segunda mitad de un arreglo que hice a medias el 6-set: ese
+              mismo día corregí el «9.096» del docblock de arriba y **dejé éste**,
+              que es el único que alguien lee. §4.3 dentro del mismo archivo. */}
           El canal solo viene en las revisiones: en Airtable el campo de origen
-          está vacío en las 9.096 fichas, así que no se puede saber de qué canal
-          venía un lead que no se convirtió.
+          está vacío en <b>todas</b> las fichas, sin una sola excepción, así que
+          no se puede saber de qué canal venía un lead que no se convirtió.
         </p>
         <p className="mt-2">
           <b className="text-[var(--bi-ink-2)]">

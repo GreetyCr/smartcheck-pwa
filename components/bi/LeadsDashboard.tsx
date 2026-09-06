@@ -311,7 +311,7 @@ export function LeadsDashboard({
           tone="neutral"
           /* La base del titular sale del embudo, no de `leadsStats.total`: el
              embudo descarta los leads con borrado suave y `leadsStats` no. Hoy
-             ambos dan 9.096, pero el día que se retire uno, el denominador de
+             ambos dan lo mismo, pero el día que se retire uno, el denominador de
              la conversión y la cifra de portada tienen que seguir siendo el
              mismo número. La cobertura de abajo sí va sobre `leadsStats`, y lo
              dice en su subtítulo. */
@@ -340,7 +340,7 @@ export function LeadsDashboard({
           value={formatPct(funnel.convertedRatePct, 2)}
           /* `exact` lleva la base del porcentaje por la misma razón por la que
              en Finanzas lleva el monto sin abreviar: un número solo no se puede
-             verificar. 2,39% de nada no significa lo mismo que 2,39% de 9.096. */
+             verificar. 2,4% de nada no significa lo mismo que 2,4% de miles. */
           exact={`${formatInt(funnel.converted)} de ${formatInt(funnel.leadsTotal)} leads`}
           hint="Por teléfono"
         />
