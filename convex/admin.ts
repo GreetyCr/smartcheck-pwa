@@ -139,14 +139,31 @@ export const listAllInspections = query({
 
     let rows = await ctx.db.query("inspections").order("desc").collect();
 
+    /**
+     * **«Ya subida» es «ya subida», no «ya subida o entregada» — A150.**
+     *
+     * Este filtro ensanchaba `synced` a `synced || report_delivered`. En el
+     * panel eso es un error, porque el selector ofrece **las dos por separado**:
+     * elegir «Ya subida» devolvía filas cuya propia insignia decía «INFORME
+     * ENTREGADO», y las dos opciones se solapaban sin decirlo.
+     *
+     * Medido en producción el 6-set: de 172 revisiones en la app, **170 están
+     * entregadas y solo 2 subidas sin entregar**. O sea que el filtro devolvía
+     * 172 donde el rótulo prometía 2, y el desglose de la portada —que sí cuenta
+     * estricto— mostraba 2 al lado. **Mismo rótulo, dos universos** (A133 · A148
+     * · A149).
+     *
+     * Y es justo el corte que le sirve a Esteban: «subidas pero sin informe
+     * entregado» es su lista de pendientes; «todo lo que llegó al servidor» ya
+     * lo contesta «Todos los estados».
+     *
+     * **En `inspections.ts:list` el ensanche se queda y es correcto:** ahí filtra
+     * la app del técnico, cuyos chips **no tienen** «Informe entregado», así que
+     * sin el ensanche las entregadas desaparecerían de su lista. La diferencia
+     * es deliberada — no unificar.
+     */
     if (args.status !== undefined) {
-      rows = rows.filter((r) => {
-        const s = r.status ?? "draft";
-        if (args.status === "synced") {
-          return s === "synced" || s === "report_delivered";
-        }
-        return s === args.status;
-      });
+      rows = rows.filter((r) => (r.status ?? "draft") === args.status);
     }
     if (args.technicianClerkId) {
       rows = rows.filter((r) => r.clerkUserId === args.technicianClerkId);

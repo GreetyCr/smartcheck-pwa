@@ -121,8 +121,15 @@ export function BiKpiCard({
             <span>{delta.label}</span>
           </span>
         ) : null}
+        {/* **El hint también envuelve — A149.** A135 sacó el `truncate` de la
+            etiqueta de variación por comerse la parte informativa, y **no lo
+            sacó de acá**: el hint del retorno de la pauta —el que dice sobre
+            cuántas revisiones se calcula— quedaba en «sobre 573 de Mercadeo e…»,
+            perdiendo justo la base que lo vuelve legible. Mismo arreglo, mismo
+            motivo, un componente más allá: es el patrón de A134 y A142 otra vez,
+            y esta vez el que no lo propagó fui yo. */}
         {hint ? (
-          <span className="block truncate text-xs text-[var(--bi-ink-3)]">
+          <span className="block text-xs leading-snug text-[var(--bi-ink-3)]">
             {hint}
           </span>
         ) : null}

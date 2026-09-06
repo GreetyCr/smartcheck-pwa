@@ -657,10 +657,32 @@ export function LeadsDashboard({
           </div>
         </BiCard>
 
+        {/**
+         * **Los avisos NO siguen al periodo, y ahora lo dicen — A148.**
+         *
+         * `issuesByType` y `leadsPorRevisar` se calculan sobre **todos** los
+         * leads: el resto de la pantalla se angostaba con el filtro y estas dos
+         * cifras se quedaban quietas, sin una palabra que lo explicara. Un
+         * número que no se mueve mientras el de al lado sí se lee como
+         * congelado, o peor, como que el filtro no funciona.
+         *
+         * **Se decidió no filtrarlos, aunque se podría:** `leadsPorRevisarImpl`
+         * ya cruza el aviso con su lead, así que la fecha del contacto está a
+         * mano. Pero esto **no es una cuenta del periodo, es una lista de
+         * pendientes**: recortarla escondería leads que siguen mal solo porque
+         * entraron antes del lapso elegido, que es exactamente lo que A141
+         * prohibió al filtrar Calidad — un filtro no puede esconder lo
+         * accionable. Lo que faltaba era decirlo donde el número está (B44 ·
+         * A126 · A133 · A144).
+         */}
         <BiCard
           className="min-w-0"
           title="Avisos de calidad"
-          subtitle="Lo esperado va aparte de lo accionable"
+          subtitle={
+            funnel.conPeriodo
+              ? "Todo el histórico · lo esperado va aparte de lo accionable"
+              : "Lo esperado va aparte de lo accionable"
+          }
         >
           <div className="flex items-start gap-2.5">
             {actionableTotal > 0 ? (
@@ -715,6 +737,16 @@ export function LeadsDashboard({
                   en Airtable.
                 </p>
               ) : null}
+              {funnel.conPeriodo ? (
+                <p className="mt-2 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+                  <b className="text-[var(--bi-ink-2)]">
+                    Este bloque no sigue al periodo de arriba
+                  </b>
+                  : cuenta todos los leads, no solo los que entraron en ese
+                  lapso. Es lo que falta corregir en Airtable, y algo que sigue
+                  mal no deja de estarlo por haber entrado antes.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -762,7 +794,7 @@ export function LeadsDashboard({
 
       {/* ---------- listas consultables ---------- */}
       <div className="mt-4">
-        <LeadsPorRevisarCard data={porRevisar} />
+        <LeadsPorRevisarCard data={porRevisar} conPeriodo={funnel.conPeriodo} />
       </div>
 
       <div className="mt-4">

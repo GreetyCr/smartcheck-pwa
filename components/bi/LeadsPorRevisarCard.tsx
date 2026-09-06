@@ -97,7 +97,18 @@ const TD = "px-4 py-3 text-[13px]";
  * `lead_dup` no está acá a propósito (A26: ruido esperado, se marca y no se
  * fusiona). Meterlo ahogaría la lista con ~1.700 filas que nadie debe tocar.
  */
-export function LeadsPorRevisarCard({ data }: { data: LeadsPorRevisar }) {
+/**
+ * `conPeriodo` entra **opcional — A148**: la lista se calcula sobre todos los
+ * leads y no la mueve el filtro de arriba, así que hay que decirlo cuando hay
+ * uno puesto. Va opcional para no romper la ventana entre despliegues (A115).
+ */
+export function LeadsPorRevisarCard({
+  data,
+  conPeriodo = false,
+}: {
+  data: LeadsPorRevisar;
+  conPeriodo?: boolean;
+}) {
   const [tab, setTab] = useState<"telefonoRaro" | "sinLlave">("telefonoRaro");
   const [page, setPage] = useState(1);
 
@@ -150,7 +161,12 @@ export function LeadsPorRevisarCard({ data }: { data: LeadsPorRevisar }) {
     <BiCard
       className="min-w-0"
       title="Leads por revisar"
-      subtitle={`${formatInt(avisos)} avisos sobre ${formatInt(leadsDistintos)} leads · corregibles en Airtable`}
+      subtitle={
+        `${formatInt(avisos)} avisos sobre ${formatInt(leadsDistintos)} leads · ` +
+        (conPeriodo
+          ? "todo el histórico, no sigue al periodo · corregibles en Airtable"
+          : "corregibles en Airtable")
+      }
       bodyClassName="pt-0"
     >
       <div

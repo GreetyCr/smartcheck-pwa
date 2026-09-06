@@ -479,10 +479,20 @@ export const leadsStatsReturns = v.object({
     byStage: v.array(v.object({ stage: v.string(), rows: v.number() })),
     byChannel: v.array(v.object({ channel: v.string(), rows: v.number() })),
     /**
-     * **NO se recorta por periodo**: `bi_quality_issues` guarda el aviso, no el
-     * lead, así que filtrarlo exigiría un join que hoy no existe. Se devuelve
-     * global y la tarjeta lo rotula como tal — decirlo es barato, y un contador
-     * que cambia a medias con el filtro sería peor que uno que no cambia (A64).
+     * **NO se recorta por periodo, y desde A148 la tarjeta lo dice.**
+     *
+     * Este comentario decía que la tarjeta ya lo rotulaba. **No lo rotulaba**:
+     * el subtítulo hablaba de otra cosa y el número se quedaba quieto mientras
+     * el resto de la pantalla se angostaba con el filtro. Es el patrón que más
+     * vuelve —un recorte, o su ausencia, sin declarar su universo— y acá el
+     * comentario además lo daba por resuelto, que es como sobrevive.
+     *
+     * Y decía que filtrarlo «exigiría un join que hoy no existe». **Existe**:
+     * `leadsPorRevisarImpl` cruza `entityRef` con el lead y tiene la fecha del
+     * contacto a mano. **No se filtra por decisión, no por límite:** esto es
+     * una lista de pendientes de Airtable, no una cuenta del periodo, y
+     * recortarla escondería leads que siguen mal solo por haber entrado antes
+     * del lapso elegido (A141 · A64).
      */
     issuesByType: v.array(
       v.object({ issueType: v.string(), rows: v.number() }),

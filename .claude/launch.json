@@ -6,6 +6,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 3000
+    },
+    {
+      "//": "El build de producción local. Hace falta para medir y para las capturas del manual: `next dev` NO genera todo el CSS de Tailwind (faltan overflow-x-auto, sr-only y los min-w arbitrarios), así que el layout que se ve ahí no es el real. Correr `pnpm build` antes.",
+      "name": "smartcheck-pwa-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["start", "-p", "3100"],
+      "port": 3100
     }
   ]
 }

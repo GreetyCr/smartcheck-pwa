@@ -140,6 +140,22 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
           hint={`Sobre ${formatInt(data.totalRowsConMonto)} revisiones con cobro anotado`}
           tone="neutral"
         />
+        {/**
+         * **El KPI arrastra su base — A149.**
+         *
+         * Medido contra producción el 6-set: el KPI decía «₡9.402 de pauta por
+         * revisión de Mercadeo» y la lista de más abajo mostraba 17 meses que
+         * suman **663** revisiones de Mercadeo. ₡5.509.328 ÷ 663 = **₡8.310**.
+         * El denominador real del KPI es **586**, porque deja fuera los 3 meses
+         * con revisiones y sin pauta anotada (77 revisiones). **Dos números con
+         * el mismo rótulo en la misma pantalla, 13% aparte.**
+         *
+         * Las tres tarjetas de la izquierda hablan de **todos los canales**;
+         * ésta habla de **un canal en un subconjunto de meses**. El número está
+         * bien —incluir los meses sin gasto anotado abarataría el costo solo
+         * porque falta el dato— y lo que faltaba era decir sobre qué se calcula,
+         * donde se lee (B44 · A126 · A133 · A144 · A148).
+         */}
         <BiKpiCard
           index={3}
           label="Retorno de la pauta"
@@ -148,7 +164,7 @@ export function ChannelDashboard({ data }: { data: ChannelRevenue }) {
               ? `${publicidad.retornoPorColon.toLocaleString("es-CR")}×`
               : "—"
           }
-          hint={`₡${formatInt(publicidad.costoPorRevisionCRC)} de pauta por revisión de ${publicidad.canalAtribuido}`}
+          hint={`₡${formatInt(publicidad.costoPorRevisionCRC)} por revisión · sobre ${formatInt(publicidad.rowsAtribuidas)} de ${publicidad.canalAtribuido} en los ${publicidad.mesesConPauta} meses con pauta anotada`}
           tone="utilidad"
         />
       </div>
@@ -330,6 +346,22 @@ function PautaMensual({
     })
     .filter((f) => f.pauta > 0 || f.rev > 0);
 
+  /**
+   * **Los meses que el KPI no cuenta, y por qué no son todos lo mismo — A149.**
+   *
+   * Un mes con revisiones y sin pauta anotada queda fuera de la cuenta, y hasta
+   * hoy se declaraba solo como un conteo («hay 3 meses…»): el lector veía sus
+   * revisiones en la lista y no tenía forma de saber cuáles eran las que
+   * faltaban. Ahora se marcan **en la fila**, que es donde se leen.
+   *
+   * Y se separan dos cosas que el backend cuenta juntas: **«no se anotó el
+   * gasto»** y **«el mes todavía no cerró»**. El segundo no es un dato que
+   * falte, es un mes en curso — mezclarlos sugiere un descuido donde no lo hay.
+   */
+  const fueraDelKpi = filas.filter((f) => f.pauta === 0 && f.rev > 0);
+  const sinPautaAnotada = fueraDelKpi.filter((f) => !f.enCurso);
+  const revFuera = fueraDelKpi.reduce((s, f) => s + f.rev, 0);
+
   if (filas.length === 0) {
     return (
       <p className="text-xs text-[var(--bi-ink-3)]">
@@ -348,20 +380,42 @@ function PautaMensual({
           Pauta: <b className="text-[var(--bi-ink)]">{formatCRC(publicidad.totalCRC)}</b>
         </span>
         <span>
-          {publicidad.canalAtribuido}:{" "}
+          {publicidad.canalAtribuido} <span className="text-[var(--bi-ink-3)]">en esos meses</span>:{" "}
           <b className="text-[var(--bi-ink)]">{formatInt(publicidad.rowsAtribuidas)}</b>{" "}
           revisiones · {formatCRC(publicidad.ingresosAtribuidosCRC)}
         </span>
       </div>
 
-      {publicidad.mesesSinPautaRegistrada > 0 ? (
+      {fueraDelKpi.length > 0 ? (
         <p className="mb-4 rounded-xl border border-[var(--bi-warn)]/30 bg-[var(--bi-warn)]/[0.07] px-3 py-2 text-[12px] leading-relaxed text-[var(--bi-ink-2)]">
-          Hay <b className="text-[var(--bi-ink)]">{publicidad.mesesSinPautaRegistrada}</b>{" "}
-          {publicidad.mesesSinPautaRegistrada === 1 ? "mes" : "meses"} con
-          revisiones de {publicidad.canalAtribuido} y{" "}
-          <b className="text-[var(--bi-ink)]">sin pauta anotada</b> en la hoja.
-          Quedan fuera de esta cuenta: si entraran, el costo por revisión saldría
-          más barato de lo real solo porque falta el gasto.
+          {publicidad.canalAtribuido} tiene{" "}
+          <b className="text-[var(--bi-ink)]">{formatInt(publicidad.rowsCanalTotal)}</b>{" "}
+          revisiones en todo el periodo, pero la cuenta de arriba usa{" "}
+          <b className="text-[var(--bi-ink)]">{formatInt(publicidad.rowsAtribuidas)}</b>:
+          quedan fuera las{" "}
+          <b className="text-[var(--bi-ink)]">{formatInt(revFuera)}</b> de{" "}
+          {fueraDelKpi.length === 1 ? "un mes" : `${fueraDelKpi.length} meses`}{" "}
+          sin pauta que dividir, marcad{fueraDelKpi.length === 1 ? "o" : "os"} abajo.{" "}
+          {/* «En 2 de ellos» sobra cuando los dos son 2: solo se cualifica
+              cuando de verdad hay mezcla con el mes en curso. */}
+          {sinPautaAnotada.length > 0 ? (
+            <>
+              {sinPautaAnotada.length < fueraDelKpi.length
+                ? `En ${sinPautaAnotada.length} de ellos `
+                : ""}
+              <b className="text-[var(--bi-ink)]">
+                {sinPautaAnotada.length < fueraDelKpi.length
+                  ? "falta"
+                  : "Falta"}{" "}
+                anotar el gasto
+              </b>{" "}
+              en la hoja; si entrara, el costo por revisión saldría más barato de
+              lo real solo porque falta el dato.
+            </>
+          ) : null}
+          {fueraDelKpi.length > sinPautaAnotada.length
+            ? " El mes en curso no cuenta porque todavía no cerró."
+            : null}
         </p>
       ) : null}
 
@@ -381,11 +435,21 @@ function PautaMensual({
                 }}
               />
             </span>
-            <span className="bi-num w-[78px] shrink-0 text-right text-[12px] tabular-nums text-[var(--bi-ink)]">
+            <span
+              className="bi-num w-[78px] shrink-0 text-right text-[12px] tabular-nums text-[var(--bi-ink)]"
+              title={
+                f.costo === null && f.rev > 0
+                  ? "Sin pauta que dividir: este mes no entra en la cuenta de arriba"
+                  : undefined
+              }
+            >
               {f.costo === null ? "—" : formatCRC(f.costo)}
             </span>
-            <span className="bi-num hidden w-[128px] shrink-0 text-right text-[11px] tabular-nums text-[var(--bi-ink-3)] sm:block">
+            <span className="bi-num hidden w-[168px] shrink-0 text-right text-[11px] tabular-nums text-[var(--bi-ink-3)] sm:block">
               {formatCRC(f.pauta)} · {formatInt(f.rev)} rev.
+              {f.costo === null && f.rev > 0 ? (
+                <span className="ml-1.5 text-[var(--bi-warn)]">fuera</span>
+              ) : null}
             </span>
           </li>
         ))}
@@ -395,7 +459,14 @@ function PautaMensual({
         La barra es el <b className="text-[var(--bi-ink-2)]">costo de pauta por
         revisión</b> del mes: más corta es mejor. El mes en curso va traslúcido
         porque su gasto todavía no está completo y hace ver el costo más bajo de
-        lo que va a quedar.
+        lo que va a quedar.{" "}
+        {fueraDelKpi.length > 0 ? (
+          <>
+            Los marcados <b className="text-[var(--bi-warn)]">fuera</b> tienen
+            revisiones y no tienen pauta, así que no hay costo que calcular y no
+            entran en la cuenta de arriba.
+          </>
+        ) : null}
       </p>
     </div>
   );

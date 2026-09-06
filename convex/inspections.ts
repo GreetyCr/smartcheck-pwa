@@ -508,6 +508,19 @@ export const listByClerkUser = query({
     const { rows } = await inspectionsForCurrentUser(ctx);
     const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
 
+    /**
+     * **Acá «synced» SÍ incluye las entregadas, y es a propósito — A150.**
+     *
+     * Ésta es la lista del técnico, y sus chips (`InspectionFilters`) no ofrecen
+     * «Informe entregado»: sin el ensanche, una revisión entregada no aparecería
+     * en ningún filtro más que «Todos». Para él «sincronizado» significa «ya
+     * salió de mi teléfono», que es lo correcto en su flujo.
+     *
+     * **El panel hace lo contrario** (`admin.ts:listAllInspections`), porque su
+     * selector sí tiene las dos opciones por separado y ensancharlas las
+     * solapaba. La diferencia entre las dos superficies es deliberada: si un día
+     * parece una inconsistencia y se «unifica», se rompe una de las dos.
+     */
     let filtered = rows;
     if (args.status !== undefined) {
       filtered = rows.filter((r) => {
