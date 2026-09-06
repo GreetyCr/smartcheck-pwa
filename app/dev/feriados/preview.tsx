@@ -36,22 +36,162 @@ const BASE = {
 };
 
 const PANEL: FeriadosPanel = {
-  ...BASE,
-  anio: 2026,
-  delAnio: [
-    { fecha: "2026-01-01", nombre: "Año Nuevo", tipo: "obligatorio", diaSemana: "jueves", pasado: true, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-04-02", nombre: "Jueves Santo", tipo: "obligatorio", diaSemana: "jueves", pasado: true, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-04-03", nombre: "Viernes Santo", tipo: "obligatorio", diaSemana: "viernes", pasado: true, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-04-11", nombre: "Batalla de Rivas (Juan Santamaría)", tipo: "obligatorio", diaSemana: "sábado", pasado: true, revisiones: 1, revisionesApp: 0, revisionesHistorico: 1 },
-    { fecha: "2026-05-01", nombre: "Día Internacional del Trabajo", tipo: "obligatorio", diaSemana: "viernes", pasado: true, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-07-25", nombre: "Anexión del Partido de Nicoya", tipo: "obligatorio", diaSemana: "sábado", pasado: true, revisiones: 2, revisionesApp: 2, revisionesHistorico: 0 },
-    { fecha: "2026-08-02", nombre: "Virgen de los Ángeles", tipo: "no_obligatorio", diaSemana: "domingo", pasado: true, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-08-15", nombre: "Día de la Madre", tipo: "obligatorio", diaSemana: "sábado", pasado: true, revisiones: 2, revisionesApp: 2, revisionesHistorico: 0 },
-    { fecha: "2026-08-31", nombre: "Día de la Persona Negra y la Cultura Afrocostarricense", tipo: "no_obligatorio", diaSemana: "lunes", pasado: true, revisiones: 2, revisionesApp: 2, revisionesHistorico: 0 },
-    { fecha: "2026-09-15", nombre: "Independencia", tipo: "obligatorio", diaSemana: "martes", pasado: false, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-12-01", nombre: "Abolición del Ejército", tipo: "no_obligatorio", diaSemana: "martes", pasado: false, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
-    { fecha: "2026-12-25", nombre: "Navidad", tipo: "obligatorio", diaSemana: "viernes", pasado: false, revisiones: 0, revisionesApp: 0, revisionesHistorico: 0 },
+  "anio": 2026,
+  "aniosCubiertos": [
+    2025,
+    2026,
+    2027
   ],
+  "cubierto": true,
+  "delAnio": [
+    {
+      "diaSemana": "jueves",
+      "fecha": "2026-01-01",
+      "nombre": "Año Nuevo",
+      "pasado": true,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "jueves",
+      "fecha": "2026-04-02",
+      "nombre": "Jueves Santo",
+      "pasado": true,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "viernes",
+      "fecha": "2026-04-03",
+      "nombre": "Viernes Santo",
+      "pasado": true,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "sábado",
+      "fecha": "2026-04-11",
+      "nombre": "Batalla de Rivas (Juan Santamaría)",
+      "pasado": true,
+      "revisiones": 1,
+      "revisionesApp": 0,
+      "revisionesHistorico": 1,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "viernes",
+      "fecha": "2026-05-01",
+      "nombre": "Día Internacional del Trabajo",
+      "pasado": true,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "sábado",
+      "fecha": "2026-07-25",
+      "nombre": "Anexión del Partido de Nicoya",
+      "pasado": true,
+      "revisiones": 2,
+      "revisionesApp": 2,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "domingo",
+      "fecha": "2026-08-02",
+      "nombre": "Virgen de los Ángeles",
+      "pasado": true,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "no_obligatorio"
+    },
+    {
+      "diaSemana": "sábado",
+      "fecha": "2026-08-15",
+      "nombre": "Día de la Madre",
+      "pasado": true,
+      "revisiones": 2,
+      "revisionesApp": 2,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "lunes",
+      "fecha": "2026-08-31",
+      "nombre": "Día de la Persona Negra y la Cultura Afrocostarricense",
+      "pasado": true,
+      "revisiones": 2,
+      "revisionesApp": 2,
+      "revisionesHistorico": 0,
+      "tipo": "no_obligatorio"
+    },
+    {
+      "diaSemana": "martes",
+      "fecha": "2026-09-15",
+      "nombre": "Independencia",
+      "pasado": false,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "martes",
+      "fecha": "2026-12-01",
+      "nombre": "Abolición del Ejército",
+      "pasado": false,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "no_obligatorio"
+    },
+    {
+      "diaSemana": "viernes",
+      "fecha": "2026-12-25",
+      "nombre": "Navidad",
+      "pasado": false,
+      "revisiones": 0,
+      "revisionesApp": 0,
+      "revisionesHistorico": 0,
+      "tipo": "obligatorio"
+    }
+  ],
+  "note": "Feriados de Costa Rica con fechas explícitas por año (el 12 de octubre dejó de ser feriado con la Ley 9803; el traslado a lunes caducó en 2024). Pago obligatorio: se paga aunque no se trabaje, y doble si se trabaja (CT art. 152). Las revisiones salen de inspections_all, así que cuadran con el resto del tablero.",
+  "proximos": [
+    {
+      "diaSemana": "martes",
+      "faltanDias": 9,
+      "fecha": "2026-09-15",
+      "nombre": "Independencia",
+      "tipo": "obligatorio"
+    },
+    {
+      "diaSemana": "martes",
+      "faltanDias": 86,
+      "fecha": "2026-12-01",
+      "nombre": "Abolición del Ejército",
+      "tipo": "no_obligatorio"
+    },
+    {
+      "diaSemana": "viernes",
+      "faltanDias": 110,
+      "fecha": "2026-12-25",
+      "nombre": "Navidad",
+      "tipo": "obligatorio"
+    }
+  ],
+  "revisionesEnNoObligatorio": 2,
+  "revisionesEnObligatorio": 12,
+  "verificadoAl": "2026-09-01"
 };
 
 /** El año que la tabla no conoce: tiene que verse distinto de «no hay feriados». */

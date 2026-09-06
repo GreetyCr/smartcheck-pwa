@@ -21,11 +21,27 @@ import { DevAdminShell } from "./shell";
  * El tipo es el de la query real (`AdminMetrics`), así que si el backend cambia
  * de forma esta muestra deja de compilar en vez de mentir.
  */
+/**
+ * **Identidades inventadas, totales reales — y los totales importan.**
+ *
+ * `admin:getDashboardMetrics` exige sesión de admin y trae nombres de técnicos,
+ * así que esta muestra no se puede regenerar desde producción y sus personas
+ * son inventadas a propósito. **Pero sus totales tienen que cuadrar con los de
+ * verdad**, porque el bloque de arriba de esta misma pantalla sí sale de
+ * producción: hasta el 6-set decía «912 revisiones» arriba y «el total del
+ * histórico —887» quince centímetros más abajo. **En una sola captura**, que es
+ * como Esteban la va a ver en el manual.
+ *
+ * Al 6-set-2026: histórico 912, de la app 171, del CRM viejo 741 (912 − 741).
+ * El reparto por estado y por técnico se mantiene inventado —el manual necesita
+ * los cinco estados poblados para poder explicarlos— pero **escalado para que
+ * sume 171**, no un número suelto.
+ */
 const METRICS: AdminMetrics = {
   todayCount: 4,
   monthCount: 47,
-  pendingSyncCount: 3,
-  totalInspections: 812,
+  pendingSyncCount: 1,
+  totalInspections: 171,
   techniciansCount: 6,
   activeTechnicians: 4,
   last7Days: [
@@ -37,20 +53,25 @@ const METRICS: AdminMetrics = {
     { dayLabel: "mar 28", count: 11 },
     { dayLabel: "mié 29", count: 4 },
   ],
+  // Suman 171, igual que `totalInspections`. Antes sumaban 682 contra un total
+  // de 812: dos cifras de la misma pantalla que no se podían conciliar.
   byTechnician: [
-    { clerkId: "u1", name: "Esteban Vargas", count: 214 },
-    { clerkId: "u2", name: "Técnico 2", count: 168 },
-    { clerkId: "u3", name: "Técnico 3", count: 141 },
-    { clerkId: "u4", name: "Kevin Solano", count: 96 },
-    { clerkId: "u5", name: "María Fernández", count: 52 },
-    { clerkId: "u6", name: "Técnico 6", count: 11 },
+    { clerkId: "u1", name: "Esteban Vargas", count: 54 },
+    { clerkId: "u2", name: "Técnico 2", count: 42 },
+    { clerkId: "u3", name: "Técnico 3", count: 35 },
+    { clerkId: "u4", name: "Kevin Solano", count: 24 },
+    { clerkId: "u5", name: "María Fernández", count: 13 },
+    { clerkId: "u6", name: "Técnico 6", count: 3 },
   ],
+  // También suman 171. Los cinco estados quedan poblados a propósito: el
+  // capítulo de Inspecciones tiene que poder explicarlos todos, y en producción
+  // hoy solo hay dos con filas.
   byStatus: {
-    draft: 38,
-    completed: 122,
-    pending_sync: 3,
-    synced: 214,
-    report_delivered: 435,
+    draft: 8,
+    completed: 26,
+    pending_sync: 1,
+    synced: 45,
+    report_delivered: 91,
   },
 };
 
@@ -72,22 +93,22 @@ const METRICS: AdminMetrics = {
  *   npx convex run --prod bi/channels:channelRevenue '{}'
  */
 const RESUMEN: ExecutiveSummary = {
-  totalRevisiones: 887,
-  totalRevisionesSinPlaceholder: 887,
-  placeholderRows: 0,
-  revisionesConMonto: 887,
-  ingresosInspeccionesCRC: 52_794_284,
-  ingresosFinancierosCRC: 51_094_410,
-  gastosCRC: 30_344_054,
-  utilidadCRC: 20_750_356,
-  marginPct: 40.61,
-  leadsTotal: 9_096,
-  leadsWithPhone: 9_025,
-  convertidos: 217,
-  conversionPct: 2.39,
-  conversionPctOfPhoned: 2.4,
-  leadToClientePct: 2.39,
-  note: "Revisiones = inspections_all (unión+dedupe, A30). Ingresos titulares = finance_entries (P&L oficial, A16). Conversión titular = bi_matches banda alta+media (A29).",
+  "conversionPct": 2.42,
+  "conversionPctOfPhoned": 2.44,
+  "convertidos": 225,
+  "gastosCRC": 31379339,
+  "ingresosFinancierosCRC": 52909410,
+  "ingresosInspeccionesCRC": 54357284,
+  "leadToClientePct": 2.42,
+  "leadsTotal": 9290,
+  "leadsWithPhone": 9218,
+  "marginPct": 40.69,
+  "note": "Revisiones = inspections_all (unión+dedupe, A30). Ingresos titulares = finance_entries (P&L oficial, A16). Conversión titular = bi_matches banda alta+media (A29).",
+  "placeholderRows": 0,
+  "revisionesConMonto": 912,
+  "totalRevisiones": 912,
+  "totalRevisionesSinPlaceholder": 912,
+  "utilidadCRC": 21530071
 };
 
 const MESES: FinanceMonth[] = [
@@ -158,7 +179,7 @@ export function AdminShellPreview() {
         <div className="mt-10 border-t border-[var(--bi-ring)] pt-8">
           {/* El histórico es mayor que lo de la app, que es el caso real y el
               que dispara el aviso del universo (A133). */}
-          <AdminDashboard metrics={METRICS} revisionesHistorico={887} />
+          <AdminDashboard metrics={METRICS} revisionesHistorico={912} />
         </div>
       </div>
     </DevAdminShell>

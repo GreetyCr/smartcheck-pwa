@@ -12,6 +12,21 @@ import { cn } from "@/lib/utils";
  * importan del catálogo**, no se copian. Es a propósito: en las otras vistas de
  * muestra ya pasó dos veces que la copia a mano se desincronizara de la fuente.
  */
+/**
+ * **Los teléfonos de esta muestra son INVENTADOS, y tienen que seguir siéndolo.**
+ *
+ * Los avisos de Calidad pintan `ejemplos` en pantalla, y en producción esos
+ * ejemplos traen el teléfono real del lead: «phone8 84441492: 2 lead(s)…».
+ * Hasta el 6-set esta muestra tenía **tres teléfonos reales de clientes**,
+ * copiados de producción y **commiteados en un repo público**.
+ *
+ * Lo destapó la guarda de `herramientas/fixtures.py` al intentar regenerar esta
+ * página desde PROD — no lo vio ninguna de las dos rondas de QA. Van con el
+ * prefijo `6000000N`, que no corresponde a ningún teléfono de Costa Rica.
+ *
+ * **Consecuencia para el manual: Calidad NO se captura desde producción.** Es la
+ * tercera pantalla con datos de personas, además de Leads e Inspecciones.
+ */
 const CONTEOS = [
   {
     issueType: "reconciliation_gap",
@@ -35,7 +50,7 @@ const CONTEOS = [
     issueType: "ambiguous_match",
     sinResolver: 31,
     resueltos: 0,
-    ejemplos: ["phone8 84441492: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 72255322: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 63221644: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana"],
+    ejemplos: ["phone8 60000001: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 60000002: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 60000003: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana"],
   },
   {
     issueType: "lead_no_key",
