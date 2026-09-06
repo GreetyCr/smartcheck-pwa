@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * **Los teléfonos de esta muestra son INVENTADOS, y tienen que seguir siéndolo.**
  *
  * Los avisos de Calidad pintan `ejemplos` en pantalla, y en producción esos
- * ejemplos traen el teléfono real del lead: «phone8 84441492: 2 lead(s)…».
+ * ejemplos traen el teléfono real del lead: «teléfono 84441492: 2 contactos…».
  * Hasta el 6-set esta muestra tenía **tres teléfonos reales de clientes**,
  * copiados de producción y **commiteados en un repo público**.
  *
@@ -32,13 +32,13 @@ const CONTEOS = [
     issueType: "reconciliation_gap",
     sinResolver: 10,
     resueltos: 0,
-    ejemplos: ["gap 2026-07: finance=₡4546000 vs inspecciones=₡4937141 → Δ₡-391141 (-8.6%)", "gap 2026-05: finance=₡4376000 vs inspecciones=₡4130617 → Δ₡245383 (5.61%)", "gap 2026-04: finance=₡3971750 vs inspecciones=₡3163000 → Δ₡808750 (20.36%)"],
+    ejemplos: ["julio de 2026: la contabilidad dice ₡4.546.000 vs las revisiones suman ₡4.937.141 · diferencia de −₡391.141 (−8,6%)", "mayo de 2026: la contabilidad dice ₡4.376.000 vs las revisiones suman ₡4.130.617 · diferencia de ₡245.383 (5,61%)", "abril de 2026: la contabilidad dice ₡3.971.750 vs las revisiones suman ₡3.163.000 · diferencia de ₡808.750 (20,36%)"],
   },
   {
     issueType: "malformed_row",
     sinResolver: 1,
     resueltos: 0,
-    ejemplos: ["fila sin fecha ni nombre; monto='6833000'; excluida"],
+    ejemplos: ["fila sin fecha ni nombre; monto ₡6.833.000; excluida"],
   },
   {
     issueType: "anomalous_phone",
@@ -50,13 +50,13 @@ const CONTEOS = [
     issueType: "ambiguous_match",
     sinResolver: 31,
     resueltos: 0,
-    ejemplos: ["phone8 60000001: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 60000002: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana", "phone8 60000003: 2 lead(s) × 1 inspección(es); desambiguado por vehículo/ventana"],
+    ejemplos: ["teléfono 60000001: 2 contactos × 1 revisión; se decidió por la marca del carro y las fechas", "teléfono 60000002: 2 contactos × 1 revisión; se decidió por la marca del carro y las fechas", "teléfono 60000003: 2 contactos × 1 revisión; se decidió por la marca del carro y las fechas"],
   },
   {
     issueType: "lead_no_key",
     sinResolver: 31,
     resueltos: 0,
-    ejemplos: ["sin teléfono ni manychatId → dedupKey sintética", "sin teléfono ni manychatId → dedupKey sintética", "sin teléfono ni manychatId → dedupKey sintética"],
+    ejemplos: ["sin teléfono ni identificador de ManyChat: no hay con qué reconocerlo", "sin teléfono ni identificador de ManyChat: no hay con qué reconocerlo", "sin teléfono ni identificador de ManyChat: no hay con qué reconocerlo"],
   },
   {
     issueType: "currency_ambiguous",

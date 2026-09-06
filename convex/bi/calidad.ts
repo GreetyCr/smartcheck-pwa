@@ -252,6 +252,68 @@ const pct = (x: number, d: number) => (d > 0 ? Math.round((x / d) * 1000) / 10 :
  * Cómputo puro (recibe `ctx`), compartido por la internal y el wrapper público
  * — en Convex una `query` no puede llamar a otra (A41).
  */
+/**
+ * **El detalle del aviso, en las palabras del panel — A156.**
+ *
+ * `bi_quality_issues.detail` es la representación interna del aviso, y así tiene
+ * que quedarse: hay código que la **parsea** —`motivoTelefono` en `bi/leads.ts`
+ * saca de ahí por qué un teléfono no sirve— y otros la leen para auditar. Pero
+ * la pantalla de Calidad la pintaba **tal cual**, así que el dueño del negocio
+ * se encontraba con:
+ *
+ *     gap 2026-07: finance=₡4546000 vs inspecciones=₡4937141 → Δ₡-391141 (-8.6%)
+ *
+ * Tres cosas mal a la vez: vocabulario de desarrollador (`gap`, `finance=`,
+ * `phone8`, `Δ`), montos sin separador de miles donde todo el panel escribe
+ * `₡4.546.000`, y el decimal con punto donde el resto usa coma. Es la pantalla
+ * que se abre **cuando algo huele raro**, o sea la peor para encontrar sintaxis
+ * ajena.
+ *
+ * Se traduce acá y no en el origen porque `calidadImpl` existe para alimentar
+ * una pantalla; el dato guardado no cambia.
+ */
+function enCristiano(detalle: string): string {
+  return detalle
+    .replace(/^gap (\d{4})-(\d{2}):/, (_m, a, mm) => `${MESES[Number(mm) - 1]} de ${a}:`)
+    .replace(/\bfinance=/g, "la contabilidad dice ")
+    .replace(/\binspecciones=/g, "las revisiones suman ")
+    .replace(/→ Δ/g, "· diferencia de ")
+    .replace(/\bphone8 /g, "teléfono ")
+    .replace(/^tel no normalizable: '(.*)'$/, (_m, v) =>
+      v ? `el teléfono «${v}» no se puede leer como número de 8 dígitos`
+        : "el contacto no trae teléfono")
+    .replace(/no normalizable a (\d+) díg/g, "no se pudo leer como 8 dígitos ($1)")
+    .replace(/sin teléfono ni manychatId → dedupKey sintética/g,
+      "sin teléfono ni identificador de ManyChat: no hay con qué reconocerlo")
+    .replace(/\bmanychatId\b/g, "identificador de ManyChat")
+    .replace(/\bPSID\b/g, "identificador de Messenger")
+    // «1 revisiones» se lee como un descuido. El número va pegado al sustantivo.
+    .replace(/(\d+) inspección\(es\)/g, (_m, n) =>
+      `${n} ${n === "1" ? "revisión" : "revisiones"}`)
+    .replace(/(\d+) lead\(s\)/g, (_m, n) =>
+      `${n} ${n === "1" ? "contacto" : "contactos"}`)
+    .replace(/desambiguado por vehículo\/ventana/g,
+      "se decidió por la marca del carro y las fechas")
+    .replace(/\bmonto='(\d+)'/g, (_m, n) => `monto ₡${miles(n)}`)
+    // Montos sin separador: ₡4546000 → ₡4.546.000. Va después de los reemplazos
+    // de palabras para no tocar lo que ya venía formateado.
+    .replace(/₡(-?)(\d{4,})/g, (_m, signo, n) => `${signo ? "−" : ""}₡${miles(n)}`)
+    // Decimal con punto → coma, solo dentro de porcentajes.
+    .replace(/\((-?)(\d+)\.(\d+)%\)/g, (_m, signo, ent, dec) =>
+      `(${signo ? "−" : ""}${ent},${dec}%)`);
+}
+
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre",
+] as const;
+
+/** Puntos de miles, como el resto del panel. */
+function miles(n: string): string {
+  return n.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+
 export async function calidadImpl(ctx: QueryCtx) {
   /* --- Avisos, agrupados por tipo ---------------------------------------- */
   type Acum = { sinResolver: number; resueltos: number; ejemplos: string[] };
@@ -296,7 +358,8 @@ export async function calidadImpl(ctx: QueryCtx) {
     const a = porTipo.get(tipo) ?? { sinResolver: 0, resueltos: 0, ejemplos: [] };
     if (i.resolved) a.resueltos++;
     else a.sinResolver++;
-    if (!i.resolved && a.ejemplos.length < 3 && i.detail) a.ejemplos.push(i.detail);
+    if (!i.resolved && a.ejemplos.length < 3 && i.detail)
+      a.ejemplos.push(enCristiano(i.detail));
     porTipo.set(tipo, a);
   }
 

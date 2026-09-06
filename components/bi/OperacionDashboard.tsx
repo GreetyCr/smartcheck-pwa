@@ -103,8 +103,23 @@ export function OperacionDashboard({ data }: { data: Operacion }) {
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.3fr_1fr]">
         {/* ---------- lo que más sale ---------- */}
         <BiCard
-          title="Lo que más aparece"
-          subtitle="Sobre las veces que cada punto se revisó, no sobre el total"
+          /**
+           * **El título dice lo que la lista de verdad ordena — A156.**
+           *
+           * Decía «Lo que más aparece» y la lista va ordenada **por tasa**, no
+           * por cuántas veces apareció: el punto que encabezaba salía 41 veces y
+           * había dos que salían 43; y uno con 5 hallazgos se pintaba encima de
+           * dos con 19.
+           *
+           * Se cambió el rótulo y no el orden, a propósito: la pregunta útil
+           * para revisar mejor un carro es **«de las veces que miro esto,
+           * cuántas está mal»**. Ordenar por cuántas veces salió lo gana siempre
+           * el punto que se revisa en todos los carros. El subtítulo ya explicaba
+           * el denominador; lo que faltaba era que el título no prometiera otra
+           * cosa.
+           */
+          title="Lo que más falla cuando se revisa"
+          subtitle="Ordenado por qué tan seguido falla, no por cuántas veces salió"
           action={
             <Wrench className="size-4 shrink-0 text-[var(--bi-ink-3)]" aria-hidden />
           }

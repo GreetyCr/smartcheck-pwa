@@ -600,6 +600,46 @@ export function LeadsDashboard({
               </tfoot>
             </table>
           </div>
+          {/**
+            * **La resta, escrita — A156.**
+            *
+            * Las dos filas de teléfono dicen «Sí» y suman 242; el pie dice «225
+            * cuentan». Los 17 de diferencia estaban explicados en pantalla, sí,
+            * pero **en otras dos tarjetas y en prosa** — nunca en esta tabla, que
+            * es la que invita a sumar sus propias filas.
+            *
+            * Y el error que provoca no es inocente: 242 contra 225 es un 7,6% de
+            * más sobre el número con el que Esteban juzga si la pauta sirve. El
+            * diccionario que ya recibió le advierte justo de esto en la entrada
+            * «Recompra».
+            */}
+          {funnel.recompras + funnel.placeholderMatches > 0 ? (
+            <p className="mt-3 border-t border-[var(--bi-ring)] pt-3 text-xs leading-relaxed text-[var(--bi-ink-3)]">
+              <b className="text-[var(--bi-ink-2)]">
+                Las filas que dicen «Sí» suman más que el total, y es correcto.
+              </b>{" "}
+              De ésas se descuentan{" "}
+              <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+                {formatInt(funnel.recompras)}
+              </span>{" "}
+              {funnel.recompras === 1 ? "recompra" : "recompras"} —gente que ya
+              era cliente y volvió a escribir—
+              {funnel.placeholderMatches > 0 ? (
+                <>
+                  {" "}y{" "}
+                  <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+                    {formatInt(funnel.placeholderMatches)}
+                  </span>{" "}
+                  sin cobro real
+                </>
+              ) : null}
+              . Por eso el total dice{" "}
+              <span className="bi-num tabular-nums text-[var(--bi-ink-2)]">
+                {formatInt(funnel.converted)}
+              </span>{" "}
+              y no la suma de arriba.
+            </p>
+          ) : null}
         </BiCard>
 
         <BiCard

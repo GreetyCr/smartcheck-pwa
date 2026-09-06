@@ -227,6 +227,14 @@ export function PayrollMonthCard({
    */
   const vigencia = guardado?.vigencia;
   const todosLosFeriados = guardado?.feriadosDetectados.detalle ?? [];
+  /** Quiénes trabajaron feriado obligatorio este mes. Ver A156. */
+  const tecnicosEnFeriado = [
+    ...new Set(
+      todosLosFeriados
+        .filter((f) => f.tipo === "obligatorio")
+        .map((f) => f.tecnico),
+    ),
+  ];
   const detectados = todosLosFeriados.filter((f) => f.tipo === "obligatorio");
   /** Trabajados pero **de pago no obligatorio**: no generan recargo. */
   const noObligatorios = todosLosFeriados.filter((f) => f.tipo !== "obligatorio");
@@ -436,13 +444,39 @@ export function PayrollMonthCard({
                       </li>
                     ))}
                   </ul>
+                  {/**
+                    * **La frase decía «un día por feriado» y no es eso — A156.**
+                    *
+                    * `pagosTecnico` cuenta **un día por cada par fecha×técnico**:
+                    * si dos personas trabajan el mismo 25 de diciembre son dos
+                    * días, y eso es correcto **para la empresa**. Pero este
+                    * número entra en la planilla de **una sola persona**, así que
+                    * propondría dos días del salario de Sergio por un feriado que
+                    * trabajaron dos.
+                    *
+                    * Hoy no hay plata mal pagada —hay un solo técnico— pero la
+                    * frase era justo la que le decía a Esteban que el número
+                    * estaba bien. Confirmaba contra una explicación falsa.
+                    *
+                    * Se arregla diciendo la verdad y **avisando cuando hay más de
+                    * un técnico**, que es cuando el número deja de servir tal
+                    * cual. Filtrar por técnico exigiría que la planilla supiera a
+                    * quién le paga, y hoy no tiene ese campo. */}
                   <p className="mt-1.5 text-[var(--bi-ink-3)]">
-                    El sistema cuenta <b>un día por feriado</b>, que es lo que
-                    puede saber: ve que hubo revisiones, no cuántas horas. Si
-                    trabajó <b>medio día</b>, poné <b>0,5</b>; también podés
-                    subirlo si trabajó un feriado sin hacer revisiones, o
-                    bajarlo si no le corresponde.
+                    El sistema cuenta <b>un día por cada feriado que un técnico
+                    trabajó</b>, que es lo que puede saber: ve que hubo
+                    revisiones, no cuántas horas. Si trabajó <b>medio día</b>,
+                    poné <b>0,5</b>; también podés subirlo si trabajó un feriado
+                    sin hacer revisiones, o bajarlo si no le corresponde.
                   </p>
+                  {tecnicosEnFeriado.length > 1 ? (
+                    <p className="mt-1.5 rounded-lg border border-[var(--bi-warn)]/40 bg-[var(--bi-warn)]/10 px-3 py-2 text-[var(--bi-warn)]">
+                      <b>Ojo: trabajaron {tecnicosEnFeriado.length} personas</b> —
+                      {" "}{tecnicosEnFeriado.join(", ")}. El número de arriba las
+                      suma a todas, y esta planilla le paga a una sola. Dejá solo
+                      los días que le corresponden a quien estás pagando.
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <p className="text-[var(--bi-ink-3)]">
