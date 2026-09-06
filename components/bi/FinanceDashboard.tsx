@@ -18,7 +18,6 @@ import { BiCategoryBars } from "./BiCategoryBars";
 import {
   ExpenseGroupsCard,
   type ExpenseBreakdown,
-  type PeriodoKey,
 } from "./ExpenseGroupsCard";
 import { BiEntriesTable } from "./BiEntriesTable";
 import { BiEntryDrawer } from "./BiEntryDrawer";
@@ -49,8 +48,6 @@ export function FinanceDashboard({
   loadingEntries = false,
   readOnly = false,
   expenseBreakdown,
-  periodoGastos,
-  onPeriodoGastos,
   conciliacion,
   contrasteHoja,
 }: {
@@ -66,8 +63,6 @@ export function FinanceDashboard({
   /** Desglose de gastos por proveedor (A83/A98). Si no llega, no se pinta. */
   expenseBreakdown?: ExpenseBreakdown;
   /** Periodo del desglose. Sin estas dos, la tarjeta no muestra el filtro. */
-  periodoGastos?: PeriodoKey;
-  onPeriodoGastos?: (p: PeriodoKey) => void;
   /** Conciliación finanzas ↔ revisiones (mitad de RF-05). Si no llega, no se pinta. */
   conciliacion?: Reconciliation;
   /** Contraste hoja ↔ Convex (A56). Si no llega, no se pinta. */
@@ -389,8 +384,11 @@ export function FinanceDashboard({
         {expenseBreakdown ? (
           <ExpenseGroupsCard
             data={expenseBreakdown}
-            periodo={periodoGastos}
-            onPeriodo={onPeriodoGastos}
+            /* Sin control propio — A158. Sigue al periodo de la barra y al mes
+               elegido, igual que las otras dos tarjetas de gasto. */
+            alcance={
+              selectedMonth ? formatMonthLong(selectedMonth) : "Todo el periodo"
+            }
           />
         ) : null}
       </div>

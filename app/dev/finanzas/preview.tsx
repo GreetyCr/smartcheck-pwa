@@ -603,9 +603,6 @@ const CONTRASTE: ContrasteHoja = {
 
 export function FinanzasPreview() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>("2026-07");
-  /* El filtro cambia de pestaña pero NO refiltra: la muestra es estática. Se
-     incluye para poder aprobar el control, no para simular la consulta. */
-  const [periodo, setPeriodo] = useState<PeriodoKey>("todo");
 
   return (
     <>
@@ -624,8 +621,6 @@ export function FinanzasPreview() {
           expenseBreakdown={DESGLOSE_OTROS}
           conciliacion={CONCILIACION}
           contrasteHoja={CONTRASTE}
-          periodoGastos={periodo}
-          onPeriodoGastos={setPeriodo}
           summary={SUMMARY}
           entries={ENTRIES}
           selectedMonth={selectedMonth}

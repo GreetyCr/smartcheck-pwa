@@ -3,7 +3,6 @@
 import { TriangleAlert } from "lucide-react";
 import { BiCard } from "@/components/bi/BiCard";
 import { categoryLabel, formatCRC, formatPct } from "@/lib/bi-format";
-import { cn } from "@/lib/utils";
 
 export type EtiquetaGrupo = {
   etiqueta: string;
@@ -79,6 +78,24 @@ export function rangoAnterior(
   return { fromMs: desde.getTime(), toMs: actual.fromMs };
 }
 
+/**
+ * `[desde, hasta)` de **un mes** (`"2026-07"`), en zona de Costa Rica — A158.
+ *
+ * Vive acá y no en la página porque es el par del `rangoDelPeriodo` de arriba:
+ * el desglose se pide con uno o con otro según haya un mes elegido, y tenerlos
+ * juntos es lo que evita que uno de los dos se corra medio día.
+ */
+export function rangoDelMes(yearMonth: string): {
+  fromMs: number;
+  toMs: number;
+} {
+  const [y, m] = yearMonth.split("-").map(Number);
+  // Las 6 UTC son la medianoche de Costa Rica, igual que `rangoDelPeriodo`.
+  const desde = Date.UTC(y, m - 1, 1, 6);
+  const hasta = Date.UTC(y, m, 1, 6);
+  return { fromMs: desde, toMs: hasta };
+}
+
 export type ExpenseBreakdown = {
   categorias: string[];
   totalCRC: number;
@@ -118,17 +135,16 @@ const NOMBRES: Record<string, string> = {
  */
 export function ExpenseGroupsCard({
   data,
-  periodo,
-  onPeriodo,
+  alcance,
 }: {
   data: ExpenseBreakdown;
-  periodo?: PeriodoKey;
-  onPeriodo?: (p: PeriodoKey) => void;
+  /** Sobre qué está hecho el desglose: «julio 2026» o «Todo el periodo». */
+  alcance?: string;
 }) {
   // Sin filas puede ser que no haya gastos… o que el periodo elegido no tenga.
   // En el segundo caso esconder la tarjeta dejaría al usuario sin forma de
   // volver atrás, así que solo se oculta cuando no hay filtro.
-  if (data.totalRows === 0 && !onPeriodo) return null;
+  if (data.totalRows === 0) return null;
 
   const clasificados = data.grupos.filter((g) => g.grupo !== "sin_clasificar");
   const sinClasificar = data.grupos.find((g) => g.grupo === "sin_clasificar");
@@ -137,32 +153,14 @@ export function ExpenseGroupsCard({
   return (
     <BiCard
       title="En qué se va el gasto"
-      subtitle={`${formatCRC(data.totalCRC)} en ${data.totalRows} movimientos · ${data.categorias
+      /* El alcance va primero: es lo que Esteban preguntó —«¿y por mes?»— y lo
+         que antes contestaba un control propio con las mismas cuatro opciones
+         que la barra de arriba (A158). */
+      subtitle={`${alcance ?? "Todo el periodo"} · ${formatCRC(
+        data.totalCRC,
+      )} en ${data.totalRows} movimientos · ${data.categorias
         .map((c) => categoryLabel(c))
         .join(" + ")}`}
-      action={
-        onPeriodo ? (
-          <div className="flex shrink-0 gap-1" role="group" aria-label="Periodo">
-            {PERIODOS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => onPeriodo(p.key)}
-                aria-pressed={periodo === p.key}
-                className={cn(
-                  "min-h-8 rounded-lg px-2.5 text-[12px] font-medium transition-colors",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bi-income)]",
-                  periodo === p.key
-                    ? "bg-[var(--bi-surface-2)] text-[var(--bi-ink)]"
-                    : "text-[var(--bi-ink-3)] hover:text-[var(--bi-ink-2)]",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        ) : null
-      }
     >
       {data.totalRows === 0 ? (
         <p className="text-[13px] text-[var(--bi-ink-3)]">
